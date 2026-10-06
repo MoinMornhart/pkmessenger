@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, shell, session, Menu, autoUpdater } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, session, Menu, autoUpdater, safeStorage } = require('electron');
 
 // Squirrel-Installer (Windows): beim Installieren/Deinstallieren Verknüpfungen anlegen und sofort beenden.
 if (handleSquirrelEvent()) return;
@@ -13,6 +13,7 @@ const { ensureEnvFile } = require('./env');
 const { registerIpc } = require('./ipc');
 const { createUpdater, parseRepo } = require('./updater');
 const { createVoiceManager } = require('./voice');
+const { createTokenStore } = require('./secrets');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -47,10 +48,13 @@ function broadcast(type, payload) {
 }
 
 // EINE Client-Instanz für alle Fenster.
+// Token-Tresor: verschlüsselt (Windows DPAPI über safeStorage) in %APPDATA%\PKMessenger\token.enc; .env wird übernommen + gelöscht.
+const tokenStore = demo ? null : createTokenStore({ safeStorage, filePath: path.join(app.getPath('userData'), 'token.enc'), envPath: ENV_PATH });
 const service = createDiscordService({
   discord,
   envPath: ENV_PATH,
   emit: broadcast,
+  ...(tokenStore ? { getToken: () => tokenStore.load() } : {}),
   ...(demo ? { createClient: demo.createClient, statusExtra: { demo: true } } : {}),
 });
 const store = createStore(path.join(app.getPath('userData'), demo || SHOTS_ARG ? 'settings-dev-demo.json' : 'settings.json'));
@@ -161,7 +165,7 @@ app.whenReady().then(() => {
     cb(perm === 'media' && audioOnly && isOwnUrl(details.requestingUrl));
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore }, isTrustedSender);
   createWindow();
   service.connect(); // async – blockiert das Fenster nicht
   updater.start();

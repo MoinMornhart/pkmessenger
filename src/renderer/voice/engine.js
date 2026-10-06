@@ -3,6 +3,7 @@
 //  Opus-Pakete der anderen → WebCodecs-Opus-Decoder je Sprecher → Lautsprecher (mit kleinem Jitter-Puffer)
 // Es wird nichts gespeichert oder aufgezeichnet.
 import { voicePacket, onVoiceAudio } from '../api';
+import { prefs } from '../prefs';
 import { SAMPLE_RATE, FRAME_SAMPLES, CHANNELS, createFrameAssembler, rms, nextPlayTime } from '../../shared/audio-frames';
 
 const OPUS_CONFIG = { codec: 'opus', sampleRate: SAMPLE_RATE, numberOfChannels: CHANNELS, bitrate: 64000, opus: { frameDuration: 20000 } };
@@ -27,21 +28,46 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
   const decoders = new Map(); // userId → { decoder, until, ts }
   let offAudio = null;
 
+  function applyOutput(p) {
+    if (!ctx) return;
+    if (master) master.gain.value = p.volume;
+    // Lautsprecher-Auswahl (Chromium: AudioContext.setSinkId); '' = Windows-Standard
+    if (typeof ctx.setSinkId === 'function') ctx.setSinkId(p.outputDeviceId || '').catch(() => {});
+  }
+
   function ensureContext() {
     if (!ctx) {
       ctx = new AudioContext({ sampleRate: SAMPLE_RATE, latencyHint: 'interactive' });
       master = ctx.createGain();
       master.connect(ctx.destination);
+      applyOutput(prefs.get());
     }
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
   }
 
+  let lastMic = prefs.get().micDeviceId;
+  const offPrefs = prefs.subscribe((p) => {
+    applyOutput(p);
+    // Anderes Mikrofon gewählt, während das Mikro an ist → nahtlos umschalten
+    if (p.micDeviceId !== lastMic) {
+      lastMic = p.micDeviceId;
+      if (mic) {
+        stopMic();
+        startMic().catch(() => {});
+      }
+    }
+  });
+
   // ---------- Sprechen ----------
   async function startMic() {
     if (mic) return;
     const c = ensureContext();
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }, video: false });
+    const micId = prefs.get().micDeviceId;
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, ...(micId ? { deviceId: { ideal: micId } } : {}) },
+      video: false,
+    });
     try {
       await c.audioWorklet.addModule('voice-worklet.js');
     } catch {
@@ -156,6 +182,7 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
   }
 
   function destroy() {
+    offPrefs();
     stopMic();
     setPlayback(false);
     if (ctx) ctx.close();

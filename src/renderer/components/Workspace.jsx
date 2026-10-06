@@ -8,6 +8,8 @@ import ChatList from './ChatList.jsx';
 import ChatView from './ChatView.jsx';
 import QuickSwitcher from './QuickSwitcher.jsx';
 import CallView from './CallView.jsx';
+import AccessDialog from './AccessDialog.jsx';
+import SettingsDialog from './SettingsDialog.jsx';
 import { useVoice } from '../voice/useVoice';
 
 const TYPING_MS = 10000;
@@ -26,6 +28,11 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [previews, setPreviews] = useState({});
   const [unreadCounts, setUnreadCounts] = useState({});
   const [now, setNow] = useState(() => Date.now());
+  const [accessByGuild, setAccessByGuild] = useState({});
+  const [accessOpen, setAccessOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const lastRefresh = useRef(0);
   const activeRef = useRef(null);
   activeRef.current = channelId;
 
@@ -39,7 +46,11 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const loadChannels = useCallback(async (gid) => {
     try {
       const groups = await api.listChannels({ guildId: gid });
-      setChannelsByGuild((m) => ({ ...m, [gid]: groups }));
+      setChannelsByGuild((m) => ({ ...m, [gid]: Array.isArray(groups) ? groups : [] }));
+      api
+        .channelAccess({ guildId: gid })
+        .then((a) => setAccessByGuild((m) => ({ ...m, [gid]: a })))
+        .catch(() => {});
       api
         .getPreviews({ guildId: gid })
         .then((p) => setPreviews((old) => {
@@ -236,6 +247,37 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     [channelsByGuild, isUnread],
   );
 
+  // ---------- Aktualisieren (Issue #1) ----------
+  const refresh = useCallback(
+    async ({ silent = false } = {}) => {
+      if (refreshing) return;
+      lastRefresh.current = Date.now();
+      setRefreshing(true);
+      try {
+        const res = await api.refresh(guildId ? { guildId } : {});
+        await loadGuilds();
+        if (!silent) {
+          if (res?.failed?.length) toast({ kind: 'warn', title: 'Teilweise aktualisiert', text: `Nicht erreichbar: ${res.failed.join(', ')}` });
+          else toast({ kind: 'info', title: 'Aktualisiert ✓', text: 'Kanäle und Rechte sind auf dem neuesten Stand.', duration: 2500 });
+        }
+      } catch (e) {
+        if (!silent) toast({ kind: 'error', title: e.message, text: e.hint });
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    [refreshing, guildId, loadGuilds, toast],
+  );
+
+  // Zurück ins Fenster → still aktualisieren (höchstens 1× pro Minute)
+  useEffect(() => {
+    const onFocus = () => {
+      if (Date.now() - lastRefresh.current > 60000) refresh({ silent: true });
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [refresh]);
+
   const invite = useCallback(async () => {
     const url = await api.getInviteUrl().catch(() => null);
     if (url) api.openExternal({ url });
@@ -312,7 +354,24 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           voice={voiceCtl.voice}
           onToggleMic={voiceCtl.toggleMic}
           onLeaveVoice={voiceCtl.leave}
+          onRefresh={() => refresh()}
+          refreshing={refreshing}
+          access={accessByGuild[guildId]}
+          onShowAccess={() => setAccessOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
+        {accessOpen && (
+          <AccessDialog
+            access={accessByGuild[guildId]}
+            guildName={guild?.name || ''}
+            onClose={() => setAccessOpen(false)}
+            onRefresh={() => {
+              setAccessOpen(false);
+              refresh();
+            }}
+          />
+        )}
+        {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} />}
         {channel?.type === 'voice' ? (
           <CallView
             channel={channel}

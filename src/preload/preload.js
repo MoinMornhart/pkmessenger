@@ -40,6 +40,11 @@ contextBridge.exposeInMainWorld('api', {
   setReadMarker: call('pk:set-read-marker'),
   setLastLocation: call('pk:set-last-location'),
   openExternal: call('pk:open-external'),
+  tokenInfo: call('pk:token-info'),
+  tokenSave: call('pk:token-save'),
+  tokenClear: call('pk:token-clear'),
+  refresh: call('pk:refresh'),
+  channelAccess: call('pk:channel-access'),
   // Sprachkanäle
   listVoiceMembers: call('pk:list-voice-members'),
   voiceState: call('pk:voice-state'),

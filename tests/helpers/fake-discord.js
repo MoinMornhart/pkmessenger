@@ -171,6 +171,16 @@ function createFakeWorld({ loginBehavior = 'ready' } = {}) {
   };
   guild.channels = { cache: new Map([[category.id, category], ...Object.values(channels).map((c) => [c.id, c])]) };
   guild.voiceStates = { cache: new Map() };
+  // REST-Nachladen (für "Aktualisieren"): zählt Aufrufe, kann zum Scheitern gebracht werden.
+  guild.refreshCalls = [];
+  guild.refreshShouldFail = false;
+  const track = (name) => async () => {
+    guild.refreshCalls.push(name);
+    if (guild.refreshShouldFail) throw new Error('Missing Access');
+  };
+  guild.members.fetchMe = track('fetchMe');
+  guild.roles.fetch = track('roles');
+  guild.channels.fetch = track('channels');
   guild.voiceAdapterCreator = () => ({ sendPayload: () => true, destroy: () => {} });
   client.guilds = { cache: new Map([[GUILD_ID, guild]]) };
   client.channels = { cache: guild.channels.cache };

@@ -18,7 +18,7 @@ const FATAL_CLOSE_CODES = new Set([4004, 4010, 4011, 4012, 4013, 4014]);
  * @param {(type: string, payload: any) => void} opts.emit  Events an den Renderer
  * @param {() => object} [opts.createClient]  Fabrik für den Client (Tests)
  */
-function createDiscordService({ discord, envPath, emit, createClient, loginTimeoutMs = LOGIN_TIMEOUT_MS, statusExtra = {} }) {
+function createDiscordService({ discord, envPath, emit, createClient, loginTimeoutMs = LOGIN_TIMEOUT_MS, statusExtra = {}, getToken = () => loadToken(envPath) }) {
   const { GatewayIntentBits, PermissionFlagsBits, ChannelType, Events, RESTEvents } = discord;
   const TEXT_TYPES = new Set([ChannelType.GuildText, ChannelType.GuildAnnouncement]);
   // Sprachkanäle (Stage-Kanäle bewusst nicht – dort gelten Sprecher-Regeln).
@@ -121,19 +121,19 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     c.on(Events.Error, (err) => emit('log', { level: 'error', message: describeError(err).message }));
 
     c.on(Events.MessageCreate, (msg) => {
-      if (!msg.guildId) return; // keine DMs (nicht Teil des Produkts)
+      if (!msg?.guildId) return; // keine DMs (nicht Teil des Produkts)
       emit('message:create', serializeMessage(msg));
     });
     c.on(Events.MessageUpdate, (_old, msg) => {
-      if (!msg.guildId || msg.partial) return;
+      if (!msg?.guildId || msg.partial) return;
       emit('message:update', serializeMessage(msg));
     });
     c.on(Events.MessageDelete, (msg) => {
-      if (!msg.guildId) return;
+      if (!msg?.guildId || !msg.id) return;
       emit('message:delete', { id: msg.id, channelId: msg.channelId });
     });
     c.on(Events.TypingStart, (typing) => {
-      if (!typing.guild || typing.user?.id === c.user?.id) return;
+      if (!typing?.guild || !typing.channel?.id || !typing.user?.id || typing.user.id === c.user?.id) return;
       emit('typing', {
         channelId: typing.channel.id,
         userId: typing.user.id,
@@ -149,8 +149,17 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     c.on(Events.ChannelUpdate, (_o, ch) => channelsChanged(ch));
     c.on(Events.ChannelDelete, channelsChanged);
     c.on(Events.GuildRoleUpdate, (role) => emit('channels:changed', { guildId: role.guild.id }));
+    // Rechte des Bots können sich ändern (neue Rolle, Rolle gelöscht) → Kanalliste neu berechnen (Issue #1).
+    c.on(Events.GuildMemberUpdate, (_old, member) => {
+      if (member?.id && member.id === c.user?.id) emit('channels:changed', { guildId: member.guild?.id ?? null });
+    });
+    c.on(Events.GuildRoleCreate, (role) => emit('channels:changed', { guildId: role?.guild?.id ?? null }));
+    c.on(Events.GuildRoleDelete, (role) => emit('channels:changed', { guildId: role?.guild?.id ?? null }));
     // Wer ist in welchem Sprachkanal? Renderer lädt die Liste daraufhin neu.
-    c.on(Events.VoiceStateUpdate, (_old, now) => emit('voice:members', { guildId: now.guild.id }));
+    c.on(Events.VoiceStateUpdate, (old, now) => {
+      const guildId = now?.guild?.id ?? old?.guild?.id;
+      if (guildId) emit('voice:members', { guildId });
+    });
 
     // discord.js/@discordjs/rest wartet bei 429 selbst retry_after ab – wir zeigen es nur an.
     c.rest?.on?.(RESTEvents.RateLimited, (info) => {
@@ -162,7 +171,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     if (connecting) return connecting;
     connecting = (async () => {
       await destroyClient();
-      const tokenResult = loadToken(envPath);
+      const tokenResult = getToken(); // verschlüsselter Tresor (secrets.js) oder .env
       if (tokenResult.status !== 'ok') return setStatus({ state: 'setup', reason: tokenResult.status });
 
       setStatus({ state: 'connecting' });
@@ -247,45 +256,57 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return member?.displayName || user?.globalName || user?.username || 'Unbekannt';
   }
 
+  // Null-sichere Helfer: Discord-Objekte können je nach Nachrichtentyp (System, Webhook, gelöschter Nutzer) Lücken haben.
+  const valuesOf = (coll) => (coll && typeof coll.values === 'function' ? [...coll.values()].filter(Boolean) : []);
+  const avatarOf = (obj) => {
+    try {
+      return typeof obj?.displayAvatarURL === 'function' ? obj.displayAvatarURL({ size: 64, extension: 'png' }) || null : null;
+    } catch {
+      return null;
+    }
+  };
+  const hexOrNull = (hex) => (typeof hex === 'string' && hex !== '#000000' ? hex : null);
+
   function serializeMessage(msg) {
-    const member = msg.member;
-    const roleColor = member?.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null;
-    const guild = msg.guild;
+    const author = msg?.author ?? null;
+    const member = msg?.member ?? null;
+    const guild = msg?.guild ?? null;
+    const ts = Number.isFinite(msg?.createdTimestamp) ? msg.createdTimestamp : Date.now();
     return {
-      id: msg.id,
-      channelId: msg.channelId,
-      guildId: msg.guildId,
-      nonce: typeof msg.nonce === 'string' ? msg.nonce : msg.nonce != null ? String(msg.nonce) : null,
+      id: String(msg?.id ?? ''),
+      channelId: msg?.channelId ?? null,
+      guildId: msg?.guildId ?? null,
+      nonce: typeof msg?.nonce === 'string' ? msg.nonce : msg?.nonce != null ? String(msg.nonce) : null,
       author: {
-        id: msg.author.id,
-        name: displayNameOf(msg.author, member),
-        username: msg.author.username,
-        avatarUrl: (member || msg.author).displayAvatarURL({ size: 64, extension: 'png' }),
-        bot: Boolean(msg.author.bot),
-        color: roleColor,
+        id: author?.id ?? '0',
+        name: displayNameOf(author, member),
+        username: author?.username ?? 'unbekannt',
+        avatarUrl: avatarOf(member) || avatarOf(author),
+        bot: Boolean(author?.bot),
+        color: hexOrNull(member?.displayHexColor),
       },
-      content: msg.content || '',
-      createdTimestamp: msg.createdTimestamp,
-      editedTimestamp: msg.editedTimestamp || null,
-      system: Boolean(msg.system),
-      isOwn: msg.author.id === client?.user?.id,
-      attachments: [...msg.attachments.values()].map((a) => ({
-        id: a.id,
-        name: a.name,
-        url: a.url,
-        size: a.size,
+      content: typeof msg?.content === 'string' ? msg.content : '',
+      createdTimestamp: ts,
+      editedTimestamp: msg?.editedTimestamp || null,
+      system: Boolean(msg?.system),
+      isOwn: Boolean(author?.id) && author.id === client?.user?.id,
+      attachments: valuesOf(msg?.attachments).map((a) => ({
+        id: a.id ?? '',
+        name: a.name ?? 'Datei',
+        url: a.url ?? '',
+        size: Number(a.size) || 0,
         contentType: a.contentType || null,
         width: a.width || null,
         height: a.height || null,
       })),
-      embedsCount: msg.embeds.length,
+      embedsCount: Array.isArray(msg?.embeds) ? msg.embeds.length : 0,
       mentions: {
-        users: [...msg.mentions.users.values()].map((u) => ({ id: u.id, name: displayNameOf(u, guild?.members?.cache?.get(u.id)) })),
-        roles: [...msg.mentions.roles.values()].map((r) => ({ id: r.id, name: r.name, color: r.hexColor !== '#000000' ? r.hexColor : null })),
-        channels: [...msg.mentions.channels.values()].map((ch) => ({ id: ch.id, name: ch.name })),
-        everyone: Boolean(msg.mentions.everyone),
+        users: valuesOf(msg?.mentions?.users).map((u) => ({ id: u.id, name: displayNameOf(u, guild?.members?.cache?.get?.(u.id)) })),
+        roles: valuesOf(msg?.mentions?.roles).map((r) => ({ id: r.id, name: r.name ?? 'Rolle', color: hexOrNull(r.hexColor) })),
+        channels: valuesOf(msg?.mentions?.channels).map((ch) => ({ id: ch.id, name: ch.name ?? 'kanal' })),
+        everyone: Boolean(msg?.mentions?.everyone),
       },
-      reference: msg.reference?.messageId ? { messageId: msg.reference.messageId, channelId: msg.reference.channelId } : null,
+      reference: msg?.reference?.messageId ? { messageId: msg.reference.messageId, channelId: msg.reference.channelId ?? null } : null,
     };
   }
 
@@ -299,14 +320,15 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   }
 
   function previewOf(msg) {
-    const text = (msg.cleanContent ?? msg.content ?? '').replace(/\s+/g, ' ').trim();
+    const raw = msg?.cleanContent ?? msg?.content ?? '';
+    const text = (typeof raw === 'string' ? raw : '').replace(/\s+/g, ' ').trim();
     return {
-      channelId: msg.channelId,
-      messageId: msg.id,
-      authorName: displayNameOf(msg.author, msg.member),
-      isOwn: msg.author.id === client?.user?.id,
-      text: text ? text.slice(0, 120) : msg.attachments?.size ? '📎 Anhang' : msg.embeds?.length ? '[Embed]' : '',
-      timestamp: msg.createdTimestamp,
+      channelId: msg?.channelId ?? null,
+      messageId: msg?.id ?? null,
+      authorName: displayNameOf(msg?.author, msg?.member),
+      isOwn: Boolean(msg?.author?.id) && msg.author.id === client?.user?.id,
+      text: text ? text.slice(0, 120) : msg?.attachments?.size ? '📎 Anhang' : msg?.embeds?.length ? '[Embed]' : '',
+      timestamp: Number.isFinite(msg?.createdTimestamp) ? msg.createdTimestamp : 0,
     };
   }
 
@@ -391,13 +413,58 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
 
   function getInviteUrl() {
     const appId = client?.application?.id || (() => {
-      const t = loadToken(envPath);
+      const t = getToken();
       return t.status === 'ok' ? botIdFromToken(t.token) : null;
     })();
     if (!appId) return null;
     const P = PermissionFlagsBits;
     const permissions = [P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AddReactions, P.AttachFiles, P.EmbedLinks, P.Connect, P.Speak].reduce((a, b) => a | b, 0n);
     return `https://discord.com/oauth2/authorize?client_id=${appId}&scope=bot+applications.commands&permissions=${permissions}`;
+  }
+
+  // ---------- Aktualisieren & Kanalzugriff (Issue #1) ----------
+
+  /**
+   * Holt Bot-Mitgliedschaft (Rollen), Rollen-Rechte und Kanäle (inkl. Rechte-Overwrites) frisch per REST.
+   * Hilft, wenn Discord eine Rechteänderung nicht per Gateway-Event gemeldet hat.
+   */
+  async function refresh({ guildId } = {}) {
+    const c = requireReady();
+    const guilds = guildId ? [requireGuild(guildId)] : [...c.guilds.cache.values()];
+    let refreshed = 0;
+    const failed = [];
+    for (const g of guilds) {
+      try {
+        await g.members.fetchMe({ force: true });
+        await g.roles.fetch(undefined, { force: true });
+        await g.channels.fetch(undefined, { force: true });
+        refreshed++;
+      } catch {
+        failed.push(g.name ?? g.id);
+      }
+    }
+    emit('guilds:changed', {});
+    for (const g of guilds) emit('channels:changed', { guildId: g.id });
+    return { refreshed, failed };
+  }
+
+  /** Welche Text-/Sprachkanäle sind für den Bot gesperrt oder nur lesbar? (zum Anzeigen + Erklären) */
+  function getChannelAccess({ guildId }) {
+    const guild = requireGuild(guildId);
+    const relevant = [...guild.channels.cache.values()].filter((ch) => ch && (TEXT_TYPES.has(ch.type) || VOICE_TYPES.has(ch.type)));
+    const describe = (ch) => ({
+      id: ch.id,
+      name: ch.name ?? '(ohne Namen)',
+      type: VOICE_TYPES.has(ch.type) ? 'voice' : 'text',
+      category: (ch.parentId && guild.channels.cache.get(ch.parentId)?.name) || null,
+    });
+    const byPos = (a, b) => (a.position ?? 0) - (b.position ?? 0);
+    const hidden = relevant.filter((ch) => !can(ch, PermissionFlagsBits.ViewChannel)).sort(byPos).map(describe);
+    const readOnly = relevant
+      .filter((ch) => TEXT_TYPES.has(ch.type) && can(ch, PermissionFlagsBits.ViewChannel) && !can(ch, PermissionFlagsBits.SendMessages))
+      .sort(byPos)
+      .map(describe);
+    return { total: relevant.length, hidden, readOnly };
   }
 
   // ---------- Sprachkanäle ----------
@@ -453,6 +520,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     serializeMessage,
     listVoiceMembers,
     getVoiceTarget,
+    refresh,
+    getChannelAccess,
   };
 }
 

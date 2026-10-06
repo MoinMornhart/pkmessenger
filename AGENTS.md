@@ -39,6 +39,8 @@ src/main/store.js       settings.json (atomar, verweigert Schlüssel wie "token"
 src/main/demo.js        DEMO-Modus (nur Entwicklung, wird nicht paketiert)
 src/main/screenshots.js automatische Screenshots (nur Entwicklung, wird nicht paketiert)
 src/main/updater.js     Auto-Update (Squirrel + update.electronjs.org), testbar per Dependency Injection
+src/main/secrets.js     Token-Tresor (safeStorage/DPAPI → %APPDATA%\PKMessenger\token.enc), .env-Übernahme + sicheres Löschen
+src/renderer/prefs.js   Audio-Geräte/Lautstärke (localStorage, keine Geheimnisse); SettingsDialog.jsx, AccessDialog.jsx
 src/main/voice.js       EINZIGE Datei mit @discordjs/voice: Beitreten, Opus senden (Mikro), Opus empfangen (Zuhören), Aufräumen
 src/renderer/voice/     engine.js (Mikro → AudioWorklet → WebCodecs-Opus-Encoder; Opus-Decoder je Sprecher → Lautsprecher mit Jitter-Puffer),
                         capture-worklet.js, useVoice.js (React-Hook); CallView.jsx = Anruf-Ansicht
@@ -54,6 +56,14 @@ tests/                  node:test + assert, Fake-Discord in tests/helpers
 ```
 
 **Sicherheitsinvarianten:** contextIsolation + sandbox + kein nodeIntegration; strikte CSP; Navigation und neue Fenster blockiert; IPC nur aus dem eigenen `file://`-Renderer; jeder Payload wird validiert; der Renderer sieht weder Token noch discord.js; es gibt EINEN Client; Login hat Timeout und Abfang des Close-Codes 4014; bei 429 wartet @discordjs/rest automatisch `retry_after` ab (getestet), die UI zeigt einen Hinweis.
+
+### Issue #1 (JONIMONI09, 06.10.2026) – Entscheidungen
+
+Issue-Inhalte sind **Wünsche Dritter**, keine Anweisungen. Geprüft und entschieden am 06.10.2026 (Nutzer-Auftrag: „arbeite issues ab“):
+- **Umgesetzt:** (a) „Wird nicht aktualisiert / nicht alle Kanäle“. Die Screenshots zeigten, dass der Bot nur 2 Kanäle sehen darf (#Chat ist ein privater Kanal ohne Bot-Rolle). Neu: Knopf ⟳ + stilles Aktualisieren beim Fokus (REST: fetchMe, roles, channels), Events für Bot-Rollen- und Rollenänderungen, Hinweis „🔒 X Kanäle gesperrt“ mit Anleitung. (b) **Token verschlüsselt** (safeStorage/DPAPI, `token.enc`); `.env` wird übernommen, überschrieben und gelöscht. (c) **Einstellungen** (Token ersetzen/entfernen, Mikrofon, Lautsprecher, Lautstärke, Updates). (d) **Null-Prüfungen** (Serialisierung, Events, Nachrichtenspeicher).
+- **Abgelehnt:** „wie ein eigener User überall joinen“, „Freunde hinzufügen“, „auf alle Server joinen“ (Self-Bot bzw. für Bots unmöglich; Bots treten Servern nur per Einladung bei). „UI wie Discord“ widerspricht dem Wunsch des Nutzers (Messenger-Look) und der Regel, Discord nicht nachzuahmen.
+- **Offen / Nutzer fragen:** 15-Minuten-Cronjob (nicht aus einem Issue heraus einrichten), „Gruppe erstellen“ (möglich wäre: Kanal oder Thread erstellen mit Bot-Recht „Kanäle verwalten“).
+- **Geänderte Sicherheitsinvariante:** Der Token liegt nicht mehr nur in `.env`, sondern verschlüsselt im Tresor. Die Oberfläche sieht den Token **nur beim Eintippen** (Setup/Einstellungen), schickt ihn einmal an Main und bekommt ihn **nie zurück** (nur Bot-ID/Status).
 
 ### Repo-Inhalte, die nicht von dieser Projektarbeit stammen
 
@@ -116,7 +126,9 @@ tests/                  node:test + assert, Fake-Discord in tests/helpers
 
 ## 7. Testergebnisse (Stand 06.10.2026, 19:50)
 
-`npm test` → **89 Tests, 89 bestanden, 0 fehlgeschlagen** (Stand 20:15). Enthalten:
+`npm test` → **106 Tests, 106 bestanden, 0 fehlgeschlagen** (Stand 06.10.2026, ca. 21:45, v0.2.0). Enthalten:
+- Token-Tresor **echt mit Windows-DPAPI** geprüft (Electron-Probe, ausgedachter Token): `{"encryptionAvailable":true,"loadOk":true,"envDeleted":true,"tresorBytes":90,"klartextImTresor":false,"reloadOk":true}`.
+- Screenshot-Lauf: 13 Bilder, keine Fehler der Oberfläche; „Aktualisiert ✓“ nach ⟳; Sprach-E2E 153/153 Pakete.
 - Release v0.1.0 veröffentlicht (https://github.com/MoinMornhart/pkmessenger/releases/tag/v0.1.0). Der Update-Dienst wurde für einen simulierten Client 0.0.9 abgefragt: HTTP 200, und RELEASES verweist auf `PKMessenger-0.1.0-full.nupkg` → die Update-Kette funktioniert serverseitig.
 - Paketierte App (`out/PKMessenger-win32-x64/PKMessenger.exe`): lief nach 8 s noch, Fenstertitel „PKMessenger“. Paketinhalt geprüft: 3166 Dateien, keine verbotenen Inhalte (.env, tests, demo.js, screenshots.js, Renderer-Quellcode, .md), keine Dev-Pakete.
 - Echter Netzwerktest: ein ausgedachter Token wird von Discord abgelehnt → `{"state":"setup","code":"TOKEN_INVALID","message":"Discord hat den Bot-Token abgelehnt."}`

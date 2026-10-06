@@ -127,7 +127,7 @@ function VoiceRows({ channels, members, speaking, activeId, voice, onSelect }) {
   );
 }
 
-function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice }) {
+function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings }) {
   const [filter, setFilter] = useState('');
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase().replace(/^#/, '');
@@ -138,7 +138,12 @@ function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, on
     <aside className="chatlist">
       <header className="chatlist__head">
         <h2 title={guild?.name}>{guild?.name || (hasGuilds ? ' ' : 'PKMessenger')}</h2>
-        <span className="kbd-hint" title="Schnell zu einem Chat springen">Strg K</span>
+        <button className={`icon-btn ${refreshing ? 'is-spinning' : ''}`} onClick={onRefresh} disabled={refreshing} title="Aktualisieren: Kanäle und Rechte neu von Discord laden" aria-label="Aktualisieren">
+          ⟳
+        </button>
+        <button className="icon-btn" onClick={onOpenSettings} title="Einstellungen" aria-label="Einstellungen">
+          ⚙
+        </button>
       </header>
       <div className="chatlist__search">
         <span className="chatlist__search-icon" aria-hidden="true">⌕</span>
@@ -201,6 +206,12 @@ function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, on
             </button>
           );
         })}
+        {!loading && !filter && access && (access.hidden?.length > 0 || access.readOnly?.length > 0) && (
+          <button className="access-hint" onClick={onShowAccess}>
+            🔒 {access.hidden?.length > 0 ? `${access.hidden.length} Kanäle für den Bot gesperrt` : `${access.readOnly.length} Kanäle nur lesbar`}
+            <span className="muted small"> – warum & wie freigeben?</span>
+          </button>
+        )}
         {!loading && !filter && (
           <VoiceRows channels={voiceChannels} members={voiceMembers} speaking={speaking} activeId={activeId} voice={voice} onSelect={onSelect} />
         )}

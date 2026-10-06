@@ -9,12 +9,30 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore }) {
   const requireVoice = () => {
     if (!voice) throw Object.assign(new Error('Sprachfunktion nicht verfügbar.'), { code: 'NOT_FOUND' });
     return voice;
   };
+  const requireTokens = () => {
+    if (!tokenStore) throw Object.assign(new Error('Im Demo-Modus gibt es keinen Token-Tresor.'), { code: 'NOT_FOUND' });
+    return tokenStore;
+  };
   return {
+    // Token: Oberfläche bekommt NIE den Token zurück, nur Status/Bot-ID.
+    'pk:token-info': () => (tokenStore ? tokenStore.info() : { stored: false, demo: true }),
+    'pk:token-save': async (p) => {
+      const info = requireTokens().save(validators.tokenInput(p));
+      const status = await service.connect();
+      return { info, state: status.state, error: status.error || null };
+    },
+    'pk:token-clear': async () => {
+      const info = requireTokens().clear();
+      await service.connect(); // → Setup-Ansicht
+      return info;
+    },
+    'pk:refresh': (p) => service.refresh(validators.optionalGuildRef(p)),
+    'pk:channel-access': (p) => service.getChannelAccess(validators.guildRef(p)),
     'pk:list-voice-members': (p) => service.listVoiceMembers(validators.guildRef(p)),
     'pk:voice-state': () => (voice ? voice.getState() : { state: 'idle' }),
     'pk:voice-join': (p) => requireVoice().join(validators.voiceJoin(p)),

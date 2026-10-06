@@ -87,6 +87,20 @@ async function runScreenshots(win, dir, { demo, stats }) {
   await wait(500);
   const after = await js(win, `document.querySelector('.callbar') ? 'Anrufleiste noch da' : 'aufgelegt'`);
   console.log(`[voice-e2e] Nach Auflegen: ${after}`);
+
+  // ---- Issue #1: Aktualisieren, gesperrte Kanäle, Einstellungen ----
+  await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Aktualisieren"]')?.click()`);
+  await wait(1200);
+  const toastText = await js(win, `[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' | ')`);
+  console.log(`[issue1] Nach Aktualisieren: ${toastText || '(kein Hinweis)'}`);
+  await js(win, `document.querySelector('.access-hint')?.click()`);
+  await wait(500);
+  await shoot(win, dir, '12-kanalzugriff');
+  await js(win, `[...document.querySelectorAll('.access .btn')].find(b=>b.textContent.includes('Schließen'))?.click()`);
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+  await wait(700);
+  await shoot(win, dir, '13-einstellungen');
 }
 
 module.exports = { runScreenshots };

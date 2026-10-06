@@ -3,8 +3,8 @@ import { api } from '../api';
 import Logo from './Logo.jsx';
 
 const REASONS = {
-  'missing-file': ['Noch kein Bot-Token eingetragen.', 'Die .env-Datei existiert noch nicht. Klicke auf ".env-Datei öffnen" – sie wird automatisch angelegt.'],
-  'missing-token': ['Noch kein Bot-Token eingetragen.', 'Trage deinen Token in der .env-Datei hinter DISCORD_TOKEN= ein und speichere.'],
+  'missing-file': ['Noch kein Bot-Token eingetragen.', 'Füge deinen Token unten in Schritt 2 ein – er wird verschlüsselt gespeichert.'],
+  'missing-token': ['Noch kein Bot-Token eingetragen.', 'Füge deinen Token unten in Schritt 2 ein.'],
   'invalid-format': ['Das sieht nicht wie ein Bot-Token aus.', 'Ein Bot-Token hat drei Teile mit Punkten dazwischen. Kopiere ihn erneut aus dem Developer Portal (Bot → Reset Token).'],
   'read-error': ['Die .env-Datei konnte nicht gelesen werden.', 'Prüfe, ob die Datei von einem anderen Programm gesperrt ist.'],
   TOKEN_INVALID: ['Discord hat den Token abgelehnt.', 'Der Token ist falsch oder wurde zurückgesetzt. Erzeuge im Developer Portal unter "Bot" mit "Reset Token" einen neuen und trage ihn ein.'],
@@ -17,6 +17,22 @@ export default function SetupScreen({ status, onReconnect }) {
   const [envInfo, setEnvInfo] = useState(null);
   const [inviteUrl, setInviteUrl] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [token, setToken] = useState('');
+  const [tokenError, setTokenError] = useState(null);
+
+  const saveToken = async () => {
+    setBusy(true);
+    setTokenError(null);
+    try {
+      const res = await api.tokenSave({ token });
+      setToken(''); // nicht im Speicher der Oberfläche liegen lassen
+      if (res?.state !== 'ready' && res?.error) setTokenError(res.error);
+    } catch (e) {
+      setTokenError({ message: e.message, hint: e.hint || '' });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     api.getInviteUrl().then(setInviteUrl).catch(() => setInviteUrl(null));
@@ -56,15 +72,39 @@ export default function SetupScreen({ status, onReconnect }) {
             </button>
           </li>
           <li>
-            <h3>Token in die .env-Datei eintragen</h3>
+            <h3>Token hier einfügen</h3>
             <p>
-              Hinter <code>DISCORD_TOKEN=</code> einfügen, speichern, schließen. Den Token <b>nie</b> teilen, committen oder screenshotten. Falls er doch
-              irgendwo landet: sofort <b>Reset Token</b>.
+              Der Token wird sofort <b>verschlüsselt</b> gespeichert (an dein Windows-Konto gebunden) und nie wieder angezeigt. Den Token <b>nie</b> teilen oder
+              abfotografieren. Falls er doch irgendwo landet: sofort <b>Reset Token</b>.
             </p>
-            <button className="btn" onClick={openEnv}>
-              .env-Datei öffnen
-            </button>
-            {(envInfo?.path || status.envPath) && <p className="muted small">Speicherort: {envInfo?.path || status.envPath}</p>}
+            <div className="settings__row">
+              <input
+                id="setup-token"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && token && saveToken()}
+                placeholder="Bot-Token einfügen (Strg+V)"
+                aria-label="Bot-Token"
+              />
+              <button className="btn btn--primary" onClick={saveToken} disabled={!token || busy}>
+                {busy ? 'Prüfe …' : 'Speichern & verbinden'}
+              </button>
+            </div>
+            {tokenError && (
+              <p className="warn small">
+                {tokenError.message} {tokenError.hint}
+              </p>
+            )}
+            <p className="muted small">
+              Alternativ: Eine <code>.env</code> mit <code>DISCORD_TOKEN=…</code> wird beim Start automatisch übernommen, verschlüsselt und gelöscht.{' '}
+              <button className="link-btn" onClick={openEnv}>
+                .env-Datei öffnen
+              </button>
+              {envInfo?.path && <span> ({envInfo.path})</span>}
+            </p>
           </li>
           <li>
             <h3>Message Content Intent einschalten</h3>

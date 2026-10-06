@@ -79,6 +79,7 @@ function createMessageStore(api) {
 
   // Bestätigte Nachricht einfügen; ersetzt die optimistische Version mit gleicher Nonce.
   function upsertConfirmed(msg) {
+    if (!msg?.channelId || !msg.id) return false;
     const s = get(msg.channelId);
     if (s.status !== 'ready') return false; // Kanal noch nie geöffnet → wird beim Öffnen frisch geladen
     const [confirmed, local] = split(s.messages);
@@ -87,7 +88,8 @@ function createMessageStore(api) {
     return true;
   }
 
-  function remove({ id, channelId }) {
+  function remove({ id, channelId } = {}) {
+    if (!id || !channelId) return;
     const s = get(channelId);
     if (!s.messages.some((m) => m.id === id)) return;
     set(channelId, { messages: s.messages.filter((m) => m.id !== id) });
