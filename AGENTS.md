@@ -55,6 +55,11 @@ tests/                  node:test + assert, Fake-Discord in tests/helpers
 
 **Sicherheitsinvarianten:** contextIsolation + sandbox + kein nodeIntegration; strikte CSP; Navigation und neue Fenster blockiert; IPC nur aus dem eigenen `file://`-Renderer; jeder Payload wird validiert; der Renderer sieht weder Token noch discord.js; es gibt EINEN Client; Login hat Timeout und Abfang des Close-Codes 4014; bei 429 wartet @discordjs/rest automatisch `retry_after` ab (getestet), die UI zeigt einen Hinweis.
 
+### Repo-Inhalte, die nicht von dieser Projektarbeit stammen
+
+- `.github/workflows/vibeworks-check.yml` wurde am 06.10.2026 um 20:17 vom Konto des Nutzers angelegt (Tool „VibeWorks“, Commit `3c01f34`). Am 06.10.2026 gelesen: kostenloser Repo-Check (Gitleaks, OSV-Scanner, Semgrep u. a.), nur `contents: read`, keine Secrets, schreibt nichts zurück → **behalten, nicht verändern**. Vor jedem Push erst `git pull --rebase`, weil dort Commits entstehen können.
+- README-Bilder liegen in `docs/images/` (Kopien ausgewählter Demo-Screenshots; `screenshots/` bleibt per .gitignore lokal). `docs/` wird nicht mitpaketiert.
+
 ## 4. Setup und Befehle
 
 | Befehl | Zweck |
