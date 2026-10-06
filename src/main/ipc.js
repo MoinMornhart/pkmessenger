@@ -9,15 +9,19 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion }) {
   return {
+    'pk:get-app-info': () => ({ version: appVersion || null, update: updater ? updater.getState() : { state: 'disabled' } }),
+    'pk:check-updates': () => (updater ? updater.check() : null),
+    'pk:install-update': () => (updater ? updater.install() : false),
     'pk:get-status': () => service.getStatus(),
     'pk:connect': () => service.connect(),
     'pk:open-env-file': () => openEnvFile(),
     'pk:get-invite-url': () => service.getInviteUrl(),
     'pk:list-guilds': () => service.listGuilds(),
     'pk:list-channels': (p) => service.listChannels(validators.guildRef(p)),
-    'pk:get-messages': (p) => service.getMessages(validators.getMessages(p)),
+    'pk:get-previews': (p) => service.getPreviews(validators.guildRef(p)),
+    'pk:get-messages':(p) => service.getMessages(validators.getMessages(p)),
     'pk:send-message': (p) => service.sendMessage(validators.sendMessage(p)),
     'pk:send-typing': (p) => service.sendTyping(validators.channelRef(p)),
     'pk:search-mentionables': (p) => service.searchMentionables(validators.searchMentionables(p)),

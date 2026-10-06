@@ -4,6 +4,7 @@ import { messageStore, randomNonce, useChannelMessages } from '../state';
 import MessageList from './MessageList.jsx';
 import Composer from './Composer.jsx';
 import SearchPanel from './SearchPanel.jsx';
+import { ChannelAvatar } from './ChatList.jsx';
 
 function Skeleton() {
   return (
@@ -21,18 +22,25 @@ function Skeleton() {
   );
 }
 
-function TypingIndicator({ names }) {
-  if (!names.length) return <div className="typing" />;
-  const text = names.length === 1 ? `${names[0]} schreibt …` : names.length === 2 ? `${names[0]} und ${names[1]} schreiben …` : 'Mehrere Leute schreiben …';
-  return (
-    <div className="typing" aria-live="polite">
-      <span className="typing__dots">
-        <i />
-        <i />
-        <i />
+// Untertitel im Chat-Kopf: "Anna schreibt …" (wie im Messenger) oder das Kanalthema.
+function HeaderSubtitle({ names, channel, guild }) {
+  if (names.length) {
+    const text = names.length === 1 ? `${names[0]} schreibt …` : names.length === 2 ? `${names[0]} und ${names[1]} schreiben …` : 'Mehrere schreiben …';
+    return (
+      <span className="chat__sub chat__sub--typing" aria-live="polite">
+        <span className="typing__dots">
+          <i />
+          <i />
+          <i />
+        </span>
+        {text}
       </span>
-      {text}
-    </div>
+    );
+  }
+  return (
+    <span className="chat__sub" title={channel.topic || ''}>
+      {channel.topic || `${guild.name} · ${channel.canSend ? 'Bot darf schreiben' : 'Bot darf nur lesen'}`}
+    </span>
   );
 }
 
@@ -115,12 +123,14 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
   return (
     <main className="chat">
       <header className="chat__head">
-        <span className="ch-icon ch-icon--lg">{channel.type === 'announcement' ? '📢' : '#'}</span>
-        <h1>{channel.name}</h1>
-        {channel.topic && <span className="chat__topic" title={channel.topic}>{channel.topic}</span>}
+        <ChannelAvatar channel={channel} size={40} />
+        <div className="chat__title">
+          <h1>{channel.name}</h1>
+          <HeaderSubtitle names={typingNames} channel={channel} guild={guild} />
+        </div>
         <div className="chat__tools">
-          <button className="btn btn--small btn--ghost" onClick={onOpenSearch} title="Suchen (Strg+F)">
-            🔍 Suchen <span className="kbd-hint">Strg F</span>
+          <button className="icon-btn icon-btn--lg" onClick={onOpenSearch} title="Im Chat suchen (Strg+F)" aria-label="Im Chat suchen">
+            ⌕
           </button>
         </div>
       </header>
@@ -159,7 +169,6 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
           ) : (
             <MessageList ref={listRef} channel={channel} state={state} onLoadOlder={loadOlder} onRetry={retry} onDiscard={discard} />
           )}
-          <TypingIndicator names={typingNames} />
           <Composer guild={guild} channel={channel} bot={bot} allChannels={allChannels} onSend={send} />
         </div>
         {searchOpen && <SearchPanel messages={state.messages} onJump={jump} onClose={onCloseSearch} />}

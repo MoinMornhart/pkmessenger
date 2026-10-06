@@ -79,4 +79,19 @@ function findMentionQuery(text, caret) {
   return { trigger: m[2], query: m[3], start: before.length - m[3].length - 1 };
 }
 
-module.exports = { tokenizeMentions, containsMassMention, applyMentionTokens, buildAllowedMentions, findMentionQuery };
+// Einzeiliger Klartext für Vorschauen: <@id> → @Name, <#id> → #kanal, Zeilenumbrüche → Leerzeichen.
+function toPlainText(content, mentions = {}, channelName = () => null) {
+  return tokenizeMentions(content)
+    .map((seg) => {
+      if (seg.type === 'text') return seg.value;
+      if (seg.type === 'user') return `@${(mentions.users || []).find((u) => u.id === seg.id)?.name || 'Unbekannt'}`;
+      if (seg.type === 'role') return `@${(mentions.roles || []).find((r) => r.id === seg.id)?.name || 'Rolle'}`;
+      if (seg.type === 'channel') return `#${(mentions.channels || []).find((c) => c.id === seg.id)?.name || channelName(seg.id) || 'kanal'}`;
+      return `@${seg.type}`;
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+module.exports = { toPlainText, tokenizeMentions, containsMassMention, applyMentionTokens, buildAllowedMentions, findMentionQuery };

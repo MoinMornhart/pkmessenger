@@ -56,13 +56,13 @@ async function runScreenshots(win, dir, { demo }) {
   await shoot(win, dir, '06-suche');
   await js(win, `document.querySelector('.search-panel .icon-btn')?.click()`);
   // Kanal mit 260+ Nachrichten → virtualisierte Liste
-  await js(win, `[...document.querySelectorAll('.ch')].find(b=>b.textContent.includes('projekt-a'))?.click()`);
+  await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('projekt-a'))?.click()`);
   await wait(1500);
   await shoot(win, dir, '07-virtualisiert');
-  await js(win, `[...document.querySelectorAll('.ch')].find(b=>b.textContent.includes('nur-lesen'))?.click()`);
+  await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('nur-lesen'))?.click()`);
   await wait(1000);
   await shoot(win, dir, '08-nur-lesen');
-  await js(win, `[...document.querySelectorAll('.ch')].find(b=>b.textContent.includes('allgemein'))?.click()`);
+  await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
   await wait(800);
   await js(win, typeInto('.composer textarea', 'Hallo aus PKMessenger 👋'));
   await js(win, `document.querySelector('.composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);

@@ -14,6 +14,8 @@ Optik: eigener Messenger. Technisch: **Bot-Control-Center**.
 - **Verboten und nicht umgesetzt:** Self-Bots, User-Tokens, Client-Mods, Nutzer-Imitation, Automatisierung persönlicher Accounts, Spam, Umgehung von Rate-Limits, Scraping außerhalb der API.
 - Jede Nachricht geht **als Bot** raus (Bot-Name + BOT-Tag). Die App nennt sich nicht „Discord“, nutzt kein Discord-Logo und keine Discord-Standardavatare. Die UI zeigt „Wird gesendet als <Bot> BOT“.
 - Datensparsamkeit: nur Intents `Guilds`, `GuildMessages`, `MessageContent` (privilegiert), `GuildMessageTyping`. **Kein** GuildMembers, **kein** GuildPresences. Keine Cloud, keine Telemetrie. Lokal gespeichert werden nur: letzte Position und Lese-Markierungen (`settings.json`). Der Token liegt nur in `.env`.
+- **Auto-Update (seit 06.10.2026, auf Wunsch des Nutzers):** Die installierte App fragt beim Start und alle 6 Stunden `update.electronjs.org` (kostenloser Dienst des Electron-Projekts) nach neuen GitHub-Releases. Übertragen werden nur Repo, Plattform, Architektur und App-Version, keine persönlichen Daten und keine Telemetrie. In der Entwicklung ist das Auto-Update aus.
+- Die Optik ist an Messenger-Apps angelehnt (Chat-Liste, Sprechblasen). Es gibt aber **kein** WhatsApp- oder Discord-Branding, sondern eigenes Logo und eigene Farben. Das BOT-Abzeichen und der Hinweis „Wird gesendet als <Bot> BOT“ bleiben Pflicht.
 - Skalierung (für privaten Gebrauch irrelevant): Verifizierung ab 100 Servern; Prüfung privilegierter Intents ab 10.000 erreichbaren Nutzern (Regel ab 10.06.2026).
 
 ### Entscheidung 06.10.2026: „Über meinen Discord-Account schreiben“ → ABGELEHNT
@@ -35,6 +37,8 @@ src/main/ipc.js         Kanal-Definitionen, Sender-Prüfung, { ok, data | error 
 src/main/store.js       settings.json (atomar, verweigert Schlüssel wie "token")
 src/main/demo.js        DEMO-Modus (nur Entwicklung, wird nicht paketiert)
 src/main/screenshots.js automatische Screenshots (nur Entwicklung, wird nicht paketiert)
+src/main/updater.js     Auto-Update (Squirrel + update.electronjs.org), testbar per Dependency Injection
+src/renderer/components ChatList (Messenger-Liste, sortiert nach Aktivität), ChatView/MessageList/MessageItem (Sprechblasen), Composer, …
 src/preload/preload.js  contextBridge: schmale benannte API window.api.*
 src/shared/*.js         reine, getestete Logik (Mentions, Gruppierung, Zeitformat, Limits, Nachrichtenspeicher)
 src/renderer/*          React 19 UI, gebündelt mit esbuild → build/renderer
@@ -54,6 +58,11 @@ tests/                  node:test + assert, Fake-Discord in tests/helpers
 | `npm test` | alle Tests |
 | `npm run make` | Windows-Installer `out/make/squirrel.windows/x64/PKMessenger-Setup.exe` + ZIP |
 | `npm run demo -- --screenshots=<ordner>` | echte Screenshots automatisch aufnehmen |
+| `npm run update` | Quellcode-Variante aktualisieren: `git pull --ff-only` + `npm install` + UI bauen |
+| `npm run publish` | neue Version als GitHub-Release hochladen (vorher `version` in package.json erhöhen; braucht `GITHUB_TOKEN`). Installierte Apps holen sie sich dann automatisch |
+
+**Release-Ablauf (damit Auto-Update greift):** 1. `version` in package.json erhöhen (SemVer, z. B. 0.1.0 → 0.2.0). 2. Commit + Push. 3. `$env:GITHUB_TOKEN="…"; npm run publish`. 4. Installierte Apps finden das Update innerhalb von 6 Stunden oder beim nächsten Start und fragen „Jetzt neu starten“.
+**Voraussetzung:** `"repository"` in package.json muss auf das echte öffentliche GitHub-Repo zeigen. Steht dort der Platzhalter `DEIN-GITHUB-NAME`, ist das Auto-Update aus und es wird kein Publisher konfiguriert.
 
 - `.env` bei der Entwicklung: im Projektordner. In der installierten App: `%APPDATA%\PKMessenger\.env`. Die Setup-Ansicht hat einen Knopf „.env-Datei öffnen“.
 - Bot-Setup (Portal, Intent, Einladung): Schritt für Schritt in der App (Setup-Ansicht) und in README.md.
@@ -66,7 +75,7 @@ tests/                  node:test + assert, Fake-Discord in tests/helpers
 | discord.js | 14.27.0 | engines laut npm: node >= 18 (nicht >= 24.17) |
 | react / react-dom | 19.3.0 | |
 | react-window | 2.3.3 | v2-API: `List`, `useDynamicRowHeight` (MIT, kostenlos) |
-| @electron-forge/cli, maker-squirrel, maker-zip | 8.0.1 | Forge 8 ist ESM, lädt `forge.config.js` (CJS) per import() |
+| @electron-forge/cli, maker-squirrel, maker-zip, publisher-github | 8.0.1 | Forge 8 ist ESM, lädt `forge.config.js` (CJS) per import() |
 | esbuild | 0.28.2 | Renderer-Bundler (statt Vite: weniger bewegliche Teile) |
 | Node (System) | 24.19.0, npm 11.17.0 | |
 
@@ -83,14 +92,18 @@ tests/                  node:test + assert, Fake-Discord in tests/helpers
 | F5 | Senden, optimistisch, 2.000-Zeichen-Zähler | ✅ getestet | `test-f5-*.js`, Screenshot 09 |
 | F6 | Mentions mit Autocomplete, allowed_mentions, @everyone-Dialog, Chips | ✅ getestet | `test-f6-mentions.js`, Screenshots 03/05 |
 | — | Strg+K Schnellsuche, Strg+F lokale Suche + Sprung zur Nachricht, Ungelesen-Punkte, Virtualisierung > 200 Zeilen | ✅ im Demo geprüft | Screenshots 04/06/07 |
+| — | Messenger-Look: Chat-Liste mit Vorschau/Uhrzeit/Zähler, Sprechblasen, Tippen im Kopf | ✅ getestet + Demo | `test-chatlist.js`, Screenshots |
+| — | Auto-Update (installierte App) + `npm run update` (Quellcode) | ✅ Logik getestet; echter Update-Durchlauf erst mit GitHub-Release möglich | `test-updater.js` |
+| — | Windows-Installer `npm run make` | ✅ gebaut (Setup.exe ~156 MB); paketierte App startet; Paketinhalt geprüft | AGENTS §7 |
 | F7–F15 | Antworten, Reaktionen, Bearbeiten/Löschen, Upload, Embeds, Threads, Pins, Server-Suche, Slash-Commands | ⏳ offen | – |
 | F16 | Optional: „Mit Discord anmelden“ (OAuth2 identify) + Signatur | ❓ wartet auf Zustimmung | siehe §2 |
 
-**Noch NICHT erledigt beim MVP:** Live-Test mit echtem Bot-Token (der Nutzer hat noch keinen Bot), `npm run make` (Installer) noch nicht gebaut und getestet.
+**Noch NICHT erledigt beim MVP:** Live-Test mit echtem Bot-Token (der Nutzer hat noch keinen Bot). Die Setup.exe wurde bewusst nicht auf dem PC des Nutzers installiert; nur die paketierte App wurde direkt gestartet.
 
-## 7. Testergebnisse (Stand 06.10.2026)
+## 7. Testergebnisse (Stand 06.10.2026, 19:50)
 
-`npm test` → **63 Tests, 63 bestanden, 0 fehlgeschlagen** (Dauer ca. 2,3 s). Enthalten:
+`npm test` → **73 Tests, 73 bestanden, 0 fehlgeschlagen**. Enthalten:
+- Paketierte App (`out/PKMessenger-win32-x64/PKMessenger.exe`): lief nach 8 s noch, Fenstertitel „PKMessenger“. Paketinhalt geprüft: 3166 Dateien, keine verbotenen Inhalte (.env, tests, demo.js, screenshots.js, Renderer-Quellcode, .md), keine Dev-Pakete.
 - Echter Netzwerktest: ein ausgedachter Token wird von Discord abgelehnt → `{"state":"setup","code":"TOKEN_INVALID","message":"Discord hat den Bot-Token abgelehnt."}`
 - Rate-Limit-Simulation mit dem echten REST-Client von discord.js gegen einen lokalen 429-Server: „gewartet: 1123 ms (retry_after = 800 ms), RateLimited-Events: 1“
 - UI: `npm run demo -- --screenshots=…` erzeugt 8 Bilder; `npm start` ohne Token zeigt die Setup-Ansicht (Screenshot 01).
@@ -107,7 +120,7 @@ tests/                  node:test + assert, Fake-Discord in tests/helpers
 ## 9. Nächste Schritte
 
 1. Nutzer legt den Bot an und trägt den Token ein (siehe Setup-Ansicht), danach Live-Test von F1–F6 mit echtem Server.
-2. `npm run make` bauen und den Installer testen.
-3. GitHub: `gh` ist nicht installiert. Nutzer möchte ein **öffentliches** Repo. Vor dem Push `.gitignore` prüfen (`.env` ist ausgeschlossen).
+2. GitHub: `gh` ist nicht installiert. Nutzer möchte ein **öffentliches** Repo. Dafür braucht es den GitHub-Namen und dann `"repository"` in package.json setzen. Vor dem Push `.gitignore` prüfen (`.env` ist ausgeschlossen).
+3. Erstes Release 0.1.0 mit `npm run publish`. Danach einen echten Update-Durchlauf testen (0.1.0 installieren → 0.1.1 veröffentlichen → Banner „Update bereit“).
 4. F7 Antworten → F8 Reaktionen → … → F15 (jeweils mit Test).
 5. F16 nur nach Zustimmung des Nutzers.

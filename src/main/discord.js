@@ -291,6 +291,41 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return { messages, hasMore: fetched.size === limit };
   }
 
+  function previewOf(msg) {
+    const text = (msg.cleanContent ?? msg.content ?? '').replace(/\s+/g, ' ').trim();
+    return {
+      channelId: msg.channelId,
+      messageId: msg.id,
+      authorName: displayNameOf(msg.author, msg.member),
+      isOwn: msg.author.id === client?.user?.id,
+      text: text ? text.slice(0, 120) : msg.attachments?.size ? '📎 Anhang' : msg.embeds?.length ? '[Embed]' : '',
+      timestamp: msg.createdTimestamp,
+    };
+  }
+
+  /**
+   * Letzte Nachricht pro Kanal für die Chat-Liste (wie in Messenger-Apps).
+   * Je Kanal max. 1 Nachricht, nur Kanäle mit Verlaufs-Recht; nacheinander, damit Rate-Limits geschont werden.
+   * Nichts davon wird gespeichert.
+   */
+  async function getPreviews({ guildId }) {
+    const guild = requireGuild(guildId);
+    const out = {};
+    const channels = [...guild.channels.cache.values()].filter(
+      (ch) => TEXT_TYPES.has(ch.type) && ch.lastMessageId && can(ch, PermissionFlagsBits.ViewChannel) && can(ch, PermissionFlagsBits.ReadMessageHistory),
+    );
+    for (const ch of channels) {
+      try {
+        const cached = ch.messages.cache?.get?.(ch.lastMessageId);
+        const msg = cached || (await ch.messages.fetch({ limit: 1 })).values().next().value;
+        if (msg) out[ch.id] = previewOf(msg);
+      } catch {
+        /* einzelner Kanal ohne Vorschau ist kein Fehler */
+      }
+    }
+    return out;
+  }
+
   async function sendMessage({ channelId, content, mentions, nonce }) {
     const channel = requireTextChannel(channelId);
     if (!can(channel, PermissionFlagsBits.SendMessages))
@@ -358,7 +393,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return `https://discord.com/oauth2/authorize?client_id=${appId}&scope=bot+applications.commands&permissions=${permissions}`;
   }
 
-  return { connect, disconnect, getStatus, listGuilds, listChannels, getMessages, sendMessage, sendTyping, searchMentionables, getInviteUrl, serializeMessage };
+  return { connect, disconnect, getStatus, listGuilds, listChannels, getPreviews, getMessages, sendMessage, sendTyping, searchMentionables, getInviteUrl, serializeMessage };
 }
 
 module.exports = { createDiscordService, FATAL_CLOSE_CODES };

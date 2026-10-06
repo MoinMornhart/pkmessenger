@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, shell, session, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, session, Menu, autoUpdater } = require('electron');
 
 // Squirrel-Installer (Windows): beim Installieren/Deinstallieren Verknüpfungen anlegen und sofort beenden.
 if (handleSquirrelEvent()) return;
@@ -11,6 +11,7 @@ const { createDiscordService } = require('./discord');
 const { createStore } = require('./store');
 const { ensureEnvFile } = require('./env');
 const { registerIpc } = require('./ipc');
+const { createUpdater, parseRepo } = require('./updater');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -47,6 +48,13 @@ const service = createDiscordService({
   ...(demo ? { createClient: demo.createClient, statusExtra: { demo: true } } : {}),
 });
 const store = createStore(path.join(app.getPath('userData'), demo || SHOTS_ARG ? 'settings-dev-demo.json' : 'settings.json'));
+const updater = createUpdater({
+  autoUpdater,
+  isPackaged: app.isPackaged,
+  version: app.getVersion(),
+  repo: parseRepo(require('../../package.json').repository),
+  emit: broadcast,
+});
 
 function isTrustedSender(event) {
   const url = event.senderFrame?.url || '';
@@ -128,9 +136,10 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   // Keine Kamera/Mikro/Benachrichtigungs-Berechtigungen für Webinhalte.
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion() }, isTrustedSender);
   createWindow();
   service.connect(); // async – blockiert das Fenster nicht
+  updater.start();
 });
 
 app.on('window-all-closed', () => app.quit());

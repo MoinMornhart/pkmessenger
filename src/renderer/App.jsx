@@ -9,6 +9,7 @@ import Toasts from './components/Toasts.jsx';
 export default function App() {
   const [status, setStatus] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const [appInfo, setAppInfo] = useState({ version: null, update: { state: 'idle' } });
   const everReady = useRef(false);
 
   const toast = useCallback((t) => {
@@ -22,8 +23,10 @@ export default function App() {
       if (type === 'status') setStatus(payload);
       else if (type === 'ratelimit') toast({ kind: 'warn', title: 'Discord bremst kurz (Rate-Limit)', text: `Automatischer neuer Versuch in ${Math.ceil((payload.retryAfterMs || 1000) / 1000)} s.` });
       else if (type === 'log') console.warn('[PKMessenger]', payload.message);
+      else if (type === 'update') setAppInfo((i) => ({ ...i, update: payload }));
       else bus.emit(type, payload);
     });
+    api.getAppInfo().then(setAppInfo).catch(() => {});
     api.getStatus().then(setStatus).catch(() => setStatus({ state: 'error', error: { message: 'Interner Fehler beim Start.', hint: 'App neu starten.' } }));
     return off;
   }, [toast]);
@@ -37,11 +40,22 @@ export default function App() {
   else if (status.state === 'setup') screen = <SetupScreen status={status} onReconnect={reconnect} />;
   else if (status.state === 'error' && !everReady.current) screen = <ErrorScreen status={status} onReconnect={reconnect} />;
   else if (status.state === 'disconnected' && !everReady.current) screen = <ErrorScreen status={status} onReconnect={reconnect} />;
-  else screen = <Workspace status={status} toast={toast} onReconnect={reconnect} />;
+  else screen = <Workspace status={status} toast={toast} onReconnect={reconnect} appInfo={appInfo} />;
 
   return (
     <>
       {screen}
+      {appInfo.update?.state === 'ready' && (
+        <div className="update-banner" role="status">
+          <span>
+            <b>Update bereit</b>
+            {appInfo.update.newVersion ? ` (${appInfo.update.newVersion})` : ''} – wird beim Neustart installiert.
+          </span>
+          <button className="btn btn--primary btn--small" onClick={() => api.installUpdate().catch(() => {})}>
+            Jetzt neu starten
+          </button>
+        </div>
+      )}
       <Toasts toasts={toasts} onClose={(id) => setToasts((l) => l.filter((t) => t.id !== id))} />
     </>
   );

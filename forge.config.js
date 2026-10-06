@@ -1,6 +1,11 @@
 'use strict';
 
-// Electron Forge 8: Paketierung + Windows-Installer (Squirrel) und ZIP.
+// Electron Forge 8: Paketierung, Windows-Installer (Squirrel) + ZIP, Veröffentlichung als GitHub-Release.
+const { parseRepo } = require('./src/main/updater');
+
+const repo = parseRepo(require('./package.json').repository);
+const [owner, name] = repo ? repo.split('/') : [null, null];
+
 module.exports = {
   packagerConfig: {
     name: 'PKMessenger',
@@ -13,4 +18,9 @@ module.exports = {
     { name: '@electron-forge/maker-squirrel', config: { name: 'PKMessenger', setupExe: 'PKMessenger-Setup.exe' } },
     { name: '@electron-forge/maker-zip', platforms: ['win32'] },
   ],
+  // `npm run publish` lädt Installer + Update-Pakete als GitHub-Release hoch (Token per Umgebungsvariable GITHUB_TOKEN).
+  // draft: false, weil update.electronjs.org nur veröffentlichte Releases sieht (Standard des Publishers wäre "Entwurf").
+  publishers: owner
+    ? [{ name: '@electron-forge/publisher-github', config: { repository: { owner, name }, draft: false, prerelease: false } }]
+    : [],
 };

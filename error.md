@@ -57,6 +57,18 @@
 
 ---
 
+## #5 – Paket-Prüfung zeigte fälschlich „keine verbotenen Inhalte“ (Prüfmethode fehlerhaft)
+
+1. **Datum & Uhrzeit:** 06.10.2026, ca. 19:50
+2. **Was passiert ist:** Die erste Prüfung des gebauten Pakets (`asar list … | grep -E "\.env$|/tests/|…"`) meldete „keine“. Die Pfade in der asar-Liste nutzen unter Windows aber `\` statt `/`. Das Muster `/tests/` konnte also gar nicht treffen. Die Aussage war **nicht belastbar**.
+3. **Reproduzierbar:** immer unter Windows.
+4. **Ursache:** Falsche Annahme über das Pfadtrennzeichen in der Ausgabe von `@electron/asar list`.
+5. **Lösung:** Prüfskript in Node geschrieben, das `\` zu `/` normalisiert und eigene Dateien, verbotene Inhalte und Dev-Pakete getrennt auflistet (Skript im Scratchpad, Logik in AGENTS.md §7 beschrieben).
+6. **Testergebnis:** „Dateien gesamt: 3166 · Verbotene Inhalte: keine · Dev-Pakete im Paket: keine“. Die eigene Dateiliste wurde einzeln geprüft (nur build/renderer, src/main ohne demo/screenshots, src/preload, src/shared, package.json, forge.config.js).
+7. **Prävention:** Eine Prüfung auf „nichts gefunden“ erst glauben, nachdem sie einmal nachweislich etwas finden **kann** (Positivkontrolle).
+
+---
+
 ## Hinweis (kein Fehler): „NativeCommandError“ beim Renderer-Build in PowerShell
 
 esbuild schreibt seine normale Erfolgsmeldung (`build\renderer\app.js 276.3kb … Done`) auf stderr. Windows PowerShell 5.1 zeigt das rot als `NativeCommandError` an, obwohl der Build erfolgreich war (Exit-Code 0). Kein Handlungsbedarf.

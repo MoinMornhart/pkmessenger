@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { bus, messageStore, NavContext } from '../state';
-import { compareSnowflakes } from '../../shared/snowflake';
+import { compareSnowflakes, timestampOf } from '../../shared/snowflake';
+import { toPlainText } from '../../shared/mentions';
 import ServerRail from './ServerRail.jsx';
-import ChannelSidebar from './ChannelSidebar.jsx';
+import ChatList from './ChatList.jsx';
 import ChatView from './ChatView.jsx';
 import QuickSwitcher from './QuickSwitcher.jsx';
 
 const TYPING_MS = 10000;
 
-export default function Workspace({ status, toast, onReconnect }) {
+export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [guilds, setGuilds] = useState(null);
   const [guildId, setGuildId] = useState(null);
   const [channelsByGuild, setChannelsByGuild] = useState({});
@@ -20,14 +21,31 @@ export default function Workspace({ status, toast, onReconnect }) {
   const [typing, setTyping] = useState({});
   const [quickOpen, setQuickOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [previews, setPreviews] = useState({});
+  const [unreadCounts, setUnreadCounts] = useState({});
+  const [now, setNow] = useState(() => Date.now());
   const activeRef = useRef(null);
   activeRef.current = channelId;
+
+  // Uhrzeiten in der Chat-Liste ("14:03" → "Gestern") minütlich aktualisieren
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
 
   // ---------- Laden ----------
   const loadChannels = useCallback(async (gid) => {
     try {
       const groups = await api.listChannels({ guildId: gid });
       setChannelsByGuild((m) => ({ ...m, [gid]: groups }));
+      api
+        .getPreviews({ guildId: gid })
+        .then((p) => setPreviews((old) => {
+          const next = { ...old };
+          for (const [cid, pv] of Object.entries(p)) if (!next[cid] || next[cid].timestamp <= pv.timestamp) next[cid] = pv;
+          return next;
+        }))
+        .catch(() => {});
       setLastIds((m) => {
         const next = { ...m };
         for (const g of groups) for (const c of g.channels) if (c.lastMessageId && (!next[c.id] || compareSnowflakes(c.lastMessageId, next[c.id]) > 0)) next[c.id] = c.lastMessageId;
@@ -92,7 +110,21 @@ export default function Workspace({ status, toast, onReconnect }) {
       if (type === 'message:create') {
         messageStore.upsertConfirmed(p);
         setLastIds((m) => ({ ...m, [p.channelId]: p.id }));
-        if (!p.isOwn && (p.channelId !== activeRef.current || document.hidden)) setLiveUnread((s) => (s.has(p.channelId) ? s : new Set(s).add(p.channelId)));
+        setPreviews((m) => ({
+          ...m,
+          [p.channelId]: {
+            channelId: p.channelId,
+            messageId: p.id,
+            authorName: p.author.name,
+            isOwn: p.isOwn,
+            text: toPlainText(p.content, p.mentions).slice(0, 120) || (p.attachments.length ? '📎 Anhang' : p.embedsCount ? '[Embed]' : ''),
+            timestamp: p.createdTimestamp,
+          },
+        }));
+        if (!p.isOwn && (p.channelId !== activeRef.current || document.hidden)) {
+          setLiveUnread((s) => (s.has(p.channelId) ? s : new Set(s).add(p.channelId)));
+          setUnreadCounts((c) => ({ ...c, [p.channelId]: (c[p.channelId] || 0) + 1 }));
+        }
         setTyping((t) => {
           if (!t[p.channelId]?.[p.author.id]) return t;
           const { [p.author.id]: _gone, ...rest } = t[p.channelId];
@@ -138,6 +170,7 @@ export default function Workspace({ status, toast, onReconnect }) {
 
   // ---------- Gelesen-Markierung ----------
   const markRead = useCallback((cid, messageId) => {
+    setUnreadCounts((c) => (c[cid] ? { ...c, [cid]: 0 } : c));
     setLiveUnread((s) => {
       if (!s.has(cid)) return s;
       const n = new Set(s);
@@ -161,6 +194,13 @@ export default function Workspace({ status, toast, onReconnect }) {
     },
     [channelId, liveUnread, lastIds, readMarkers],
   );
+
+  // Chats des Servers nach letzter Aktivität sortiert (neueste oben, wie in Messengern).
+  const chats = useMemo(() => {
+    const list = (channels || []).flatMap((g) => g.channels);
+    const activity = (c) => previews[c.id]?.timestamp || (lastIds[c.id] ? timestampOf(lastIds[c.id]) : 0);
+    return list.sort((a, b) => activity(b) - activity(a) || a.position - b.position);
+  }, [channels, previews, lastIds]);
 
   const unreadGuilds = useMemo(() => {
     const s = new Set();
@@ -203,17 +243,16 @@ export default function Workspace({ status, toast, onReconnect }) {
       } else if (e.ctrlKey && k === 'f') {
         e.preventDefault();
         setSearchOpen(true);
-      } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && channels) {
+      } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && chats.length) {
         e.preventDefault();
-        const all = channels.flatMap((g) => g.channels);
-        const i = all.findIndex((c) => c.id === channelId);
-        const next = all[(i + (e.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length];
+        const i = chats.findIndex((c) => c.id === channelId);
+        const next = chats[(i + (e.key === 'ArrowDown' ? 1 : -1) + chats.length) % chats.length];
         if (next) setChannelId(next.id);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [channels, channelId]);
+  }, [chats, channelId]);
 
   const nav = useMemo(
     () => ({
@@ -246,7 +285,21 @@ export default function Workspace({ status, toast, onReconnect }) {
           </div>
         )}
         <ServerRail guilds={guilds} activeId={guildId} unreadGuilds={unreadGuilds} onSelect={selectGuild} onInvite={invite} />
-        <ChannelSidebar guild={guild} groups={channels} activeId={channelId} isUnread={isUnread} onSelect={setChannelId} status={status} hasGuilds={guilds === null || guilds.length > 0} onInvite={invite} />
+        <ChatList
+          guild={guild}
+          chats={chats}
+          previews={previews}
+          activeId={channelId}
+          isUnread={isUnread}
+          unreadCounts={unreadCounts}
+          onSelect={setChannelId}
+          status={status}
+          hasGuilds={guilds === null || guilds.length > 0}
+          loading={guilds === null || (guildId && !channels)}
+          onInvite={invite}
+          now={now}
+          appInfo={appInfo}
+        />
         <ChatView
           key={channelId || 'none'}
           guild={guild}

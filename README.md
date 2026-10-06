@@ -27,5 +27,12 @@ npm start      # echte App – beim ersten Start führt dich die Setup-Ansicht d
 | `npm run demo` | Demo ohne Discord |
 | `npm test` | Tests |
 | `npm run make` | Windows-Installer bauen |
+| `npm run update` | Quellcode auf den neuesten Stand holen (git pull + Build) |
+| `npm run publish` | neue Version als GitHub-Release veröffentlichen |
+
+## Updates
+
+Die **installierte App** sucht beim Start und alle 6 Stunden selbst nach neuen Versionen (GitHub-Releases über update.electronjs.org), lädt sie im Hintergrund und bietet „Jetzt neu starten“ an. Eine Neuinstallation ist nicht nötig.
+Wer mit dem **Quellcode** arbeitet, nutzt `npm run update`.
 
 Details zu Architektur, Recht und Status: [AGENTS.md](AGENTS.md) · Fehlerprotokoll: [error.md](error.md)

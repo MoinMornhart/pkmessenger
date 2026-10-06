@@ -14,4 +14,13 @@ function compareSnowflakes(a, b) {
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
-module.exports = { isSnowflake, compareSnowflakes };
+// Erstellungszeit aus der ID (Discord-Epoche 2015-01-01 = 1420070400000 ms).
+function timestampOf(id) {
+  try {
+    return Number((BigInt(id) >> 22n) + 1420070400000n);
+  } catch {
+    return 0;
+  }
+}
+
+module.exports = { isSnowflake, compareSnowflakes, timestampOf };

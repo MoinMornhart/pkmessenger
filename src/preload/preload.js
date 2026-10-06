@@ -13,17 +13,22 @@ const EVENT_TYPES = new Set([
   'channels:changed',
   'ratelimit',
   'log',
+  'update',
 ]);
 
 const call = (channel) => (payload) => ipcRenderer.invoke(channel, payload);
 
 contextBridge.exposeInMainWorld('api', {
   getStatus: call('pk:get-status'),
+  getAppInfo: call('pk:get-app-info'),
+  checkForUpdates: call('pk:check-updates'),
+  installUpdate: call('pk:install-update'),
   connect: call('pk:connect'),
   openEnvFile: call('pk:open-env-file'),
   getInviteUrl: call('pk:get-invite-url'),
   listGuilds: call('pk:list-guilds'),
   listChannels: call('pk:list-channels'),
+  getPreviews: call('pk:get-previews'),
   getMessages: call('pk:get-messages'),
   sendMessage: call('pk:send-message'),
   sendTyping: call('pk:send-typing'),

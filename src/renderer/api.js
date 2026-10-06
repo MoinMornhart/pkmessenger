@@ -18,11 +18,15 @@ function call(name) {
 export const api = Object.fromEntries(
   [
     'getStatus',
+    'getAppInfo',
+    'checkForUpdates',
+    'installUpdate',
     'connect',
     'openEnvFile',
     'getInviteUrl',
     'listGuilds',
     'listChannels',
+    'getPreviews',
     'getMessages',
     'sendMessage',
     'sendTyping',

@@ -28,7 +28,10 @@ export default function Composer({ guild, channel, bot, allChannels, onSend }) {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = `${Math.min(ta.scrollHeight, 280)}px`;
+    // +2 px für den Rahmen (box-sizing: border-box), sonst erscheint ein überflüssiger Scrollbalken
+    const full = ta.scrollHeight + 2;
+    ta.style.height = `${Math.min(full, 280)}px`;
+    ta.style.overflowY = full > 280 ? 'auto' : 'hidden';
   }, [text]);
 
   useEffect(() => {
