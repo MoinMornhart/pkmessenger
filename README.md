@@ -1,38 +1,215 @@
+<div align="center">
+
+<img src="docs/images/logo.svg" width="96" height="96" alt="PKMessenger-Logo">
+
 # PKMessenger
 
-Kostenloses Windows-Bot-Control-Center für Discord: Du lädst **deinen eigenen Bot** auf deinen Server ein und liest und schreibst dann alles direkt in PKMessenger, ohne den Discord-Client.
+**Dein Discord-Server – als schlanker Messenger auf dem Windows-Desktop.**
+Lesen, schreiben, erwähnen, suchen und in Sprachkanälen sprechen, ohne den Discord-Client zu öffnen. Alles läuft über deinen **eigenen Bot**.
 
-> Alle Nachrichten gehen **als dein Bot** raus (mit BOT-Kennzeichnung). PKMessenger ist kein offizielles Discord-Produkt und kein Ersatz für deinen persönlichen Account.
+[![Neueste Version](https://img.shields.io/github/v/release/MoinMornhart/pkmessenger?label=Version&color=2dd4bf)](https://github.com/MoinMornhart/pkmessenger/releases/latest)
+[![Plattform](https://img.shields.io/badge/Plattform-Windows%2010%20%7C%2011-6366f1)](#-installation)
+[![Lizenz](https://img.shields.io/badge/Lizenz-MIT-34d399)](LICENSE)
+[![Kostenlos](https://img.shields.io/badge/Preis-kostenlos-fbbf24)](#)
 
-## Schnellstart
+[**⬇️ Herunterladen**](https://github.com/MoinMornhart/pkmessenger/releases/latest) · [Funktionen](#-funktionen) · [Einrichtung](#-bot-einrichten-einmalig-ca-10-minuten) · [Anrufe](#-sprachkanäle-anrufe) · [FAQ](#-häufige-fragen)
+
+<br>
+
+<img src="docs/images/chat.png" alt="PKMessenger: Chat-Liste links, Unterhaltung in Sprechblasen rechts" width="900">
+
+<sub>Bildschirmfoto aus dem Demo-Modus mit Beispieldaten (oben rechts „DEMO“).</sub>
+
+</div>
+
+---
+
+## 💡 Was ist PKMessenger?
+
+PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau und Uhrzeit, rechts die Unterhaltung in Sprechblasen. Im Hintergrund steckt aber **kein** persönlicher Discord-Account, sondern ein **Bot, den du selbst anlegst** und auf deinen Server einlädst. So bleibt alles im Rahmen der offiziellen Discord-Regeln.
+
+> **Wichtig, damit keine falschen Erwartungen entstehen:** Nachrichten und Sprache laufen immer als dein Bot, mit sichtbarem **BOT**-Abzeichen. PKMessenger ist kein offizielles Discord-Produkt und ersetzt nicht deinen persönlichen Account.
+
+---
+
+## ✨ Funktionen
+
+| | |
+|---|---|
+| 💬 **Messenger-Ansicht** | Chat-Liste sortiert nach letzter Aktivität, Vorschau der letzten Nachricht, Ungelesen-Zähler, Sprechblasen mit Häkchen ✓ |
+| ⚡ **Live** | Neue Nachrichten und „Anna schreibt …“ erscheinen sofort, deine Nachricht steht ohne Wartezeit im Chat |
+| 📜 **Ganzer Verlauf** | Beim Hochscrollen werden ältere Nachrichten automatisch nachgeladen. Auch Tausende Nachrichten bleiben flüssig |
+| @ **Erwähnungen** | `@` tippen → Personen und Rollen vorschlagen lassen. `#` → Kanäle. Gepingt wird nur, wen du wirklich auswählst |
+| 🛡️ **Schutz vor Massen-Ping** | `@everyone` und `@here` gehen nur nach einer Rückfrage raus |
+| 🔊 **Sprachkanäle** | Beitreten, über den Bot sprechen, die anderen hören, Mikro und Ton schalten, auflegen |
+| 🔍 **Schnell finden** | <kbd>Strg</kbd>+<kbd>K</kbd> springt zu jedem Chat, <kbd>Strg</kbd>+<kbd>F</kbd> sucht im Verlauf und springt zur Nachricht |
+| 🔄 **Auto-Update** | Neue Versionen kommen automatisch, ohne Neuinstallation |
+| 🇩🇪 **Komplett auf Deutsch** | Oberfläche, Datumsangaben und verständliche Fehlermeldungen mit „Was kann ich tun?“ |
+| 🔒 **Privat** | Keine Cloud, keine Werbung, keine Telemetrie. Dein Bot-Token bleibt nur auf deinem PC |
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/erwaehnen.png" alt="Vorschlagsliste beim Tippen von @an"><br><sub><b>Erwähnen:</b> <code>@an</code> tippen, Anna auswählen, fertig.</sub></td>
+    <td width="50%"><img src="docs/images/everyone-schutz.png" alt="Rückfrage vor @everyone"><br><sub><b>Kein versehentlicher Massen-Ping:</b> <code>@everyone</code> nur mit Bestätigung.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/schnellsuche.png" alt="Schnellsuche mit Strg+K"><br><sub><b>Strg+K:</b> Zu jedem Chat springen.</sub></td>
+    <td><img src="docs/images/suche.png" alt="Suche im Verlauf mit Strg+F"><br><sub><b>Strg+F:</b> Im Verlauf suchen, Treffer anklicken, hinspringen.</sub></td>
+  </tr>
+</table>
+
+---
+
+## 🔊 Sprachkanäle (Anrufe)
+
+<img src="docs/images/anruf.png" alt="Anruf-Ansicht: PKBot, Anna (spricht) und Bernd (stumm) im Sprachkanal Lounge" width="900">
+
+- **Beitreten** mit einem Klick. Danach zeigt eine Anrufleiste unten links, dass du verbunden bist, auch wenn du nebenbei chattest.
+- **Mikro an/aus:** Die anderen hören dich als **„DeinBot [BOT]“**. Das Mikrofon wird beim Ausschalten komplett freigegeben.
+- **Ton an/aus:** Die anderen hören. Wer gerade spricht, leuchtet grün.
+- **Ende-zu-Ende-verschlüsselt** über das DAVE-Protokoll, das Discord seit März 2026 vorschreibt.
+- **Es wird nichts aufgezeichnet.** Ton wird nur live durchgereicht.
+
+> ⚠️ **Gut zu wissen:** Discord dokumentiert das *Zuhören* für Bots nicht offiziell, deshalb ist es in PKMessenger als „experimentell“ markiert. **Nicht möglich** sind mit Bots grundsätzlich: einzelne Personen direkt anrufen, Video und Bildschirm teilen.
+
+---
+
+## 📦 Installation
+
+1. Lade die neueste **`PKMessenger-Setup.exe`** herunter: **[→ Releases](https://github.com/MoinMornhart/pkmessenger/releases/latest)**
+2. Doppelklick, und PKMessenger installiert sich und startet. Eine Verknüpfung landet auf dem Desktop und im Startmenü.
+3. Beim ersten Start führt dich die App durch die Einrichtung (siehe unten).
+
+> Windows SmartScreen meldet sich eventuell mit „Unbekannter Herausgeber“, weil die App (noch) nicht kostenpflichtig signiert ist. Klicke dann auf **„Weitere Informationen“ → „Trotzdem ausführen“**.
+
+**Updates kommen automatisch.** Die App prüft beim Start und alle 6 Stunden, ob es eine neue Version gibt, lädt sie im Hintergrund und fragt dann: *„Update bereit – Jetzt neu starten?“*
+
+---
+
+## 🤖 Bot einrichten (einmalig, ca. 10 Minuten)
+
+<img src="docs/images/einrichtung.png" alt="Einrichtungs-Assistent von PKMessenger" width="900">
+
+Die App zeigt dir diese Schritte auch selbst an:
+
+1. **Bot anlegen:** Öffne das [Discord Developer Portal](https://discord.com/developers/applications) → **New Application** → Namen vergeben → links **Bot** → **Reset Token** → Token **einmal** kopieren.
+2. **Token eintragen:** In PKMessenger auf **„.env-Datei öffnen“** klicken, den Token hinter `DISCORD_TOKEN=` einfügen, speichern.
+   > 🔐 Den Token **nie** weitergeben, posten oder abfotografieren. Er ist das Passwort deines Bots. Falls er doch irgendwo landet: im Portal sofort **Reset Token**.
+3. **Message Content Intent einschalten:** Im Portal unter **Bot → Privileged Gateway Intents** nur **Message Content Intent** aktivieren. *Server Members* und *Presence* bleiben aus, die braucht PKMessenger nicht.
+4. **Bot einladen:** Die App zeigt dir den fertigen **Einladungslink** an. Er enthält genau die nötigen Rechte: Kanäle ansehen, Nachrichten senden, Verlauf lesen, Reaktionen, Dateien, Links einbetten, Verbinden, Sprechen.
+5. **Verbinden** klicken. Fertig, unten links steht **„Verbunden ✓“**.
+
+> Solange PKMessenger nicht läuft, zeigt Discord deinen Bot als **offline** an. Das ist normal. Der Bot sieht außerdem nur Kanäle, die seine Rolle sehen darf.
+
+---
+
+## ⌨️ Tastenkürzel
+
+| Kürzel | Aktion |
+|---|---|
+| <kbd>Enter</kbd> | Nachricht senden |
+| <kbd>Umschalt</kbd>+<kbd>Enter</kbd> | Neue Zeile |
+| <kbd>@</kbd> / <kbd>#</kbd> | Person/Rolle bzw. Kanal erwähnen |
+| <kbd>Strg</kbd>+<kbd>K</kbd> | Zu einem Chat springen |
+| <kbd>Strg</kbd>+<kbd>F</kbd> | Im Verlauf suchen |
+| <kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> | Vorheriger / nächster Chat |
+| <kbd>Esc</kbd> | Dialog oder Vorschläge schließen |
+
+---
+
+## 🔒 Datenschutz & Fairness
+
+- **Nur offizielle Discord-Bot-API.** Keine Self-Bots, keine User-Tokens, keine Client-Mods. Das würde gegen die Discord-Regeln verstoßen und deinen Account gefährden.
+- **Jede Nachricht ist als Bot gekennzeichnet.** Niemand wird getäuscht.
+- **Datensparsam:** Gespeichert werden nur, welchen Chat du zuletzt offen hattest und bis wohin du gelesen hast. Der Token liegt ausschließlich in deiner lokalen `.env`-Datei.
+- **Keine Cloud, keine Analyse, keine Telemetrie.** Für Updates fragt die App nur nach der neuesten Version, dabei werden App-Version und Plattform übertragen, keine persönlichen Daten.
+- **Sprachkanäle:** nichts wird aufgezeichnet.
+
+---
+
+## ❓ Häufige Fragen
+
+<details>
+<summary><b>Kann ich über meinen persönlichen Discord-Account schreiben?</b></summary>
+
+Nein. Discord bietet dafür keine erlaubte Schnittstelle, das wäre ein sogenannter Self-Bot und kann zur Sperrung deines Accounts führen. PKMessenger nutzt deshalb immer einen eigenen Bot.
+</details>
+
+<details>
+<summary><b>Kann ich Leute anrufen wie bei WhatsApp?</b></summary>
+
+Bots können nur **Sprachkanälen auf Servern** beitreten. Einzelne Personen direkt anrufen geht mit Bots nicht, Video und Bildschirm teilen ebenfalls nicht.
+</details>
+
+<details>
+<summary><b>Warum sehe ich manche Kanäle nicht?</b></summary>
+
+Der Bot sieht nur Kanäle, die seine Rolle sehen darf. Gib der Bot-Rolle in den Kanaleinstellungen „Kanal ansehen“ (und zum Schreiben „Nachrichten senden“).
+</details>
+
+<details>
+<summary><b>Muss mein PC laufen?</b></summary>
+
+Ja. Der Bot ist online, solange PKMessenger läuft. Ist die App geschlossen, ist der Bot offline.
+</details>
+
+<details>
+<summary><b>Kostet das etwas?</b></summary>
+
+Nein. PKMessenger ist kostenlos und quelloffen (MIT-Lizenz). Auch Discord-Bots sind kostenlos.
+</details>
+
+<details>
+<summary><b>Die App sagt „Discord hat den Token abgelehnt“.</b></summary>
+
+Der Token ist falsch oder wurde zurückgesetzt. Im Developer Portal unter **Bot → Reset Token** einen neuen erzeugen und in die `.env` eintragen.
+</details>
+
+---
+
+## 🛠️ Für Entwickler
 
 ```powershell
+git clone https://github.com/MoinMornhart/pkmessenger.git
+cd pkmessenger
 npm install
-npm run demo   # Oberfläche mit Beispieldaten ansehen (ohne Token)
-npm start      # echte App – beim ersten Start führt dich die Setup-Ansicht durch alles
+npm run demo     # Oberfläche mit Beispieldaten ansehen – ohne Token
+npm start        # echte App
 ```
-
-## Bot einrichten (einmalig)
-
-1. https://discord.com/developers/applications öffnen → **New Application** → links **Bot** → **Reset Token** → Token kopieren.
-2. Token in `.env` eintragen: `DISCORD_TOKEN=...` (Vorlage: `.env.example`). **Niemals teilen oder committen.**
-3. **Bot → Privileged Gateway Intents:** nur **Message Content Intent** einschalten.
-4. Bot einladen: Den Link zeigt die App an, sobald der Token eingetragen ist. Benötigte Rechte: Kanäle ansehen, Nachrichten senden, Nachrichtenverlauf lesen.
-
-## Befehle
 
 | Befehl | Zweck |
 |---|---|
 | `npm start` | App starten |
-| `npm run demo` | Demo ohne Discord |
-| `npm test` | Tests |
-| `npm run make` | Windows-Installer bauen |
+| `npm run demo` | Demo ohne Discord (Beispieldaten, „DEMO“-Badge) |
+| `npm test` | Alle Tests (Node-Testrunner) |
+| `npm run make` | Windows-Installer + ZIP bauen |
+| `npm run publish` | Neue Version als GitHub-Release veröffentlichen (`GITHUB_TOKEN` nötig) |
 | `npm run update` | Quellcode auf den neuesten Stand holen (git pull + Build) |
-| `npm run publish` | neue Version als GitHub-Release veröffentlichen |
 
-## Updates
+**Technik:** Electron 44 · discord.js 14 · @discordjs/voice (DAVE) · React 19 · react-window · esbuild · Electron Forge.
+Sprache läuft ohne FFmpeg und ohne native Opus-Module: Kodiert wird mit WebCodecs direkt im eingebauten Chromium.
 
-Die **installierte App** sucht beim Start und alle 6 Stunden selbst nach neuen Versionen (GitHub-Releases über update.electronjs.org), lädt sie im Hintergrund und bietet „Jetzt neu starten“ an. Eine Neuinstallation ist nicht nötig.
-Wer mit dem **Quellcode** arbeitet, nutzt `npm run update`.
+**Sicherheit:** Der Token bleibt im Hauptprozess, die Oberfläche läuft in einer Sandbox mit strenger Content-Security-Policy, und jede Anfrage zwischen Oberfläche und Hauptprozess wird geprüft.
 
-Details zu Architektur, Recht und Status: [AGENTS.md](AGENTS.md) · Fehlerprotokoll: [error.md](error.md)
+Mehr Details: [AGENTS.md](AGENTS.md) (Architektur, Entscheidungen, Teststand) · [error.md](error.md) (Fehlerprotokoll)
+
+---
+
+## 🗺️ Geplant
+
+- [ ] Auf Nachrichten antworten (mit Zitat-Vorschau)
+- [ ] Reaktionen mit Emoji-Auswahl
+- [ ] Eigene Nachrichten bearbeiten und löschen
+- [ ] Dateien und Bilder senden (bis 25 MiB)
+- [ ] Embeds anzeigen und erstellen
+- [ ] Threads
+- [ ] Angepinnte Nachrichten
+- [ ] Serverweite Suche
+- [ ] Slash-Befehle
+
+---
+
+<div align="center">
+<sub>PKMessenger ist ein unabhängiges Projekt und steht in keiner Verbindung zu Discord Inc. „Discord“ ist eine Marke der Discord Inc.<br>
+Lizenz: <a href="LICENSE">MIT</a></sub>
+</div>
