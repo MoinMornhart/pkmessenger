@@ -1,0 +1,37 @@
+// Dünne Hülle um window.api (aus preload.js): wandelt { ok:false, error } in eine Exception mit deutscher Meldung.
+const raw = window.api;
+
+function call(name) {
+  return async (payload) => {
+    const res = await raw[name](payload);
+    if (!res || !res.ok) {
+      const info = res?.error || { code: 'UNKNOWN', message: 'Unbekannter Fehler.', hint: '' };
+      const err = new Error(info.message);
+      err.code = info.code;
+      err.hint = info.hint;
+      throw err;
+    }
+    return res.data;
+  };
+}
+
+export const api = Object.fromEntries(
+  [
+    'getStatus',
+    'connect',
+    'openEnvFile',
+    'getInviteUrl',
+    'listGuilds',
+    'listChannels',
+    'getMessages',
+    'sendMessage',
+    'sendTyping',
+    'searchMentionables',
+    'getSettings',
+    'setReadMarker',
+    'setLastLocation',
+    'openExternal',
+  ].map((n) => [n, call(n)]),
+);
+
+export const onEvent = (cb) => raw.onEvent(cb);

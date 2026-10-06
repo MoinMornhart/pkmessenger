@@ -1,0 +1,16 @@
+# Abhängigkeiten & Build
+node_modules/
+out/
+dist/
+build/
+
+# GEHEIM – Bot-Token
+.env
+.env.*
+!.env.example
+
+# Sonstiges
+*.log
+screenshots/
+.DS_Store
+Thumbs.db
