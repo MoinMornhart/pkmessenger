@@ -96,7 +96,7 @@ function makeChannel(guild, { id, name, type = ChannelType.GuildText, parentId =
  * - #allgemein (sehen+schreiben+verlauf), #nur-lesen (sehen+verlauf), #geheim (unsichtbar), #ankuendigungen (Ankündigung),
  *   ein Sprachkanal (wird nie gelistet), Kategorie "Projekte" mit #projekt-a.
  */
-function createFakeWorld({ loginBehavior = 'ready' } = {}) {
+function createFakeWorld({ loginBehavior = 'ready', withExtraTypes = false } = {}) {
   const client = new EventEmitter();
   client.user = makeUser(BOT_ID, 'PKBot', { bot: true });
   client.application = { id: BOT_ID };
@@ -169,6 +169,12 @@ function createFakeWorld({ loginBehavior = 'ready' } = {}) {
     projektA: makeChannel(guild, { id: '444444444444444406', name: 'projekt-a', parentId: category.id, position: 0, perms: all }),
     blindHistory: makeChannel(guild, { id: '444444444444444407', name: 'ohne-verlauf', position: 5, perms: [P.ViewChannel, P.SendMessages] }),
   };
+  // Kanaltypen, die erkannt, aber (noch) nicht bedient werden – nur in Tests, die sie ausdrücklich anfordern
+  if (withExtraTypes) {
+    channels.forum = makeChannel(guild, { id: '444444444444444408', name: 'ideen-forum', type: ChannelType.GuildForum, position: 6, perms: all });
+    channels.stage = makeChannel(guild, { id: '444444444444444409', name: 'bühne', type: ChannelType.GuildStageVoice, position: 7, perms: all });
+    channels.thread = makeChannel(guild, { id: '444444444444444410', name: 'ein-thread', type: ChannelType.PublicThread, parentId: '444444444444444401', perms: all });
+  }
   guild.channels = { cache: new Map([[category.id, category], ...Object.values(channels).map((c) => [c.id, c])]) };
   guild.voiceStates = { cache: new Map() };
   // REST-Nachladen (für "Aktualisieren"): zählt Aufrufe, kann zum Scheitern gebracht werden.

@@ -1305,6 +1305,17 @@ a:hover {
     transform: rotate(360deg);
   }
 }
+.chatrow--disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.chatrow--disabled:hover {
+  background: none;
+}
+.chat-avatar--muted {
+  background: var(--elev);
+  font-size: 20px;
+}
 .access-hint {
   display: block;
   width: calc(100% - 24px);

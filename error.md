@@ -93,6 +93,18 @@
 
 ---
 
+## #8 – Git-Branch plötzlich „leer“ (iCloud-Sync-Konflikt in .git)
+
+1. **Datum & Uhrzeit:** 06.10.2026, ca. 22:20 (stündlicher Issue-Lauf)
+2. **Was passiert ist:** `git pull --rebase` meldete wörtlich `fatal: Updating an unborn branch with changes added to the index.` und `fatal: your current branch 'main' does not have any commits yet`. `git status`: `## No commits yet on main...origin/main [gone]`.
+3. **Reproduzierbar:** einmalig, kann bei iCloud-Synchronisation jederzeit wieder auftreten.
+4. **Ursache (geprüft):** In `.git/refs/heads/` lag statt `main` eine Datei **`main 2`**, so benennt iCloud Drive Dateien bei Sync-Konflikten. Ohne `refs/heads/main` hält Git den Branch für leer. Der Inhalt von `main 2` war korrekt (`5c16022…`), alle Objekte vorhanden, `origin/main` identisch.
+5. **Lösung:** `main 2` gesichert (Scratchpad), dann `git update-ref refs/heads/main 5c160229…` und `main 2` entfernt. Keine Daten verloren, nichts überschrieben.
+6. **Testergebnis:** `git status -sb` → `## main...origin/main`; `git log` zeigt 5c16022/2680646/5ea6faa; `git fsck --no-dangling` ohne Fehler.
+7. **Prävention:** Das Projekt liegt im iCloud-Ordner, und iCloud verträgt sich schlecht mit `.git` und `node_modules`. **Empfehlung an den Nutzer:** das Projekt in einen Ordner außerhalb von iCloud verschieben (z. B. `C:\Projekte\PKMessenger`), da GitHub ohnehin die Sicherung ist. Bis dahin vor jedem Lauf prüfen: `find .git -name "* 2*"`.
+
+---
+
 ## Hinweis (kein Fehler): „NativeCommandError“ beim Renderer-Build in PowerShell
 
 esbuild schreibt seine normale Erfolgsmeldung (`build\renderer\app.js 276.3kb … Done`) auf stderr. Windows PowerShell 5.1 zeigt das rot als `NativeCommandError` an, obwohl der Build erfolgreich war (Exit-Code 0). Kein Handlungsbedarf.

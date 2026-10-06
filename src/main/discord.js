@@ -23,6 +23,13 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   const TEXT_TYPES = new Set([ChannelType.GuildText, ChannelType.GuildAnnouncement]);
   // Sprachkanäle (Stage-Kanäle bewusst nicht – dort gelten Sprecher-Regeln).
   const VOICE_TYPES = new Set([ChannelType.GuildVoice]);
+  // Erkannt, aber (noch) nicht bedienbar – werden angezeigt statt stillschweigend zu fehlen (Issue #1: „alle Kanäle erkennen“).
+  const OTHER_TYPES = new Map([
+    [ChannelType.GuildForum, 'forum'],
+    [ChannelType.GuildMedia, 'media'],
+    [ChannelType.GuildStageVoice, 'stage'],
+  ]);
+  const THREAD_TYPES = new Set([ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread]);
 
   const makeClient =
     createClient ||
@@ -223,27 +230,30 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
 
   function listChannels({ guildId }) {
     const guild = requireGuild(guildId);
-    const all = [...guild.channels.cache.values()];
-    const visible = all.filter((ch) => (TEXT_TYPES.has(ch.type) || VOICE_TYPES.has(ch.type)) && can(ch, PermissionFlagsBits.ViewChannel));
+    const all = [...guild.channels.cache.values()].filter(Boolean);
+    const known = (ch) => TEXT_TYPES.has(ch.type) || VOICE_TYPES.has(ch.type) || OTHER_TYPES.has(ch.type);
+    const visible = all.filter((ch) => known(ch) && can(ch, PermissionFlagsBits.ViewChannel));
     const groups = new Map();
     for (const ch of visible) {
       const key = ch.parentId || '';
       if (!groups.has(key)) {
         const parent = ch.parentId ? guild.channels.cache.get(ch.parentId) : null;
-        groups.set(key, { category: parent ? { id: parent.id, name: parent.name } : null, position: parent ? parent.position : -1, channels: [] });
+        groups.set(key, { category: parent ? { id: parent.id, name: parent.name ?? '' } : null, position: parent ? (parent.position ?? 0) : -1, channels: [] });
       }
+      const other = OTHER_TYPES.get(ch.type);
       groups.get(key).channels.push({
         id: ch.id,
         guildId: guild.id,
-        name: ch.name,
-        type: VOICE_TYPES.has(ch.type) ? 'voice' : ch.type === ChannelType.GuildAnnouncement ? 'announcement' : 'text',
+        name: ch.name ?? '(ohne Namen)',
+        type: other || (VOICE_TYPES.has(ch.type) ? 'voice' : ch.type === ChannelType.GuildAnnouncement ? 'announcement' : 'text'),
+        unsupported: Boolean(other), // Forum/Medien/Stage: angezeigt, aber noch nicht bedienbar
         canConnect: VOICE_TYPES.has(ch.type) && can(ch, PermissionFlagsBits.Connect),
         canSpeak: VOICE_TYPES.has(ch.type) && can(ch, PermissionFlagsBits.Speak),
         topic: ch.topic || '',
-        position: ch.position,
-        lastMessageId: ch.lastMessageId || null,
-        canSend: can(ch, PermissionFlagsBits.SendMessages),
-        canReadHistory: can(ch, PermissionFlagsBits.ReadMessageHistory),
+        position: ch.position ?? 0,
+        lastMessageId: other ? null : ch.lastMessageId || null,
+        canSend: !other && can(ch, PermissionFlagsBits.SendMessages),
+        canReadHistory: !other && can(ch, PermissionFlagsBits.ReadMessageHistory),
         canMentionEveryone: can(ch, PermissionFlagsBits.MentionEveryone),
       });
     }
@@ -451,20 +461,24 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   /** Welche Text-/Sprachkanäle sind für den Bot gesperrt oder nur lesbar? (zum Anzeigen + Erklären) */
   function getChannelAccess({ guildId }) {
     const guild = requireGuild(guildId);
-    const relevant = [...guild.channels.cache.values()].filter((ch) => ch && (TEXT_TYPES.has(ch.type) || VOICE_TYPES.has(ch.type)));
+    const all = [...guild.channels.cache.values()].filter(Boolean);
+    const relevant = all.filter((ch) => TEXT_TYPES.has(ch.type) || VOICE_TYPES.has(ch.type) || OTHER_TYPES.has(ch.type));
     const describe = (ch) => ({
       id: ch.id,
       name: ch.name ?? '(ohne Namen)',
-      type: VOICE_TYPES.has(ch.type) ? 'voice' : 'text',
+      type: OTHER_TYPES.get(ch.type) || (VOICE_TYPES.has(ch.type) ? 'voice' : 'text'),
       category: (ch.parentId && guild.channels.cache.get(ch.parentId)?.name) || null,
     });
+    // Sichtbare, aber noch nicht bedienbare Kanäle + aktive Threads (kommen mit F12)
+    const unsupported = relevant.filter((ch) => OTHER_TYPES.has(ch.type) && can(ch, PermissionFlagsBits.ViewChannel)).map(describe);
+    const threads = all.filter((ch) => THREAD_TYPES.has(ch.type)).length;
     const byPos = (a, b) => (a.position ?? 0) - (b.position ?? 0);
     const hidden = relevant.filter((ch) => !can(ch, PermissionFlagsBits.ViewChannel)).sort(byPos).map(describe);
     const readOnly = relevant
       .filter((ch) => TEXT_TYPES.has(ch.type) && can(ch, PermissionFlagsBits.ViewChannel) && !can(ch, PermissionFlagsBits.SendMessages))
       .sort(byPos)
       .map(describe);
-    return { total: relevant.length, hidden, readOnly };
+    return { total: relevant.length, hidden, readOnly, unsupported, threads };
   }
 
   // ---------- Sprachkanäle ----------

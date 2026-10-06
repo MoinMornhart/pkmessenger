@@ -100,15 +100,17 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   }, [loadGuilds]);
 
   const channels = useMemo(() => (guildId ? channelsByGuild[guildId] : null), [guildId, channelsByGuild]);
-  const flatChannels = useMemo(() => Object.values(channelsByGuild).flatMap((groups) => groups.flatMap((g) => g.channels)), [channelsByGuild]);
+  const allChannels = useMemo(() => Object.values(channelsByGuild).flatMap((groups) => groups.flatMap((g) => g.channels)), [channelsByGuild]);
+  // Nur bedienbare Kanäle für Schnellsuche, #-Erwähnungen und Navigation (Forum/Stage sind erkannt, aber noch nicht bedienbar)
+  const flatChannels = useMemo(() => allChannels.filter((c) => !c.unsupported), [allChannels]);
   const channelById = useMemo(() => new Map(flatChannels.map((c) => [c.id, c])), [flatChannels]);
   const channel = channelById.get(channelId) || null;
 
   // Gespeicherter Kanal gehört nicht (mehr) zum Server → ersten sichtbaren Kanal wählen.
   useEffect(() => {
     if (!guildId || !channels) return;
-    const inGuild = channels.some((g) => g.channels.some((c) => c.id === channelId));
-    if (!inGuild) setChannelId(channels.flatMap((g) => g.channels).find((c) => c.type !== 'voice')?.id || null);
+    const inGuild = channels.some((g) => g.channels.some((c) => c.id === channelId && !c.unsupported));
+    if (!inGuild) setChannelId(channels.flatMap((g) => g.channels).find((c) => c.type !== 'voice' && !c.unsupported)?.id || null);
   }, [guildId, channels, channelId]);
 
   useEffect(() => {
@@ -212,10 +214,11 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const guildIds = useMemo(() => (guilds || []).map((g) => g.id), [guilds]);
   const voiceCtl = useVoice({ toast, guildIds });
   const voiceChannels = useMemo(() => (channels || []).flatMap((g) => g.channels).filter((c) => c.type === 'voice'), [channels]);
+  const otherChannels = useMemo(() => (channels || []).flatMap((g) => g.channels).filter((c) => c.unsupported), [channels]);
 
   // Chats des Servers nach letzter Aktivität sortiert (neueste oben, wie in Messengern).
   const chats = useMemo(() => {
-    const list = (channels || []).flatMap((g) => g.channels).filter((c) => c.type !== 'voice');
+    const list = (channels || []).flatMap((g) => g.channels).filter((c) => c.type !== 'voice' && !c.unsupported);
     const activity = (c) => previews[c.id]?.timestamp || (lastIds[c.id] ? timestampOf(lastIds[c.id]) : 0);
     return list.sort((a, b) => activity(b) - activity(a) || a.position - b.position);
   }, [channels, previews, lastIds]);
@@ -241,7 +244,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     (gid) => {
       setGuildId(gid);
       const groups = channelsByGuild[gid] || [];
-      const all = groups.flatMap((g) => g.channels).filter((c) => c.type !== 'voice');
+      const all = groups.flatMap((g) => g.channels).filter((c) => c.type !== 'voice' && !c.unsupported);
       setChannelId(all.find(isUnread)?.id || all[0]?.id || null);
     },
     [channelsByGuild, isUnread],
@@ -349,6 +352,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           now={now}
           appInfo={appInfo}
           voiceChannels={voiceChannels}
+          otherChannels={otherChannels}
           voiceMembers={voiceCtl.members[guildId] || {}}
           speaking={voiceCtl.speaking}
           voice={voiceCtl.voice}

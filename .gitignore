@@ -14,3 +14,6 @@ build/
 screenshots/
 .DS_Store
 Thumbs.db
+
+# Claude-Code-Sitzungsdateien (z. B. scheduled_tasks.lock) – nie ins öffentliche Repo
+.claude/

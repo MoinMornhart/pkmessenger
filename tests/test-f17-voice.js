@@ -141,6 +141,19 @@ test('Teilnehmerliste: Namen, Stumm-Status, Bot selbst; Nachladen-Fehler bricht 
   ]);
 });
 
+test('Neuaufbau des Discord-Clients legt verwaiste Sprachverbindung auf; Gateway-Resume nicht', async () => {
+  const { vm, lib, events } = setup();
+  await vm.join({ guildId: GUILD_ID, channelId: VC });
+  assert.equal(vm.handleDiscordStatus('reconnecting'), false, 'Resume: Verbindung bleibt');
+  assert.equal(vm.handleDiscordStatus('ready'), false);
+  assert.equal(vm.getState().state, 'connected');
+  assert.equal(vm.handleDiscordStatus('connecting'), true, 'neuer Client: auflegen');
+  assert.equal(lib.connections[0].state.status, 'destroyed');
+  assert.equal(vm.getState().state, 'idle');
+  assert.match(events.at(-1).p.ended, /neu aufgebaut/);
+  assert.equal(vm.handleDiscordStatus('connecting'), false, 'ohne Verbindung: nichts zu tun');
+});
+
 test('Discord-Seite: Sprachkanal in Kanalliste mit Rechten; ohne "Verbinden" → Fehler', async () => {
   const { service, world } = await readyService();
   const flat = service.listChannels({ guildId: GUILD_ID }).flatMap((g) => g.channels);

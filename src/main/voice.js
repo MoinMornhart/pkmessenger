@@ -176,7 +176,21 @@ function createVoiceManager({ voiceLib, getVoiceTarget, emit, sendAudio, joinTim
     return setState({ state: 'idle' });
   }
 
-  return { join, leave, setTalking, setListening, pushPacket, getState: publicState };
+  /**
+   * Discord-Client wird neu aufgebaut (Token-Wechsel, „Neu verbinden“, Abmeldung) → die Sprachverbindung hängt am ALTEN
+   * Client und wäre verwaist. Dann sauber auflegen. Gateway-Resume ("reconnecting"/"ready") lässt die Verbindung bestehen.
+   */
+  function handleDiscordStatus(discordState) {
+    if (!session) return false;
+    if (['connecting', 'setup', 'error', 'disconnected', 'idle'].includes(discordState)) {
+      cleanupSession();
+      setState({ state: 'idle', ended: 'Sprachverbindung beendet, weil die Verbindung zu Discord neu aufgebaut wurde.' });
+      return true;
+    }
+    return false;
+  }
+
+  return { join, leave, setTalking, setListening, pushPacket, getState: publicState, handleDiscordStatus };
 }
 
 module.exports = { createVoiceManager, MAX_OPUS_PACKET };

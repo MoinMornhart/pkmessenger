@@ -42,6 +42,14 @@ const ENV_PATH = demo ? demo.envPath : app.isPackaged ? path.join(app.getPath('u
 let mainWindow = null;
 
 function broadcast(type, payload) {
+  // Neuaufbau des Discord-Clients → verwaiste Sprachverbindung auflegen (Fehlersuche Issue #1)
+  if (type === 'status') {
+    try {
+      voice.handleDiscordStatus(payload?.state);
+    } catch {
+      /* Sprach-Manager noch nicht initialisiert – dann gibt es auch keine Verbindung */
+    }
+  }
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send('pk:event', { type, payload });
   }

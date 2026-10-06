@@ -15,7 +15,7 @@ function avatarFor() {
 }
 
 function createDemo() {
-  const world = createFakeWorld();
+  const world = createFakeWorld({ withExtraTypes: true });
   const { guild, channels, client } = world;
   guild.name = 'PK Testserver';
   guild.nameAcronym = 'PK';

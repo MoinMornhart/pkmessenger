@@ -41,6 +41,19 @@ export default function AccessDialog({ access, guildName, onClose, onRefresh }) 
           </>
         )}
         {hidden.length === 0 && readOnly.length === 0 && <p>✓ Der Bot hat in allen Text- und Sprachkanälen Zugriff.</p>}
+        {(access?.unsupported?.length > 0 || access?.threads > 0) && (
+          <>
+            <h4>🧩 Erkannt, aber noch nicht unterstützt</h4>
+            <ul className="access__list">
+              {(access.unsupported || []).map((c) => (
+                <li key={c.id}>
+                  {c.type === 'forum' ? '🗂 Forum' : c.type === 'media' ? '🖼 Medien' : '🎙 Stage'}: {c.name}
+                </li>
+              ))}
+              {access.threads > 0 && <li>🧵 {access.threads} aktive Threads (Anzeige kommt mit F12)</li>}
+            </ul>
+          </>
+        )}
 
         <div className="callout">
           <span className="callout__label">Was kann ich tun?</span>
