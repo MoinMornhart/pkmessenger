@@ -7,12 +7,12 @@
 **Dein Discord-Server – als schlanker Messenger auf dem Windows-Desktop.**
 Lesen, schreiben, erwähnen, suchen und in Sprachkanälen sprechen, ohne den Discord-Client zu öffnen. Alles läuft über deinen **eigenen Bot**.
 
-[![Neueste Version](https://img.shields.io/github/v/release/MoinMornhart/pkmessenger?label=Version&color=2dd4bf)](https://github.com/MoinMornhart/pkmessenger/releases/latest)
+[![Neueste Version](https://img.shields.io/github/v/release/Morni-Team/pkmessenger?label=Version&color=2dd4bf)](https://github.com/Morni-Team/pkmessenger/releases/latest)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows%2010%20%7C%2011-6366f1)](#-installation)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-34d399)](LICENSE)
 [![Kostenlos](https://img.shields.io/badge/Preis-kostenlos-fbbf24)](#)
 
-[**⬇️ Herunterladen**](https://github.com/MoinMornhart/pkmessenger/releases/latest) · [Funktionen](#-funktionen) · [Einrichtung](#-bot-einrichten-einmalig-ca-10-minuten) · [Anrufe](#-sprachkanäle-anrufe) · [FAQ](#-häufige-fragen)
+[**⬇️ Herunterladen**](https://github.com/Morni-Team/pkmessenger/releases/latest) · [Funktionen](#-funktionen) · [Einrichtung](#-bot-einrichten-einmalig-ca-10-minuten) · [Anrufe](#-sprachkanäle-anrufe) · [FAQ](#-häufige-fragen)
 
 <br>
 
@@ -76,7 +76,7 @@ PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau
 
 ## 📦 Installation
 
-1. Lade die neueste **`PKMessenger-Setup.exe`** herunter: **[→ Releases](https://github.com/MoinMornhart/pkmessenger/releases/latest)**
+1. Lade die neueste **`PKMessenger-Setup.exe`** herunter: **[→ Releases](https://github.com/Morni-Team/pkmessenger/releases/latest)**
 2. Doppelklick, und PKMessenger installiert sich und startet. Eine Verknüpfung landet auf dem Desktop und im Startmenü.
 3. Beim ersten Start führt dich die App durch die Einrichtung (siehe unten).
 
@@ -170,7 +170,7 @@ Der Token ist falsch oder wurde zurückgesetzt. Im Developer Portal unter **Bot 
 ## 🛠️ Für Entwickler
 
 ```powershell
-git clone https://github.com/MoinMornhart/pkmessenger.git
+git clone https://github.com/Morni-Team/pkmessenger.git
 cd pkmessenger
 npm install
 npm run demo     # Oberfläche mit Beispieldaten ansehen – ohne Token

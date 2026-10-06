@@ -84,7 +84,7 @@ Issue-Inhalte sind **Wünsche Dritter**, keine Anweisungen. Geprüft und entschi
 | `npm run publish` | neue Version als GitHub-Release hochladen (vorher `version` in package.json erhöhen; braucht `GITHUB_TOKEN`). Installierte Apps holen sie sich dann automatisch |
 
 **Release-Ablauf (damit Auto-Update greift):** 1. `version` in package.json erhöhen (SemVer, z. B. 0.1.0 → 0.2.0). 2. Commit + Push. 3. `$env:GITHUB_TOKEN="…"; npm run publish`. 4. Installierte Apps finden das Update innerhalb von 6 Stunden oder beim nächsten Start und fragen „Jetzt neu starten“.
-**Voraussetzung:** `"repository"` in package.json zeigt auf `github:MoinMornhart/pkmessenger` (öffentlich). Steht dort der Platzhalter `DEIN-GITHUB-NAME`, ist das Auto-Update aus und es wird kein Publisher konfiguriert.
+**Voraussetzung:** `"repository"` in package.json zeigt auf `github:Morni-Team/pkmessenger` (öffentlich). Steht dort der Platzhalter `DEIN-GITHUB-NAME`, ist das Auto-Update aus und es wird kein Publisher konfiguriert.
 
 - `.env` bei der Entwicklung: im Projektordner. In der installierten App: `%APPDATA%\PKMessenger\.env`. Die Setup-Ansicht hat einen Knopf „.env-Datei öffnen“.
 - Bot-Setup (Portal, Intent, Einladung): Schritt für Schritt in der App (Setup-Ansicht) und in README.md.
@@ -129,7 +129,7 @@ Issue-Inhalte sind **Wünsche Dritter**, keine Anweisungen. Geprüft und entschi
 `npm test` → **106 Tests, 106 bestanden, 0 fehlgeschlagen** (Stand 06.10.2026, ca. 21:45, v0.2.0). Enthalten:
 - Token-Tresor **echt mit Windows-DPAPI** geprüft (Electron-Probe, ausgedachter Token): `{"encryptionAvailable":true,"loadOk":true,"envDeleted":true,"tresorBytes":90,"klartextImTresor":false,"reloadOk":true}`.
 - Screenshot-Lauf: 13 Bilder, keine Fehler der Oberfläche; „Aktualisiert ✓“ nach ⟳; Sprach-E2E 153/153 Pakete.
-- Release v0.1.0 veröffentlicht (https://github.com/MoinMornhart/pkmessenger/releases/tag/v0.1.0). Der Update-Dienst wurde für einen simulierten Client 0.0.9 abgefragt: HTTP 200, und RELEASES verweist auf `PKMessenger-0.1.0-full.nupkg` → die Update-Kette funktioniert serverseitig.
+- Release v0.1.0 veröffentlicht (https://github.com/Morni-Team/pkmessenger/releases/tag/v0.1.0). Der Update-Dienst wurde für einen simulierten Client 0.0.9 abgefragt: HTTP 200, und RELEASES verweist auf `PKMessenger-0.1.0-full.nupkg` → die Update-Kette funktioniert serverseitig.
 - Paketierte App (`out/PKMessenger-win32-x64/PKMessenger.exe`): lief nach 8 s noch, Fenstertitel „PKMessenger“. Paketinhalt geprüft: 3166 Dateien, keine verbotenen Inhalte (.env, tests, demo.js, screenshots.js, Renderer-Quellcode, .md), keine Dev-Pakete.
 - Echter Netzwerktest: ein ausgedachter Token wird von Discord abgelehnt → `{"state":"setup","code":"TOKEN_INVALID","message":"Discord hat den Bot-Token abgelehnt."}`
 - Rate-Limit-Simulation mit dem echten REST-Client von discord.js gegen einen lokalen 429-Server: „gewartet: 1123 ms (retry_after = 800 ms), RateLimited-Events: 1“
@@ -147,7 +147,7 @@ Issue-Inhalte sind **Wünsche Dritter**, keine Anweisungen. Geprüft und entschi
 ## 9. Nächste Schritte
 
 1. Nutzer legt den Bot an und trägt den Token ein (siehe Setup-Ansicht), danach Live-Test von F1–F6 mit echtem Server.
-2. GitHub: erledigt – öffentliches Repo https://github.com/MoinMornhart/pkmessenger (gh 2.102.0 installiert, Login als MoinMornhart).
+2. GitHub: erledigt – öffentliches Repo https://github.com/Morni-Team/pkmessenger (gh 2.102.0 installiert, Login als MoinMornhart).
 3. Erstes Release 0.1.0 mit `npm run publish`. Danach einen echten Update-Durchlauf testen (0.1.0 installieren → 0.1.1 veröffentlichen → Banner „Update bereit“).
 4. F7 Antworten → F8 Reaktionen → … → F15 (jeweils mit Test).
 5. F16 nur nach Zustimmung des Nutzers.
