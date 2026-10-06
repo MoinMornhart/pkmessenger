@@ -7,7 +7,7 @@
   "private": true,
   "license": "MIT",
   "author": "pmorn",
-  "repository": "github:DEIN-GITHUB-NAME/pkmessenger",
+  "repository": "github:MoinMornhart/pkmessenger",
   "scripts": {
     "build:renderer": "node scripts/build-renderer.js",
     "start": "npm run build:renderer && node scripts/start.js",

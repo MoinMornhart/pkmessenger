@@ -62,7 +62,7 @@ tests/                  node:test + assert, Fake-Discord in tests/helpers
 | `npm run publish` | neue Version als GitHub-Release hochladen (vorher `version` in package.json erhöhen; braucht `GITHUB_TOKEN`). Installierte Apps holen sie sich dann automatisch |
 
 **Release-Ablauf (damit Auto-Update greift):** 1. `version` in package.json erhöhen (SemVer, z. B. 0.1.0 → 0.2.0). 2. Commit + Push. 3. `$env:GITHUB_TOKEN="…"; npm run publish`. 4. Installierte Apps finden das Update innerhalb von 6 Stunden oder beim nächsten Start und fragen „Jetzt neu starten“.
-**Voraussetzung:** `"repository"` in package.json muss auf das echte öffentliche GitHub-Repo zeigen. Steht dort der Platzhalter `DEIN-GITHUB-NAME`, ist das Auto-Update aus und es wird kein Publisher konfiguriert.
+**Voraussetzung:** `"repository"` in package.json zeigt auf `github:MoinMornhart/pkmessenger` (öffentlich). Steht dort der Platzhalter `DEIN-GITHUB-NAME`, ist das Auto-Update aus und es wird kein Publisher konfiguriert.
 
 - `.env` bei der Entwicklung: im Projektordner. In der installierten App: `%APPDATA%\PKMessenger\.env`. Die Setup-Ansicht hat einen Knopf „.env-Datei öffnen“.
 - Bot-Setup (Portal, Intent, Einladung): Schritt für Schritt in der App (Setup-Ansicht) und in README.md.
@@ -120,7 +120,7 @@ tests/                  node:test + assert, Fake-Discord in tests/helpers
 ## 9. Nächste Schritte
 
 1. Nutzer legt den Bot an und trägt den Token ein (siehe Setup-Ansicht), danach Live-Test von F1–F6 mit echtem Server.
-2. GitHub: `gh` ist nicht installiert. Nutzer möchte ein **öffentliches** Repo. Dafür braucht es den GitHub-Namen und dann `"repository"` in package.json setzen. Vor dem Push `.gitignore` prüfen (`.env` ist ausgeschlossen).
+2. GitHub: erledigt – öffentliches Repo https://github.com/MoinMornhart/pkmessenger (gh 2.102.0 installiert, Login als MoinMornhart).
 3. Erstes Release 0.1.0 mit `npm run publish`. Danach einen echten Update-Durchlauf testen (0.1.0 installieren → 0.1.1 veröffentlichen → Banner „Update bereit“).
 4. F7 Antworten → F8 Reaktionen → … → F15 (jeweils mit Test).
 5. F16 nur nach Zustimmung des Nutzers.
