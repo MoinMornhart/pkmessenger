@@ -14,6 +14,9 @@ const EVENT_TYPES = new Set([
   'ratelimit',
   'log',
   'update',
+  'voice:state',
+  'voice:speaking',
+  'voice:members',
 ]);
 
 const call = (channel) => (payload) => ipcRenderer.invoke(channel, payload);
@@ -37,6 +40,23 @@ contextBridge.exposeInMainWorld('api', {
   setReadMarker: call('pk:set-read-marker'),
   setLastLocation: call('pk:set-last-location'),
   openExternal: call('pk:open-external'),
+  // Sprachkanäle
+  listVoiceMembers: call('pk:list-voice-members'),
+  voiceState: call('pk:voice-state'),
+  voiceJoin: call('pk:voice-join'),
+  voiceLeave: call('pk:voice-leave'),
+  voiceTalk: call('pk:voice-talk'),
+  voiceListen: call('pk:voice-listen'),
+  voicePacket(data) {
+    if (data instanceof Uint8Array && data.byteLength > 0 && data.byteLength <= 1500) ipcRenderer.send('pk:voice-packet', data);
+  },
+  onVoiceAudio(callback) {
+    const listener = (_e, msg) => {
+      if (msg && typeof msg.userId === 'string' && msg.data instanceof Uint8Array) callback(msg.userId, msg.data);
+    };
+    ipcRenderer.on('pk:voice-audio', listener);
+    return () => ipcRenderer.removeListener('pk:voice-audio', listener);
+  },
   // Abo auf Live-Events. Gibt eine Abmelde-Funktion zurück.
   onEvent(callback) {
     const listener = (_e, msg) => {

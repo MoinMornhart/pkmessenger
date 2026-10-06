@@ -12,6 +12,7 @@ const { createStore } = require('./store');
 const { ensureEnvFile } = require('./env');
 const { registerIpc } = require('./ipc');
 const { createUpdater, parseRepo } = require('./updater');
+const { createVoiceManager } = require('./voice');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -28,6 +29,11 @@ const RENDERER_URL_PREFIX = require('node:url').pathToFileURL(path.dirname(RENDE
 const DEMO = !app.isPackaged && process.argv.includes('--demo');
 const SHOTS_ARG = !app.isPackaged && process.argv.find((a) => a.startsWith('--screenshots='));
 const demo = DEMO ? require('./demo').createDemo() : null;
+// Automatischer Testlauf: simuliertes Mikrofon (Testton) statt des echten – dein Mikro wird dabei NICHT benutzt.
+if (SHOTS_ARG) {
+  app.commandLine.appendSwitch('use-fake-device-for-media-stream');
+  app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
+}
 
 // Entwicklung: .env im Projektordner. Installierte App: .env im Benutzerordner (%APPDATA%\PKMessenger).
 const ENV_PATH = demo ? demo.envPath : app.isPackaged ? path.join(app.getPath('userData'), '.env') : path.join(ROOT, '.env');
@@ -48,6 +54,15 @@ const service = createDiscordService({
   ...(demo ? { createClient: demo.createClient, statusExtra: { demo: true } } : {}),
 });
 const store = createStore(path.join(app.getPath('userData'), demo || SHOTS_ARG ? 'settings-dev-demo.json' : 'settings.json'));
+const voice = createVoiceManager({
+  voiceLib: demo ? demo.voiceLib : require('@discordjs/voice'),
+  getVoiceTarget: (t) => service.getVoiceTarget(t),
+  emit: broadcast,
+  // Empfangener Ton (Opus) live ans Fenster – wird nirgends gespeichert.
+  sendAudio: (userId, data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('pk:voice-audio', { userId, data });
+  },
+});
 const updater = createUpdater({
   autoUpdater,
   isPackaged: app.isPackaged,
@@ -112,10 +127,14 @@ function createWindow() {
 
   mainWindow.loadFile(RENDERER_HTML);
   if (SHOTS_ARG) {
+    // Testlauf: Fehler aus der Oberfläche im Terminal sichtbar machen
+    mainWindow.webContents.on('console-message', (e) => {
+      if (e.level === 'error' || e.level === 'warning') console.log(`[renderer:${e.level}] ${e.message}`);
+    });
     const dir = path.resolve(SHOTS_ARG.split('=')[1]);
     mainWindow.webContents.once('did-finish-load', () => {
       require('./screenshots')
-        .runScreenshots(mainWindow, dir, { demo: DEMO })
+        .runScreenshots(mainWindow, dir, { demo: DEMO, stats: demo?.stats })
         .catch((e) => console.error('[screenshots] Fehler:', e))
         .finally(() => app.quit());
     });
@@ -134,9 +153,15 @@ app.on('second-instance', () => {
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
-  // Keine Kamera/Mikro/Benachrichtigungs-Berechtigungen für Webinhalte.
-  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion() }, isTrustedSender);
+  // Berechtigungen: NUR Mikrofon (Audio, keine Kamera), NUR für unser eigenes App-Fenster (Sprachkanäle).
+  // Alles andere (Kamera, Benachrichtigungen, Standort, …) wird abgelehnt.
+  const isOwnUrl = (url) => typeof url === 'string' && url.startsWith(RENDERER_URL_PREFIX);
+  session.defaultSession.setPermissionRequestHandler((_wc, perm, cb, details) => {
+    const audioOnly = Array.isArray(details?.mediaTypes) && details.mediaTypes.length > 0 && details.mediaTypes.every((t) => t === 'audio');
+    cb(perm === 'media' && audioOnly && isOwnUrl(details.requestingUrl));
+  });
+  session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice }, isTrustedSender);
   createWindow();
   service.connect(); // async – blockiert das Fenster nicht
   updater.start();
@@ -151,6 +176,11 @@ app.on('before-quit', (e) => {
   e.preventDefault();
   try {
     store.flush();
+  } catch {
+    /* ignorieren */
+  }
+  try {
+    voice.leave(); // sauber auflegen
   } catch {
     /* ignorieren */
   }

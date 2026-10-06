@@ -9,8 +9,18 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice }) {
+  const requireVoice = () => {
+    if (!voice) throw Object.assign(new Error('Sprachfunktion nicht verfügbar.'), { code: 'NOT_FOUND' });
+    return voice;
+  };
   return {
+    'pk:list-voice-members': (p) => service.listVoiceMembers(validators.guildRef(p)),
+    'pk:voice-state': () => (voice ? voice.getState() : { state: 'idle' }),
+    'pk:voice-join': (p) => requireVoice().join(validators.voiceJoin(p)),
+    'pk:voice-leave': () => requireVoice().leave(),
+    'pk:voice-talk': (p) => requireVoice().setTalking(validators.flag(p)),
+    'pk:voice-listen': (p) => requireVoice().setListening(validators.flag(p)),
     'pk:get-app-info': () => ({ version: appVersion || null, update: updater ? updater.getState() : { state: 'disabled' } }),
     'pk:check-updates': () => (updater ? updater.check() : null),
     'pk:install-update': () => (updater ? updater.install() : false),
@@ -55,6 +65,12 @@ function wrap(handler, isTrustedSender) {
 function registerIpc(ipcMain, deps, isTrustedSender) {
   const handlers = buildHandlers(deps);
   for (const [channel, handler] of Object.entries(handlers)) ipcMain.handle(channel, wrap(handler, isTrustedSender));
+  // Mikrofon-Pakete: ~50 pro Sekunde → "fire and forget" statt invoke. Prüfung auf Herkunft + Größe in voice.pushPacket().
+  if (deps.voice) {
+    ipcMain.on('pk:voice-packet', (event, data) => {
+      if (isTrustedSender(event)) deps.voice.pushPacket(data);
+    });
+  }
   return Object.keys(handlers);
 }
 

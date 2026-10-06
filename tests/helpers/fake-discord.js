@@ -170,6 +170,8 @@ function createFakeWorld({ loginBehavior = 'ready' } = {}) {
     blindHistory: makeChannel(guild, { id: '444444444444444407', name: 'ohne-verlauf', position: 5, perms: [P.ViewChannel, P.SendMessages] }),
   };
   guild.channels = { cache: new Map([[category.id, category], ...Object.values(channels).map((c) => [c.id, c])]) };
+  guild.voiceStates = { cache: new Map() };
+  guild.voiceAdapterCreator = () => ({ sendPayload: () => true, destroy: () => {} });
   client.guilds = { cache: new Map([[GUILD_ID, guild]]) };
   client.channels = { cache: guild.channels.cache };
 

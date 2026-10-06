@@ -7,6 +7,8 @@ import ServerRail from './ServerRail.jsx';
 import ChatList from './ChatList.jsx';
 import ChatView from './ChatView.jsx';
 import QuickSwitcher from './QuickSwitcher.jsx';
+import CallView from './CallView.jsx';
+import { useVoice } from '../voice/useVoice';
 
 const TYPING_MS = 10000;
 
@@ -95,7 +97,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   useEffect(() => {
     if (!guildId || !channels) return;
     const inGuild = channels.some((g) => g.channels.some((c) => c.id === channelId));
-    if (!inGuild) setChannelId(channels[0]?.channels[0]?.id || null);
+    if (!inGuild) setChannelId(channels.flatMap((g) => g.channels).find((c) => c.type !== 'voice')?.id || null);
   }, [guildId, channels, channelId]);
 
   useEffect(() => {
@@ -195,9 +197,14 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     [channelId, liveUnread, lastIds, readMarkers],
   );
 
+  // Sprachkanäle (Teilnehmer, Beitreten, Mikro, Ton, Auflegen)
+  const guildIds = useMemo(() => (guilds || []).map((g) => g.id), [guilds]);
+  const voiceCtl = useVoice({ toast, guildIds });
+  const voiceChannels = useMemo(() => (channels || []).flatMap((g) => g.channels).filter((c) => c.type === 'voice'), [channels]);
+
   // Chats des Servers nach letzter Aktivität sortiert (neueste oben, wie in Messengern).
   const chats = useMemo(() => {
-    const list = (channels || []).flatMap((g) => g.channels);
+    const list = (channels || []).flatMap((g) => g.channels).filter((c) => c.type !== 'voice');
     const activity = (c) => previews[c.id]?.timestamp || (lastIds[c.id] ? timestampOf(lastIds[c.id]) : 0);
     return list.sort((a, b) => activity(b) - activity(a) || a.position - b.position);
   }, [channels, previews, lastIds]);
@@ -223,7 +230,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     (gid) => {
       setGuildId(gid);
       const groups = channelsByGuild[gid] || [];
-      const all = groups.flatMap((g) => g.channels);
+      const all = groups.flatMap((g) => g.channels).filter((c) => c.type !== 'voice');
       setChannelId(all.find(isUnread)?.id || all[0]?.id || null);
     },
     [channelsByGuild, isUnread],
@@ -299,20 +306,41 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           onInvite={invite}
           now={now}
           appInfo={appInfo}
+          voiceChannels={voiceChannels}
+          voiceMembers={voiceCtl.members[guildId] || {}}
+          speaking={voiceCtl.speaking}
+          voice={voiceCtl.voice}
+          onToggleMic={voiceCtl.toggleMic}
+          onLeaveVoice={voiceCtl.leave}
         />
-        <ChatView
-          key={channelId || 'none'}
-          guild={guild}
-          channel={channel}
-          bot={status.bot}
-          typingNames={typingNames}
-          onRead={markRead}
-          toast={toast}
-          searchOpen={searchOpen}
-          onCloseSearch={() => setSearchOpen(false)}
-          onOpenSearch={() => setSearchOpen(true)}
-          allChannels={flatChannels}
-        />
+        {channel?.type === 'voice' ? (
+          <CallView
+            channel={channel}
+            members={(voiceCtl.members[channel.guildId] || {})[channel.id] || []}
+            speaking={voiceCtl.speaking}
+            voice={voiceCtl.voice}
+            bot={status.bot}
+            micLevel={voiceCtl.micLevel}
+            onJoin={voiceCtl.join}
+            onLeave={voiceCtl.leave}
+            onToggleMic={voiceCtl.toggleMic}
+            onToggleListen={voiceCtl.toggleListen}
+          />
+        ) : (
+          <ChatView
+            key={channelId || 'none'}
+            guild={guild}
+            channel={channel}
+            bot={status.bot}
+            typingNames={typingNames}
+            onRead={markRead}
+            toast={toast}
+            searchOpen={searchOpen}
+            onCloseSearch={() => setSearchOpen(false)}
+            onOpenSearch={() => setSearchOpen(true)}
+            allChannels={flatChannels}
+          />
+        )}
         {quickOpen && (
           <QuickSwitcher
             channels={flatChannels}

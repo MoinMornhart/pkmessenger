@@ -25,13 +25,16 @@ const typeInto = (selector, text) => `(() => {
 
 const key = (k, opts = {}) => `window.dispatchEvent(new KeyboardEvent('keydown', ${JSON.stringify({ key: k, bubbles: true, ...opts })}))`;
 
-async function runScreenshots(win, dir, { demo }) {
+async function runScreenshots(win, dir, { demo, stats }) {
   fs.mkdirSync(dir, { recursive: true });
   await wait(3500);
   if (!demo) {
     await shoot(win, dir, '01-setup');
     return;
   }
+  // Die App merkt sich den letzten Chat – für reproduzierbare Bilder immer bei #allgemein starten.
+  await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
+  await wait(1200);
   await shoot(win, dir, '02-chat');
   await js(win, typeInto('.composer textarea', 'Hey @an'));
   await wait(900);
@@ -68,6 +71,22 @@ async function runScreenshots(win, dir, { demo }) {
   await js(win, `document.querySelector('.composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
   await wait(800);
   await shoot(win, dir, '09-gesendet');
+
+  // ---- Sprachkanal (F17) inkl. End-to-End-Tontest mit SIMULIERTEM Mikrofon ----
+  await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('Lounge'))?.click()`);
+  await wait(800);
+  await shoot(win, dir, '10-sprachkanal');
+  await js(win, `document.querySelector('.call-btn--join')?.click()`);
+  await wait(1500);
+  await js(win, `[...document.querySelectorAll('.call-btn')].find(b=>b.textContent.includes('Mikro'))?.click()`);
+  await wait(3000);
+  await shoot(win, dir, '11-im-anruf');
+  const r = await js(win, 'JSON.stringify(window.__pkVoiceStats || {})');
+  console.log(`[voice-e2e] Renderer: ${r} | Main: ${JSON.stringify(stats || {})}`);
+  await js(win, `document.querySelector('.call-btn--hangup')?.click()`);
+  await wait(500);
+  const after = await js(win, `document.querySelector('.callbar') ? 'Anrufleiste noch da' : 'aufgelegt'`);
+  console.log(`[voice-e2e] Nach Auflegen: ${after}`);
 }
 
 module.exports = { runScreenshots };

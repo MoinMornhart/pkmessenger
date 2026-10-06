@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { SnowflakeUtil } = require('discord.js');
 const { createFakeWorld, FAKE_TOKEN, makeMessage, Events } = require('../../tests/helpers/fake-discord');
+const { createFakeVoiceLib } = require('../../tests/helpers/fake-voice');
 
 // Keine Discord-Standardavatare: PKMessenger zeigt eigene Initialen-Avatare.
 function avatarFor() {
@@ -79,9 +80,64 @@ function createDemo() {
   }, 15000);
   live.unref?.();
 
+  // Sprachkanal "Lounge" mit Anna und Bernd; der Bot darf verbinden und sprechen.
+  const vc = channels.voice;
+  vc.name = 'Lounge';
+  const { PermissionFlagsBits: PF } = require('discord.js');
+  const vcPerms = new Set([PF.ViewChannel, PF.Connect, PF.Speak]);
+  vc.permissionsFor = () => ({ has: (f) => vcPerms.has(f) });
+  for (const [u, muted] of [
+    [anna, false],
+    [bernd, true],
+  ]) {
+    guild.voiceStates.cache.set(u.id, { id: u.id, channelId: vc.id, member: guild.members.cache.get(u.id), selfMute: muted, selfDeaf: false });
+  }
+
+  // Simulierte Sprach-Bibliothek: Beitritt klappt, Anna und Bernd "sprechen" abwechselnd.
+  // Spricht der Bot (Mikro an), wird sein Ton als "Anna" zurückgespielt → testet Senden UND Empfangen komplett.
+  const voiceLib = createFakeVoiceLib();
+  const stats = { micPackets: 0, echoedPackets: 0 };
+  const realResource = voiceLib.createAudioResource;
+  voiceLib.createAudioResource = (stream, opts) => {
+    stream.on('data', (pkt) => {
+      stats.micPackets++;
+      const conn = voiceLib.connections.at(-1);
+      for (const sub of conn?.receiver.subscriptions || []) {
+        if (sub.userId === anna.id && !sub.stream.destroyed && sub.stream.writable) {
+          sub.stream.write(pkt);
+          stats.echoedPackets++;
+        }
+      }
+    });
+    return realResource(stream, opts);
+  };
+  const realJoin = voiceLib.joinVoiceChannel;
+  voiceLib.joinVoiceChannel = (cfg) => {
+    const conn = realJoin(cfg);
+    guild.voiceStates.cache.set(client.user.id, { id: client.user.id, channelId: cfg.channelId, member: null, selfMute: cfg.selfMute, selfDeaf: cfg.selfDeaf });
+    client.emit(Events.VoiceStateUpdate, {}, { guild });
+    let turn = 0;
+    // Anna "spricht" sofort (damit ihr Empfangs-Abo für den Echo-Test steht), danach abwechselnd mit Bernd.
+    setTimeout(() => conn.receiver.speaking.emit('start', anna.id), 300);
+    const t = setInterval(() => {
+      const who = turn++ % 2 ? anna : bernd;
+      conn.receiver.speaking.emit('start', who.id);
+      setTimeout(() => who !== anna && conn.receiver.speaking.emit('end', who.id), 1800);
+    }, 2600);
+    t.unref?.();
+    conn.on('stateChange', (_o, n) => {
+      if (n.status === 'destroyed') {
+        clearInterval(t);
+        guild.voiceStates.cache.delete(client.user.id);
+        client.emit(Events.VoiceStateUpdate, {}, { guild });
+      }
+    });
+    return conn;
+  };
+
   const envPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pk-demo-')), '.env');
   fs.writeFileSync(envPath, `DISCORD_TOKEN=${FAKE_TOKEN}\n`);
-  return { world, envPath, createClient: () => client };
+  return { world, envPath, createClient: () => client, voiceLib, stats };
 }
 
 module.exports = { createDemo };

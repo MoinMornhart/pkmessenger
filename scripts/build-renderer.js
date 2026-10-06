@@ -17,7 +17,12 @@ async function main() {
   fs.copyFileSync(path.join(SRC, 'index.html'), path.join(OUT, 'index.html'));
 
   const options = {
-    entryPoints: { app: path.join(SRC, 'index.jsx'), styles: path.join(SRC, 'styles.css') },
+    entryPoints: {
+      app: path.join(SRC, 'index.jsx'),
+      styles: path.join(SRC, 'styles.css'),
+      // AudioWorklet muss eine eigene Datei sein (CSP: script-src 'self')
+      'voice-worklet': path.join(SRC, 'voice', 'capture-worklet.js'),
+    },
     outdir: OUT,
     bundle: true,
     format: 'iife',

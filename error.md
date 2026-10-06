@@ -69,6 +69,30 @@
 
 ---
 
+## #6 – Test-Fehler: Float32-Rundung im Audio-Frame-Test
+
+1. **Datum & Uhrzeit:** 06.10.2026, ca. 20:05
+2. **Was passiert ist:** `AssertionError [ERR_ASSERTION]: Expected values to be strictly equal: actual: 0.9599999785423279, expected: 0.96`
+3. **Reproduzierbar:** immer.
+4. **Ursache:** Fehler im **Test**, nicht in der Logik. Ein `Float32Array` speichert 0,96 als 0,9599999785…; der Test hatte mit einer 64-Bit-Zahl verglichen.
+5. **Lösung:** Erwartungswert mit `Math.fround()` auf Float32 gerundet (`tests/test-f17-audio.js`).
+6. **Testergebnis:** `test-f17-audio.js`: 5/5 bestanden.
+7. **Prävention:** Werte aus typisierten Float32-Arrays immer mit `Math.fround` vergleichen.
+
+---
+
+## #7 – Automatischer Screenshot-Lauf brach ab („Cannot read properties of null (reading 'focus')“)
+
+1. **Datum & Uhrzeit:** 06.10.2026, ca. 20:12
+2. **Was passiert ist:** `[screenshots] Fehler: Error: Script failed to execute …`; die Oberfläche meldete wörtlich `Uncaught TypeError: Cannot read properties of null (reading 'focus')`. Außerdem kam die Warnung `The Content Security Policy directive 'frame-ancestors' is ignored when delivered via a <meta> element.`
+3. **Reproduzierbar:** immer, wenn der vorige Lauf in einem Sprachkanal endete.
+4. **Ursache (geprüft):** Die App merkt sich den letzten Chat (`settings-dev-demo.json`). Der vorige Lauf endete im Sprachkanal „Lounge“, daher startete der neue Lauf in der Anruf-Ansicht. Dort gibt es kein Eingabefeld, und das Testskript fand `.composer textarea` nicht. `frame-ancestors` wird in `<meta>`-CSP grundsätzlich ignoriert.
+5. **Lösung:** Das Testskript öffnet zuerst immer #allgemein (`src/main/screenshots.js`). `frame-ancestors` wurde aus `src/renderer/index.html` entfernt (für Electron-Fenster ohnehin bedeutungslos). Fehler der Oberfläche werden im Testlauf jetzt ins Terminal geschrieben (`src/main/main.js`, nur bei `--screenshots`).
+6. **Testergebnis:** Erneuter Lauf: 11 Screenshots, keine Fehler und keine Warnungen der Oberfläche; Sprach-E2E: `{"encoded":151,"decoded":145,"played":145} | Main: {"micPackets":151,"echoedPackets":151}`.
+7. **Prävention:** Automatische Tests setzen ihren Startzustand selbst und verlassen sich nicht auf gespeicherte Einstellungen.
+
+---
+
 ## Hinweis (kein Fehler): „NativeCommandError“ beim Renderer-Build in PowerShell
 
 esbuild schreibt seine normale Erfolgsmeldung (`build\renderer\app.js 276.3kb … Done`) auf stderr. Windows PowerShell 5.1 zeigt das rot als `NativeCommandError` an, obwohl der Build erfolgreich war (Exit-Code 0). Kein Handlungsbedarf.

@@ -79,6 +79,16 @@ const validators = {
     const { guildId, channelId } = obj(p);
     return { guildId: optionalSnowflake(guildId, 'guildId') ?? null, channelId: optionalSnowflake(channelId, 'channelId') ?? null };
   },
+  voiceJoin(p) {
+    const { guildId, channelId, listen } = obj(p);
+    if (listen !== undefined && typeof listen !== 'boolean') throw new ValidationError('Ungültiges Feld "listen".');
+    return { guildId: snowflake(guildId, 'guildId'), channelId: snowflake(channelId, 'channelId'), listen: listen !== false };
+  },
+  flag(p) {
+    const { on } = obj(p);
+    if (typeof on !== 'boolean') throw new ValidationError('Ungültiges Feld "on".');
+    return on;
+  },
   externalUrl(p) {
     const { url } = obj(p);
     let parsed;

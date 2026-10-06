@@ -35,7 +35,15 @@ export const api = Object.fromEntries(
     'setReadMarker',
     'setLastLocation',
     'openExternal',
+    'listVoiceMembers',
+    'voiceState',
+    'voiceJoin',
+    'voiceLeave',
+    'voiceTalk',
+    'voiceListen',
   ].map((n) => [n, call(n)]),
 );
 
 export const onEvent = (cb) => raw.onEvent(cb);
+export const voicePacket = (data) => raw.voicePacket(data);
+export const onVoiceAudio = (cb) => raw.onVoiceAudio(cb);

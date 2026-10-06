@@ -48,7 +48,7 @@ export function ChannelAvatar({ channel, size = 46 }) {
       style={{ width: size, height: size, background: `linear-gradient(135deg, hsl(${hue} 45% 40%), hsl(${(hue + 50) % 360} 55% 28%))` }}
       aria-hidden="true"
     >
-      {channel.type === 'announcement' ? '📢' : '#'}
+      {channel.type === 'voice' ? '🔊' : channel.type === 'announcement' ? '📢' : '#'}
     </div>
   );
 }
@@ -73,7 +73,61 @@ function BotFooter({ status }) {
   );
 }
 
-function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo }) {
+// Mini-Anrufleiste (sichtbar, solange der Bot in einem Sprachkanal ist)
+function CallBar({ voice, onOpen, onToggleMic, onLeave }) {
+  if (voice.state === 'idle' || voice.state === 'error') return null;
+  return (
+    <div className="callbar">
+      <button className="callbar__info" onClick={onOpen} title="Anruf öffnen">
+        <span className={`callbar__dot ${voice.state === 'connected' ? 'is-ok' : ''}`} />
+        <span>
+          <b>{voice.state === 'connected' ? 'Im Sprachkanal' : 'Verbinde …'}</b>
+          <span className="muted small"> 🔊 {voice.channelName}</span>
+        </span>
+      </button>
+      <button className={`icon-btn ${voice.talking ? 'is-on' : ''}`} onClick={onToggleMic} disabled={!voice.canSpeak || voice.state !== 'connected'} title={voice.talking ? 'Mikrofon aus' : 'Mikrofon an'}>
+        {voice.talking ? '🎙️' : '🔇'}
+      </button>
+      <button className="icon-btn icon-btn--danger" onClick={onLeave} title="Auflegen">
+        📞
+      </button>
+    </div>
+  );
+}
+
+function VoiceRows({ channels, members, speaking, activeId, voice, onSelect }) {
+  if (!channels.length) return null;
+  return (
+    <>
+      <div className="chatlist__section">Sprachkanäle</div>
+      {channels.map((c) => {
+        const people = members[c.id] || [];
+        const live = voice.channelId === c.id && voice.state === 'connected';
+        const talking = people.filter((p) => speaking.has(p.id)).map((p) => p.name);
+        return (
+          <button key={c.id} className={`chatrow ${c.id === activeId ? 'is-active' : ''}`} onClick={() => onSelect(c.id)} title={c.name}>
+            <ChannelAvatar channel={c} />
+            <div className="chatrow__main">
+              <div className="chatrow__top">
+                <span className="chatrow__name">{c.name}</span>
+                {live && <span className="chatrow__live">LIVE</span>}
+              </div>
+              <div className="chatrow__bottom">
+                <span className={`chatrow__preview ${talking.length ? 'is-talking' : ''}`}>
+                  {talking.length ? `${talking.join(', ')} spricht …` : people.length ? people.map((p) => p.name).join(', ') : <span className="muted">Niemand da</span>}
+                </span>
+                {!c.canConnect && <span className="chatrow__lock" title="Der Bot darf hier nicht beitreten">🔒</span>}
+                {people.length > 0 && <span className="badge badge--soft">{people.length}</span>}
+              </div>
+            </div>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice }) {
   const [filter, setFilter] = useState('');
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase().replace(/^#/, '');
@@ -147,7 +201,11 @@ function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, on
             </button>
           );
         })}
+        {!loading && !filter && (
+          <VoiceRows channels={voiceChannels} members={voiceMembers} speaking={speaking} activeId={activeId} voice={voice} onSelect={onSelect} />
+        )}
       </div>
+      <CallBar voice={voice} onOpen={() => onSelect(voice.channelId)} onToggleMic={onToggleMic} onLeave={onLeaveVoice} />
       <BotFooter status={status} />
       <VersionLine appInfo={appInfo} />
     </aside>

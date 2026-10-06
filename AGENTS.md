@@ -15,6 +15,7 @@ Optik: eigener Messenger. Technisch: **Bot-Control-Center**.
 - Jede Nachricht geht **als Bot** raus (Bot-Name + BOT-Tag). Die App nennt sich nicht „Discord“, nutzt kein Discord-Logo und keine Discord-Standardavatare. Die UI zeigt „Wird gesendet als <Bot> BOT“.
 - Datensparsamkeit: nur Intents `Guilds`, `GuildMessages`, `MessageContent` (privilegiert), `GuildMessageTyping`. **Kein** GuildMembers, **kein** GuildPresences. Keine Cloud, keine Telemetrie. Lokal gespeichert werden nur: letzte Position und Lese-Markierungen (`settings.json`). Der Token liegt nur in `.env`.
 - **Auto-Update (seit 06.10.2026, auf Wunsch des Nutzers):** Die installierte App fragt beim Start und alle 6 Stunden `update.electronjs.org` (kostenloser Dienst des Electron-Projekts) nach neuen GitHub-Releases. Übertragen werden nur Repo, Plattform, Architektur und App-Version, keine persönlichen Daten und keine Telemetrie. In der Entwicklung ist das Auto-Update aus.
+- **Sprachkanäle (F17, seit 06.10.2026, auf Wunsch des Nutzers: Sprechen + Zuhören):** Der Bot tritt Sprachkanälen bei, und alle hören „<Bot> BOT“. **Anrufe an einzelne Personen, Video und Bildschirm teilen sind mit Bots nicht möglich** und wurden nicht gebaut. Das Empfangen von Ton ist für Bots von Discord **nicht offiziell dokumentiert** (`VoiceReceiver` ist in @discordjs/voice als `@beta` markiert). Es ist in der UI als „experimentell“ gekennzeichnet. **Es wird nichts aufgezeichnet oder gespeichert**, Ton wird nur live durchgereicht. DAVE (Ende-zu-Ende-Verschlüsselung, Pflicht seit 01.03.2026) ist an. Zusätzliches Intent: `GuildVoiceStates` (nicht privilegiert). Einladungslink enthält jetzt „Verbinden“ und „Sprechen“. Mikrofon-Freigabe gilt nur für das eigene App-Fenster und nur für Audio. Das Mikro wird beim Ausschalten vollständig freigegeben.
 - Die Optik ist an Messenger-Apps angelehnt (Chat-Liste, Sprechblasen). Es gibt aber **kein** WhatsApp- oder Discord-Branding, sondern eigenes Logo und eigene Farben. Das BOT-Abzeichen und der Hinweis „Wird gesendet als <Bot> BOT“ bleiben Pflicht.
 - Skalierung (für privaten Gebrauch irrelevant): Verifizierung ab 100 Servern; Prüfung privilegierter Intents ab 10.000 erreichbaren Nutzern (Regel ab 10.06.2026).
 
@@ -38,6 +39,12 @@ src/main/store.js       settings.json (atomar, verweigert Schlüssel wie "token"
 src/main/demo.js        DEMO-Modus (nur Entwicklung, wird nicht paketiert)
 src/main/screenshots.js automatische Screenshots (nur Entwicklung, wird nicht paketiert)
 src/main/updater.js     Auto-Update (Squirrel + update.electronjs.org), testbar per Dependency Injection
+src/main/voice.js       EINZIGE Datei mit @discordjs/voice: Beitreten, Opus senden (Mikro), Opus empfangen (Zuhören), Aufräumen
+src/renderer/voice/     engine.js (Mikro → AudioWorklet → WebCodecs-Opus-Encoder; Opus-Decoder je Sprecher → Lautsprecher mit Jitter-Puffer),
+                        capture-worklet.js, useVoice.js (React-Hook); CallView.jsx = Anruf-Ansicht
+Sprach-Datenfluss: Renderer --ipcRenderer.send('pk:voice-packet', Opus 20 ms)--> Main voice.pushPacket → AudioPlayer (StreamType.Opus)
+                   Main receiver.subscribe(user) --webContents.send('pk:voice-audio')--> Renderer AudioDecoder → AudioContext
+                   Kein FFmpeg, keine nativen Opus-Module nötig (WebCodecs im eingebauten Chromium; aes-256-gcm + @snazzah/davey geprüft)
 src/renderer/components ChatList (Messenger-Liste, sortiert nach Aktivität), ChatView/MessageList/MessageItem (Sprechblasen), Composer, …
 src/preload/preload.js  contextBridge: schmale benannte API window.api.*
 src/shared/*.js         reine, getestete Logik (Mentions, Gruppierung, Zeitformat, Limits, Nachrichtenspeicher)
@@ -76,6 +83,7 @@ tests/                  node:test + assert, Fake-Discord in tests/helpers
 | react / react-dom | 19.3.0 | |
 | react-window | 2.3.3 | v2-API: `List`, `useDynamicRowHeight` (MIT, kostenlos) |
 | @electron-forge/cli, maker-squirrel, maker-zip, publisher-github | 8.0.1 | Forge 8 ist ESM, lädt `forge.config.js` (CJS) per import() |
+| @discordjs/voice | 0.19.2 | bringt @snazzah/davey (DAVE, N-API-Binary win32-x64) mit; Verschlüsselung über eingebautes aes-256-gcm (in Electron 44 geprüft: true) |
 | esbuild | 0.28.2 | Renderer-Bundler (statt Vite: weniger bewegliche Teile) |
 | Node (System) | 24.19.0, npm 11.17.0 | |
 
@@ -97,12 +105,14 @@ tests/                  node:test + assert, Fake-Discord in tests/helpers
 | — | Windows-Installer `npm run make` | ✅ gebaut (Setup.exe ~156 MB); paketierte App startet; Paketinhalt geprüft | AGENTS §7 |
 | F7–F15 | Antworten, Reaktionen, Bearbeiten/Löschen, Upload, Embeds, Threads, Pins, Server-Suche, Slash-Commands | ⏳ offen | – |
 | F16 | Optional: „Mit Discord anmelden“ (OAuth2 identify) + Signatur | ❓ wartet auf Zustimmung | siehe §2 |
+| F17 | Sprachkanäle: Teilnehmer, Beitreten, Sprechen, Zuhören (experimentell), Auflegen, Mini-Anrufleiste | ✅ Logik getestet + **End-to-End im Demo** (simuliertes Mikro → Opus → Main → Echo → Decoder: 151/151 Pakete). **Live mit echtem Discord noch nicht getestet** | `test-f17-voice.js`, `test-f17-audio.js`, Screenshots 10/11 |
 
 **Noch NICHT erledigt beim MVP:** Live-Test mit echtem Bot-Token (der Nutzer hat noch keinen Bot). Die Setup.exe wurde bewusst nicht auf dem PC des Nutzers installiert; nur die paketierte App wurde direkt gestartet.
 
 ## 7. Testergebnisse (Stand 06.10.2026, 19:50)
 
-`npm test` → **73 Tests, 73 bestanden, 0 fehlgeschlagen**. Enthalten:
+`npm test` → **89 Tests, 89 bestanden, 0 fehlgeschlagen** (Stand 20:15). Enthalten:
+- Release v0.1.0 veröffentlicht (https://github.com/MoinMornhart/pkmessenger/releases/tag/v0.1.0). Der Update-Dienst wurde für einen simulierten Client 0.0.9 abgefragt: HTTP 200, und RELEASES verweist auf `PKMessenger-0.1.0-full.nupkg` → die Update-Kette funktioniert serverseitig.
 - Paketierte App (`out/PKMessenger-win32-x64/PKMessenger.exe`): lief nach 8 s noch, Fenstertitel „PKMessenger“. Paketinhalt geprüft: 3166 Dateien, keine verbotenen Inhalte (.env, tests, demo.js, screenshots.js, Renderer-Quellcode, .md), keine Dev-Pakete.
 - Echter Netzwerktest: ein ausgedachter Token wird von Discord abgelehnt → `{"state":"setup","code":"TOKEN_INVALID","message":"Discord hat den Bot-Token abgelehnt."}`
 - Rate-Limit-Simulation mit dem echten REST-Client von discord.js gegen einen lokalen 429-Server: „gewartet: 1123 ms (retry_after = 800 ms), RateLimited-Events: 1“

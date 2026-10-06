@@ -21,6 +21,8 @@ const FATAL_CLOSE_CODES = new Set([4004, 4010, 4011, 4012, 4013, 4014]);
 function createDiscordService({ discord, envPath, emit, createClient, loginTimeoutMs = LOGIN_TIMEOUT_MS, statusExtra = {} }) {
   const { GatewayIntentBits, PermissionFlagsBits, ChannelType, Events, RESTEvents } = discord;
   const TEXT_TYPES = new Set([ChannelType.GuildText, ChannelType.GuildAnnouncement]);
+  // Sprachkanäle (Stage-Kanäle bewusst nicht – dort gelten Sprecher-Regeln).
+  const VOICE_TYPES = new Set([ChannelType.GuildVoice]);
 
   const makeClient =
     createClient ||
@@ -32,6 +34,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
           GatewayIntentBits.GuildMessages,
           GatewayIntentBits.MessageContent,
           GatewayIntentBits.GuildMessageTyping,
+          GatewayIntentBits.GuildVoiceStates, // nicht privilegiert; nötig für Sprachkanäle (wer ist drin, Beitreten)
         ],
         // Sicherheitsnetz: standardmäßig pingt der Bot NIEMANDEN, nur explizit gelistete IDs.
         allowedMentions: { parse: [], repliedUser: false },
@@ -146,6 +149,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     c.on(Events.ChannelUpdate, (_o, ch) => channelsChanged(ch));
     c.on(Events.ChannelDelete, channelsChanged);
     c.on(Events.GuildRoleUpdate, (role) => emit('channels:changed', { guildId: role.guild.id }));
+    // Wer ist in welchem Sprachkanal? Renderer lädt die Liste daraufhin neu.
+    c.on(Events.VoiceStateUpdate, (_old, now) => emit('voice:members', { guildId: now.guild.id }));
 
     // discord.js/@discordjs/rest wartet bei 429 selbst retry_after ab – wir zeigen es nur an.
     c.rest?.on?.(RESTEvents.RateLimited, (info) => {
@@ -210,7 +215,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   function listChannels({ guildId }) {
     const guild = requireGuild(guildId);
     const all = [...guild.channels.cache.values()];
-    const visible = all.filter((ch) => TEXT_TYPES.has(ch.type) && can(ch, PermissionFlagsBits.ViewChannel));
+    const visible = all.filter((ch) => (TEXT_TYPES.has(ch.type) || VOICE_TYPES.has(ch.type)) && can(ch, PermissionFlagsBits.ViewChannel));
     const groups = new Map();
     for (const ch of visible) {
       const key = ch.parentId || '';
@@ -222,7 +227,9 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         id: ch.id,
         guildId: guild.id,
         name: ch.name,
-        type: ch.type === ChannelType.GuildAnnouncement ? 'announcement' : 'text',
+        type: VOICE_TYPES.has(ch.type) ? 'voice' : ch.type === ChannelType.GuildAnnouncement ? 'announcement' : 'text',
+        canConnect: VOICE_TYPES.has(ch.type) && can(ch, PermissionFlagsBits.Connect),
+        canSpeak: VOICE_TYPES.has(ch.type) && can(ch, PermissionFlagsBits.Speak),
         topic: ch.topic || '',
         position: ch.position,
         lastMessageId: ch.lastMessageId || null,
@@ -389,11 +396,64 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     })();
     if (!appId) return null;
     const P = PermissionFlagsBits;
-    const permissions = [P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AddReactions, P.AttachFiles, P.EmbedLinks].reduce((a, b) => a | b, 0n);
+    const permissions = [P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AddReactions, P.AttachFiles, P.EmbedLinks, P.Connect, P.Speak].reduce((a, b) => a | b, 0n);
     return `https://discord.com/oauth2/authorize?client_id=${appId}&scope=bot+applications.commands&permissions=${permissions}`;
   }
 
-  return { connect, disconnect, getStatus, listGuilds, listChannels, getPreviews, getMessages, sendMessage, sendTyping, searchMentionables, getInviteUrl, serializeMessage };
+  // ---------- Sprachkanäle ----------
+
+  /** Teilnehmer aller Sprachkanäle eines Servers: { [channelId]: [{ id, name, avatarUrl, bot, muted, deafened }] } */
+  async function listVoiceMembers({ guildId }) {
+    const guild = requireGuild(guildId);
+    const out = {};
+    for (const vs of guild.voiceStates.cache.values()) {
+      if (!vs.channelId) continue;
+      const ch = guild.channels.cache.get(vs.channelId);
+      if (!ch || !can(ch, PermissionFlagsBits.ViewChannel)) continue; // nur Kanäle, die der Bot sehen darf
+      let member = vs.member || guild.members.cache.get(vs.id) || (vs.id === client.user.id ? guild.members.me : null);
+      // "Get Guild Member" braucht kein privilegiertes Intent. Fehler (auch synchrone) dürfen die Liste nie abbrechen.
+      if (!member) member = await Promise.resolve().then(() => guild.members.fetch(vs.id)).catch(() => null);
+      const user = member?.user || (vs.id === client.user.id ? client.user : client.users?.cache?.get(vs.id));
+      (out[vs.channelId] ||= []).push({
+        id: vs.id,
+        name: displayNameOf(user, member),
+        avatarUrl: (member || user)?.displayAvatarURL?.({ size: 64, extension: 'png' }) || null,
+        bot: Boolean(user?.bot),
+        isMe: vs.id === client.user.id,
+        muted: Boolean(vs.selfMute || vs.serverMute),
+        deafened: Boolean(vs.selfDeaf || vs.serverDeaf),
+      });
+    }
+    return out;
+  }
+
+  /** Für voice.js: prüft Sichtbarkeit und Rechte und liefert die Objekte zum Beitreten. */
+  function getVoiceTarget({ guildId, channelId }) {
+    const guild = requireGuild(guildId);
+    const channel = guild.channels.cache.get(channelId);
+    if (!channel || !VOICE_TYPES.has(channel.type) || !can(channel, PermissionFlagsBits.ViewChannel))
+      throw appError('NOT_FOUND', 'Sprachkanal nicht gefunden oder für den Bot nicht sichtbar.');
+    if (!can(channel, PermissionFlagsBits.Connect))
+      throw appError('MISSING_PERMISSION', 'Der Bot darf diesem Sprachkanal nicht beitreten.', 'Gib der Bot-Rolle im Sprachkanal das Recht „Verbinden“.');
+    return { guild, channel, canSpeak: can(channel, PermissionFlagsBits.Speak), botId: client.user.id, channelName: channel.name };
+  }
+
+  return {
+    connect,
+    disconnect,
+    getStatus,
+    listGuilds,
+    listChannels,
+    getPreviews,
+    getMessages,
+    sendMessage,
+    sendTyping,
+    searchMentionables,
+    getInviteUrl,
+    serializeMessage,
+    listVoiceMembers,
+    getVoiceTarget,
+  };
 }
 
 module.exports = { createDiscordService, FATAL_CLOSE_CODES };

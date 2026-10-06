@@ -10,14 +10,14 @@ test('Serverliste enthält ID, Name, Kürzel', async () => {
   assert.deepEqual(service.listGuilds(), [{ id: GUILD_ID, name: 'Testserver', acronym: 'T', iconUrl: null }]);
 });
 
-test('Kanalliste: unsichtbare Kanäle und Sprachkanäle fehlen, Kategorien gruppiert', async () => {
+test('Kanalliste: unsichtbare Kanäle fehlen, Sprachkanäle als type "voice" (seit F17), Kategorien gruppiert', async () => {
   const { service } = await readyService();
   const groups = service.listChannels({ guildId: GUILD_ID });
   const names = groups.flatMap((g) => g.channels.map((c) => c.name));
   assert.ok(!names.includes('geheim'), 'unsichtbarer Kanal darf nicht erscheinen');
-  assert.ok(!names.includes('Sprache'), 'Sprachkanal darf nicht erscheinen');
+  assert.equal(groups.flatMap((g) => g.channels).find((c) => c.name === 'Sprache').type, 'voice');
   assert.equal(groups[0].category, null, 'Kanäle ohne Kategorie stehen oben');
-  assert.deepEqual(groups[0].channels.map((c) => c.name), ['allgemein', 'nur-lesen', 'ankuendigungen', 'ohne-verlauf']);
+  assert.deepEqual(groups[0].channels.map((c) => c.name), ['allgemein', 'nur-lesen', 'ankuendigungen', 'Sprache', 'ohne-verlauf']);
   assert.deepEqual(groups[1].category, { id: '444444444444444400', name: 'Projekte' });
   assert.deepEqual(groups[1].channels.map((c) => c.name), ['projekt-a']);
 });
