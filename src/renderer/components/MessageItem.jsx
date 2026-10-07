@@ -6,6 +6,7 @@ import { ReplyQuote, Reactions, Embeds, ThreadChip, MessageActionBar, PollCard }
 import { hueFor } from './ChatList.jsx';
 import { systemInfo } from '../../shared/system-messages';
 import MediaGate from './MediaGate.jsx';
+import { openProfile } from './ProfileCard.jsx';
 import { attachmentKind } from '../../shared/media';
 
 function Avatar({ author }) {
@@ -95,13 +96,22 @@ function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
     .join(' ');
   return (
     <div className={cls} data-mid={m.id} onContextMenu={(e) => actions?.contextMenu?.(e, m)}>
-      {!out && (grouped ? <span className="avatar-spacer" /> : <Avatar author={m.author} />)}
+      {!out &&
+        (grouped ? (
+          <span className="avatar-spacer" />
+        ) : (
+          <button className="avatar-btn" onClick={() => !m.system && openProfile(m.author.id, m.guildId)} aria-label={`Profil von ${m.author.name}`} title="Profil anzeigen">
+            <Avatar author={m.author} />
+          </button>
+        ))}
       <div className={`bubble ${grouped ? '' : 'bubble--tail'}`}>
         <MessageActionBar message={m} out={out} />
         <ReplyQuote reference={m.reference} />
         {!out && !grouped && (
           <div className="bubble__author" style={{ color: m.author.color || `hsl(${hueFor(m.author.id)} 70% var(--author-l, 68%))` }}>
-            {m.author.name}
+            <button className="linklike bubble__author-btn" onClick={() => openProfile(m.author.id, m.guildId)} title="Profil anzeigen">
+              {m.author.name}
+            </button>
             {m.author.bot && <span className="bot-tag">BOT</span>}
           </div>
         )}

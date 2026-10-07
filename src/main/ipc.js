@@ -105,6 +105,8 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:send-message': (p) => service.sendMessage(validators.sendMessage(p)),
     'pk:send-typing': (p) => service.sendTyping(validators.channelRef(p)),
     'pk:search-mentionables': (p) => service.searchMentionables(validators.searchMentionables(p)),
+    'pk:search-people': (p) => service.searchPeople(validators.searchPeople(p)),
+    'pk:user-profile': (p) => service.getUserProfile(validators.userProfile(p)),
     'pk:get-settings': () => {
       const { appLock: _lock, ...rest } = store.get(); // Passwort-Hash nie an die Oberfläche
       return rest;

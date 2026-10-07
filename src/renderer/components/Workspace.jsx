@@ -16,6 +16,7 @@ import CallView from './CallView.jsx';
 import AccessDialog from './AccessDialog.jsx';
 import SettingsDialog from './SettingsDialog.jsx';
 import LinkWarnDialog from './LinkWarnDialog.jsx';
+import ProfileCard from './ProfileCard.jsx';
 import { prefs } from '../prefs';
 import JoinServerDialog from './JoinServerDialog.jsx';
 import { ThreadsPanel } from './SidePanels.jsx';
@@ -45,6 +46,12 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsFocus, setSettingsFocus] = useState(null); // z. B. 'media' → dorthin scrollen
   const [linkAsk, setLinkAsk] = useState(null); // Link-Warnung (Issue #1)
+  const [profileOf, setProfileOf] = useState(null); // Profil-Fenster { userId, guildId } (Issue #1)
+  useEffect(() => {
+    const onOpen = (e) => e.detail?.userId && setProfileOf({ userId: e.detail.userId, guildId: e.detail.guildId || null });
+    window.addEventListener('pk:open-profile', onOpen);
+    return () => window.removeEventListener('pk:open-profile', onOpen);
+  }, []);
   useEffect(() => {
     const onOpen = (e) => {
       setSettingsFocus(e.detail?.focus || null);
@@ -520,6 +527,27 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           />
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
+        {profileOf && (
+          <ProfileCard
+            userId={profileOf.userId}
+            guildId={profileOf.guildId}
+            toast={toast}
+            onClose={() => setProfileOf(null)}
+            onOpenDM={async (userId) => {
+              try {
+                const dm = await api.openDM({ userId });
+                setProfileOf(null);
+                await loadDMs();
+                setGuildId(DM_ID);
+                setActiveThread(null);
+                setForum(null);
+                setChannelId(dm.id);
+              } catch (e) {
+                toast({ kind: 'error', title: e.message, text: e.hint });
+              }
+            }}
+          />
+        )}
         {linkAsk && (
           <LinkWarnDialog
             url={linkAsk}
