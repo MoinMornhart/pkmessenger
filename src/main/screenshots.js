@@ -131,7 +131,7 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     await js(win, `[...document.querySelectorAll('.modal .btn')].find(b=>b.textContent.includes('Nur dieses'))?.click()`);
     await wait(500);
     const video = await js(win, `JSON.stringify({ video: Boolean(document.querySelector('video.embed__image')), src: document.querySelector('video.embed__image')?.getAttribute('src')?.slice(0,45) || null })`);
-    await js(win, `[...document.querySelectorAll('.bubble a')].find(l=>l.textContent.includes('tenor'))?.click()`);
+    await js(win, `[...document.querySelectorAll('.bubble a')].find(l=>l.textContent.includes('beispiel-shop'))?.click()`);
     await wait(300);
     await shoot(win, dir, '47-link-warnung');
     const warn = await js(win, `document.querySelector('.link-warn')?.textContent.replace(/\\s+/g,' ').slice(0,90) || null`);
@@ -256,6 +256,21 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
     await wait(300);
     console.log(`[einstellungen] Suche „passwrt“: ${found} · Knöpfe ohne Hinweis: ${hints}`);
+  }
+  // #38: IP-Grabber erkannt → gesperrt + Warnung; „für mich ausblenden“
+  {
+    await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.querySelector('.chatrow__name')?.textContent==='ankuendigungen')?.click()`);
+    await wait(700);
+    await js(win, `document.querySelector('.link-alarm')?.scrollIntoView({block:'center'})`);
+    await wait(300);
+    await shoot(win, dir, '63-ip-grabber-erkannt');
+    const alarm = await js(win, `JSON.stringify({ alarm: document.querySelector('.link-alarm b')?.textContent || null, gesperrt: document.querySelector('.link-danger')?.textContent || null, klickbar: [...document.querySelectorAll('.bubble a')].some(a=>a.href.includes('grabify')) })`);
+    await js(win, `[...document.querySelectorAll('.link-alarm .btn')].find(b=>b.textContent.includes('ausblenden'))?.click()`);
+    await wait(300);
+    const hidden = await js(win, `document.querySelector('.msg-hidden')?.textContent.trim().slice(0,60) || null`);
+    await js(win, `[...document.querySelectorAll('.msg-hidden .linklike')][0]?.click()`);
+    await wait(200);
+    console.log(`[link-schutz] ${alarm} · ausgeblendet: ${hidden}`);
   }
   // #35: fremder Spoiler → Rückfrage; Vorschau verdeckt; Einstellungen „nur dieser Bereich“; @Name getippt → Erwähnung
   {

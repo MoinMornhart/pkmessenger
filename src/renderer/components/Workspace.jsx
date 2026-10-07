@@ -17,6 +17,7 @@ import CallView from './CallView.jsx';
 import AccessDialog from './AccessDialog.jsx';
 import SettingsDialog from './SettingsDialog.jsx';
 import LinkWarnDialog from './LinkWarnDialog.jsx';
+import { checkLink } from '../../shared/link-safety';
 import ProfileCard from './ProfileCard.jsx';
 import Tour from './Tour.jsx';
 import { prefs } from '../prefs';
@@ -458,7 +459,13 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     () => ({
       channelName: (id) => channelById.get(id)?.name || null,
       openChannel,
-      openExternal: (url) => (prefs.get().linkWarn ? setLinkAsk(url) : api.openExternal({ url }).catch((e) => toast({ kind: 'error', title: e.message }))),
+      openExternal: (url) => {
+        // Link-Schutz (Issue #38): vertraute Seiten direkt, gefährliche/verdächtige IMMER mit Warnung
+        const { level } = checkLink(url, prefs.get().trustedDomains);
+        const ask = level === 'danger' || level === 'warn' || (level !== 'trusted' && prefs.get().linkWarn);
+        if (ask) setLinkAsk(url);
+        else api.openExternal({ url }).catch((e) => toast({ kind: 'error', title: e.message }));
+      },
     }),
     [channelById, openChannel, toast],
   );

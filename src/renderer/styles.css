@@ -4044,3 +4044,48 @@ kbd {
 .format-bar__icon {
   line-height: 1.1;
 }
+
+/* ---------- Link-Schutz (Issue #38) ---------- */
+.link-danger {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+  font-weight: 600;
+  user-select: none;
+  cursor: not-allowed;
+}
+.link--warn,
+.link--unknown {
+  text-decoration-style: wavy;
+  text-decoration-color: #f59e0b;
+}
+.link-alarm {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 2px;
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  font-size: 13px;
+}
+.link-alarm b {
+  color: #f87171;
+}
+.link-alarm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.msg--hidden .msg-hidden {
+  padding: 6px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.link {
+  word-break: break-all;
+}

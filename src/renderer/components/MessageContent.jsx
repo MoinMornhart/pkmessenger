@@ -3,6 +3,7 @@ import { tokenizeMentions } from '../../shared/mentions';
 import { NavContext } from '../state';
 import { createPortal } from 'react-dom';
 import { prefs } from '../prefs';
+import { checkLink } from '../../shared/link-safety';
 
 // Sicheres Mini-Markdown: erzeugt nur React-Elemente, NIEMALS innerHTML.
 const CODE_BLOCK = /```(?:[a-zA-Z0-9_+-]*\n)?([\s\S]*?)```/g;
@@ -68,17 +69,28 @@ function Spoiler({ children }) {
 /** Eigene Nachricht? Dann Spoiler ohne Rückfrage aufdecken. */
 export const OwnMessageContext = createContext(false);
 
+// Link-Schutz (Issue #38): gefährliche Links (IP-Grabber, Betrug) sind weder klickbar noch kopierbar
 function Link({ href }) {
   const nav = useContext(NavContext);
+  const check = checkLink(href, prefs.get().trustedDomains);
+  if (check.level === 'danger')
+    return (
+      <span className="link-danger" title={check.reasons.join(' ')} onCopy={(e) => e.preventDefault()} onContextMenu={(e) => e.stopPropagation()}>
+        ⛔ gefährlicher Link ({check.host || 'unbekannt'})
+      </span>
+    );
+  const badge = check.level === 'warn' ? '⚠️ ' : check.level === 'unknown' ? '❔ ' : '';
   return (
     <a
       href={href}
+      className={`link link--${check.level}`}
       onClick={(e) => {
         e.preventDefault();
         nav.openExternal(href);
       }}
-      title={`${href} (öffnet im Browser)`}
+      title={`${href}${check.reasons.length ? ` – ${check.reasons.join(' ')}` : ''} (öffnet im Browser)`}
     >
+      {badge}
       {href}
     </a>
   );
