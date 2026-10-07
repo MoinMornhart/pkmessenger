@@ -82,6 +82,12 @@ function createDemo() {
   threadMsg.thread = thread;
   a.threads.list.push(thread);
   client.channels.cache.set(thread.id, thread);
+  // Beispiel-Umfrage des Bots mit Stimmen
+  const pollMsg = add(a, client.user, '', 2);
+  pollMsg.poll = { question: { text: 'Welcher Abend passt euch?' }, allowMultiselect: false, expiresTimestamp: Date.now() + 20 * 3600000, resultsFinalized: false, channel: a, messageId: pollMsg.id, answers: new Map(), end: async () => { pollMsg.poll.resultsFinalized = true; } };
+  [['Freitag', 5], ['Samstag', 8], ['Sonntag', 2]].forEach(([text, n], i) => pollMsg.poll.answers.set(i + 1, { id: i + 1, text, voteCount: n, poll: pollMsg.poll }));
+  extra.add(PF.SendPolls);
+
   // eigenes Server-Emoji für die Reaktionsauswahl
   guild.emojis = { cache: new Map() };
 

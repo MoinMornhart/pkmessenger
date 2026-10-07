@@ -40,6 +40,7 @@ export const api = Object.fromEntries(
     'tokenClear',
     'invitePreview',
     'editMessage',
+    'endPoll',
     'deleteMessage',
     'react',
     'listPins',

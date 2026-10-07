@@ -4,6 +4,7 @@ import { applyMentionTokens, findMentionQuery } from '../../shared/mentions';
 import { MESSAGE_CONTENT_MAX, TYPING_THROTTLE_MS } from '../../shared/limits';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import EmbedDialog from './EmbedDialog.jsx';
+import PollDialog from './PollDialog.jsx';
 import { UPLOAD_MAX_BYTES, FILES_PER_MESSAGE_MAX } from '../../shared/limits';
 
 const fmtSize = (b) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} MB`);
@@ -22,6 +23,8 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
   const [fileError, setFileError] = useState(null);
   const [embeds, setEmbeds] = useState([]); // F11
   const [embedOpen, setEmbedOpen] = useState(false);
+  const [poll, setPoll] = useState(null); // Umfrage
+  const [pollOpen, setPollOpen] = useState(false);
   const [pingReply, setPingReply] = useState(false); // F7
   const fileInputRef = useRef(null);
   const taRef = useRef(null);
@@ -31,7 +34,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
   const final = useMemo(() => applyMentionTokens(text, inserted), [text, inserted]);
   const length = final.content.length;
   const tooLong = length > MESSAGE_CONTENT_MAX;
-  const empty = text.trim().length === 0 && (editing || (files.length === 0 && embeds.length === 0));
+  const empty = text.trim().length === 0 && (editing || (files.length === 0 && embeds.length === 0 && !poll));
 
   // Höhe automatisch anpassen
   useLayoutEffect(() => {
@@ -154,6 +157,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
     setSuggest(null);
     setFiles([]);
     setEmbeds([]);
+    setPoll(null);
     setFileError(null);
   };
 
@@ -163,7 +167,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
     if (editing) {
       onSaveEdit({ content: final.content, mentions });
     } else {
-      onSend({ content: final.content, mentions, files: files.map(({ name, data }) => ({ name, data })), embeds, replyTo: replyTo?.id || null, pingReply });
+      onSend({ content: final.content, mentions, files: files.map(({ name, data }) => ({ name, data })), embeds, poll, replyTo: replyTo?.id || null, pingReply });
       onCancelReply();
     }
     reset();
@@ -300,7 +304,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
         </div>
       )}
       {/* F10 Dateien / F11 Embeds als Vorschau */}
-      {(files.length > 0 || embeds.length > 0 || fileError) && !editing && (
+      {(files.length > 0 || embeds.length > 0 || poll || fileError) && !editing && (
         <div className="composer__attachments">
           {files.map((f, i) => (
             <div key={`${f.name}-${i}`} className="att">
@@ -323,6 +327,16 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
               </button>
             </div>
           ))}
+          {poll && (
+            <div className="att att--embed">
+              <span className="att__icon">📊</span>
+              <span className="att__name">{poll.question}</span>
+              <span className="muted small">{poll.answers.length} Antworten</span>
+              <button className="icon-btn" onClick={() => setPoll(null)} aria-label="Umfrage entfernen">
+                ×
+              </button>
+            </div>
+          )}
           {fileError && <span className="warn small">{fileError}</span>}
         </div>
       )}
@@ -342,6 +356,11 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
             <button className="tool-btn" onClick={() => setEmbedOpen(true)} title="Embed erstellen" aria-label="Embed erstellen">
               ▤
             </button>
+            {channel.canPoll !== false && (
+              <button className="tool-btn" onClick={() => setPollOpen(true)} title="Umfrage erstellen" aria-label="Umfrage erstellen">
+                📊
+              </button>
+            )}
             <input
               ref={fileInputRef}
               type="file"
@@ -376,6 +395,15 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
           {editing ? '✓' : '➤'}
         </button>
       </div>
+      {pollOpen && (
+        <PollDialog
+          onClose={() => setPollOpen(false)}
+          onAdd={(p) => {
+            setPoll(p);
+            setPollOpen(false);
+          }}
+        />
+      )}
       {embedOpen && (
         <EmbedDialog
           onClose={() => setEmbedOpen(false)}

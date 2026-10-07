@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('api', {
   tokenClear: call('pk:token-clear'),
   invitePreview: call('pk:invite-preview'),
   editMessage: call('pk:edit-message'),
+  endPoll: call('pk:end-poll'),
   deleteMessage: call('pk:delete-message'),
   react: call('pk:react'),
   listPins: call('pk:list-pins'),

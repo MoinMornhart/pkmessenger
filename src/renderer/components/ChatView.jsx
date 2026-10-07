@@ -82,7 +82,7 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
   }, [channel, newestId, onRead]);
 
   const send = useCallback(
-    async ({ content, mentions, files = [], embeds = [], replyTo: replyId = null, pingReply = false }) => {
+    async ({ content, mentions, files = [], embeds = [], poll = null, replyTo: replyId = null, pingReply = false }) => {
       const nonce = randomNonce();
       const replied = replyId ? state.messages.find((x) => x.id === replyId) : null;
       // Optimistisch: sofort anzeigen, Discord-Bestätigung ersetzt den Platzhalter (über die Nonce).
@@ -100,11 +100,12 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
         embeds: [],
         reactions: [],
         reference: replyId ? { messageId: replyId, authorName: replied?.author?.name ?? null, text: (replied?.content || '').slice(0, 100) } : null,
-        sendArgs: { files, embeds, replyTo: replyId, pingReply },
+        poll: poll ? { question: poll.question, answers: poll.answers.map((text, i) => ({ id: i + 1, text, count: 0 })), total: 0, allowMultiselect: poll.allowMultiselect, expiresTimestamp: Date.now() + poll.durationHours * 3600000, finalized: false } : null,
+        sendArgs: { files, embeds, poll, replyTo: replyId, pingReply },
       });
       listRef.current?.scrollToBottom();
       try {
-        const msg = await api.sendMessage({ channelId: channel.id, content, mentions, nonce, files, embeds, replyTo: replyId || undefined, pingReply });
+        const msg = await api.sendMessage({ channelId: channel.id, content, mentions, nonce, files, embeds, ...(poll ? { poll } : {}), replyTo: replyId || undefined, pingReply });
         messageStore.upsertConfirmed(msg);
       } catch (e) {
         messageStore.markFailed(channel.id, nonce, { message: e.message, hint: e.hint, code: e.code });
@@ -165,6 +166,14 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
           })
           .catch(fail),
       startThread: (m) => setThreadFrom(m),
+      endPoll: (m) =>
+        api
+          .endPoll({ channelId: m.channelId, messageId: m.id })
+          .then((msg) => {
+            messageStore.upsertConfirmed(msg);
+            toast({ kind: 'info', title: 'Umfrage beendet', duration: 2000 });
+          })
+          .catch(fail),
       openThread: (id) => onOpenThread?.(id),
     }),
     [channel, emojis, jump, fail, toast, onOpenThread],

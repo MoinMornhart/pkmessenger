@@ -157,6 +157,20 @@ async function runScreenshots(win, dir, { demo, stats }) {
   await wait(300);
   await shoot(win, dir, '17-embed-baukasten');
   await js(win, `[...document.querySelectorAll('.embed-dialog .btn')].find(b=>b.textContent.includes('Abbrechen'))?.click()`);
+  // Umfrage: Karte prüfen, Dialog zeigen
+  const pollInfo = await js(win, `JSON.stringify({ karten: document.querySelectorAll('.poll').length, antworten: document.querySelectorAll('.poll__a').length, gewinner: document.querySelector('.poll__a.is-win') ? 1 : 0 })`);
+  console.log(`[poll] Anzeige: ${pollInfo}`);
+  await js(win, `document.querySelector('.tool-btn[aria-label="Umfrage erstellen"]')?.click()`);
+  await wait(300);
+  await js(win, `(() => { const set=(el,v)=>{ Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,v); el.dispatchEvent(new Event('input',{bubbles:true})); }; set(document.querySelector('#poll-q'),'Wohin geht der nächste Ausflug?'); const a=document.querySelectorAll('.poll-dialog input[aria-label^="Antwort"]'); set(a[0],'Berge'); set(a[1],'See'); })()`);
+  await wait(300);
+  await shoot(win, dir, '19-umfrage');
+  await js(win, `[...document.querySelectorAll('.poll-dialog .btn')].find(b=>b.textContent.includes('hinzufügen'))?.click()`);
+  await wait(200);
+  await js(win, `document.querySelector('.composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+  await wait(800);
+  const pollSent = await js(win, `[...document.querySelectorAll('.msg--out .poll__q')].some(q=>q.textContent.includes('Ausflug'))`);
+  console.log(`[poll] Gesendete Umfrage sichtbar: ${pollSent}`);
   // Serversuche
   await js(win, `document.querySelector('.chat__tools button[aria-label="Suchen"]')?.click()`);
   await wait(300);

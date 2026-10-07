@@ -1653,6 +1653,84 @@ a.embed__title {
   color: var(--accent);
 }
 
+/* Umfragen */
+.poll {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: min(360px, 100%);
+}
+.poll__q {
+  font-weight: 700;
+}
+.poll__a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  font-size: 13.5px;
+}
+.poll__a.is-win {
+  border-color: var(--accent);
+}
+.poll__bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--mention);
+  transition: width 0.4s var(--ease);
+}
+.poll__text,
+.poll__pct {
+  position: relative;
+}
+.poll__text {
+  flex: 1;
+  min-width: 0;
+}
+.poll__pct {
+  font-size: 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.poll__foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.poll-dialog {
+  width: min(520px, 94vw);
+  padding: 22px;
+  max-height: 86vh;
+  overflow-y: auto;
+}
+.poll-dialog__opts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 10px 0 6px;
+}
+.poll-dialog select {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 10px;
+  color: var(--text);
+  font: inherit;
+}
+
 /* Server beitreten */
 .join {
   width: min(600px, 94vw);

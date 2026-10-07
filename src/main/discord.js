@@ -43,6 +43,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
           GatewayIntentBits.GuildMessageTyping,
           GatewayIntentBits.GuildVoiceStates, // nicht privilegiert; nötig für Sprachkanäle (wer ist drin, Beitreten)
           GatewayIntentBits.GuildMessageReactions, // F8: Reaktionen live (nicht privilegiert)
+          GatewayIntentBits.GuildMessagePolls, // Umfragen: Stimmen live (nicht privilegiert)
         ],
         // F8: Reaktionen auch an älteren, nicht im Speicher liegenden Nachrichten erkennen
         partials: Partials ? [Partials.Message, Partials.Reaction] : [],
@@ -177,6 +178,19 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     c.on(Events.MessageReactionAdd, onReaction);
     c.on(Events.MessageReactionRemove, onReaction);
     c.on(Events.MessageReactionRemoveAll, (m) => m?.guildId && !m.partial && emit('message:update', serializeMessage(m)));
+    // Umfragen: neue/entfernte Stimme → Nachricht neu an die Oberfläche
+    const onVote = async (answer) => {
+      try {
+        const poll = answer?.poll;
+        let m = poll?.channel?.messages?.cache?.get?.(poll.messageId);
+        if (!m && poll?.channel?.messages?.fetch) m = await poll.channel.messages.fetch(poll.messageId);
+        if (m?.guildId) emit('message:update', serializeMessage(m));
+      } catch {
+        /* Nachricht nicht mehr erreichbar */
+      }
+    };
+    c.on(Events.MessagePollVoteAdd, onVote);
+    c.on(Events.MessagePollVoteRemove, onVote);
     // F12: Threads geändert → Thread-Liste des Kanals neu laden
     const threadsChanged = (t) => {
       if (t?.parentId) emit('threads:changed', { channelId: t.parentId, threadId: t.id });
@@ -291,6 +305,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         canCreateThreads: other === 'forum' ? can(ch, PermissionFlagsBits.SendMessages) : !other && can(ch, PermissionFlagsBits.CreatePublicThreads),
         canAttach: !other && can(ch, PermissionFlagsBits.AttachFiles),
         canEmbed: !other && can(ch, PermissionFlagsBits.EmbedLinks),
+        canPoll: !other && can(ch, PermissionFlagsBits.SendPolls ?? PermissionFlagsBits.SendMessages),
       });
     }
     return [...groups.values()]
@@ -356,10 +371,25 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       reactions: valuesOf(msg?.reactions?.cache).map(serializeReaction).filter(Boolean),
       embeds: (Array.isArray(msg?.embeds) ? msg.embeds : []).slice(0, 10).map(serializeEmbed),
       pinned: Boolean(msg?.pinned),
+      poll: serializePoll(msg?.poll),
       thread: msg?.hasThread && msg.thread ? { id: msg.thread.id, name: msg.thread.name ?? 'Thread', messageCount: msg.thread.messageCount ?? null } : null,
       // Bearbeiten nur eigene (Discord-Regel); Löschen eigene oder mit "Nachrichten verwalten"
       canEdit: Boolean(author?.id) && author.id === client?.user?.id,
       canDelete: (Boolean(author?.id) && author.id === client?.user?.id) || (msg?.channel ? can(msg.channel, PermissionFlagsBits.ManageMessages) : false),
+    };
+  }
+
+  // Umfragen: Frage, Antworten mit Stimmen, Ende, ob ausgezählt
+  function serializePoll(p) {
+    if (!p) return null;
+    const answers = valuesOf(p.answers).map((a) => ({ id: a.id, text: a.text ?? '', emoji: a.emoji?.name ?? null, count: Number(a.voteCount) || 0 }));
+    return {
+      question: p.question?.text ?? '',
+      answers,
+      total: answers.reduce((n, a) => n + a.count, 0),
+      allowMultiselect: Boolean(p.allowMultiselect),
+      expiresTimestamp: p.expiresTimestamp ?? null,
+      finalized: Boolean(p.resultsFinalized),
     };
   }
 
@@ -459,7 +489,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return out;
   }
 
-  async function sendMessage({ channelId, content, mentions, nonce, replyTo = null, pingReply = false, files = [], embeds = [] }) {
+  async function sendMessage({ channelId, content, mentions, nonce, replyTo = null, pingReply = false, files = [], embeds = [], poll = null }) {
     const channel = requireTextChannel(channelId);
     if (!canSendIn(channel))
       throw appError('MISSING_PERMISSION', 'Der Bot darf in diesem Kanal nicht schreiben.', 'Gib der Bot-Rolle hier "Nachrichten senden".');
@@ -481,6 +511,11 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       if (!can(channel, PermissionFlagsBits.EmbedLinks))
         throw appError('MISSING_PERMISSION', 'Der Bot darf hier keine Embeds senden.', 'Gib der Bot-Rolle hier "Links einbetten".');
       payload.embeds = embeds.map(toApiEmbed);
+    }
+    if (poll) {
+      if (!can(channel, PermissionFlagsBits.SendPolls ?? PermissionFlagsBits.SendMessages))
+        throw appError('MISSING_PERMISSION', 'Der Bot darf hier keine Umfragen erstellen.', 'Gib der Bot-Rolle hier "Umfragen erstellen".');
+      payload.poll = { question: { text: poll.question }, answers: poll.answers.map((text) => ({ text })), duration: poll.durationHours, allowMultiselect: poll.allowMultiselect };
     }
     const sent = await channel.send(payload);
     return serializeMessage(sent);
@@ -536,7 +571,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     })();
     if (!appId) return null;
     const P = PermissionFlagsBits;
-    const permissions = [P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AddReactions, P.AttachFiles, P.EmbedLinks, P.Connect, P.Speak, P.PinMessages, P.CreatePublicThreads, P.SendMessagesInThreads].filter((x) => typeof x === "bigint").reduce((a, b) => a | b, 0n);
+    const permissions = [P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AddReactions, P.AttachFiles, P.EmbedLinks, P.Connect, P.Speak, P.PinMessages, P.CreatePublicThreads, P.SendMessagesInThreads, P.SendPolls].filter((x) => typeof x === "bigint").reduce((a, b) => a | b, 0n);
     const preselect = guildId ? `&guild_id=${guildId}&disable_guild_select=true` : '';
     return `https://discord.com/oauth2/authorize?client_id=${appId}&scope=bot+applications.commands&permissions=${permissions}${preselect}`;
   }
@@ -711,6 +746,16 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     if (pin) await msg.pin();
     else await msg.unpin();
     return serializeMessage(msg);
+  }
+
+  /** Eigene Umfrage vorzeitig beenden (Discord erlaubt nur eigene). */
+  async function endPoll({ channelId, messageId }) {
+    const { msg } = await requireMessage(channelId, messageId);
+    if (!msg.poll) throw appError('NOT_FOUND', 'Diese Nachricht enthält keine Umfrage.');
+    if (msg.author?.id !== client.user.id) throw appError('MISSING_PERMISSION', 'Nur eigene Umfragen des Bots können beendet werden.', 'Das ist eine Discord-Regel.');
+    await msg.poll.end();
+    const fresh = await msg.fetch?.().catch(() => msg) ?? msg;
+    return serializeMessage(fresh);
   }
 
   // ---------- F12 Threads & Forum-Beiträge ----------
@@ -892,6 +937,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     getChannelAccess,
     previewInvite,
     editMessage,
+    endPoll,
     deleteMessage,
     react,
     listPins,

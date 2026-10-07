@@ -33,6 +33,7 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     },
     // F7–F15
     'pk:edit-message': (p) => service.editMessage(validators.editMessage(p)),
+    'pk:end-poll': (p) => service.endPoll(validators.messageRef(p)),
     'pk:delete-message': (p) => service.deleteMessage(validators.messageRef(p)),
     'pk:react': (p) => service.react(validators.react(p)),
     'pk:list-pins': (p) => service.listPins(validators.channelRef(p)),

@@ -73,6 +73,55 @@ export const Embeds = memo(function Embeds({ embeds }) {
   ));
 });
 
+// Umfrage: Ergebnisse als Balken, Restzeit, eigene Umfrage beenden
+function timeLeft(ts) {
+  const ms = ts - Date.now();
+  if (ms <= 0) return 'beendet';
+  const h = Math.floor(ms / 3600000);
+  if (h >= 24) return `endet in ${Math.round(h / 24)} Tag${Math.round(h / 24) === 1 ? '' : 'en'}`;
+  if (h >= 1) return `endet in ${h} Std.`;
+  return `endet in ${Math.max(1, Math.round(ms / 60000))} Min.`;
+}
+
+export const PollCard = memo(function PollCard({ message }) {
+  const actions = useContext(MessageActionsContext);
+  const p = message.poll;
+  if (!p) return null;
+  const ended = p.finalized || (p.expiresTimestamp && p.expiresTimestamp <= Date.now());
+  const max = Math.max(1, ...p.answers.map((a) => a.count));
+  return (
+    <div className="poll">
+      <div className="poll__q">📊 {p.question}</div>
+      {p.answers.map((a) => {
+        const pct = p.total ? Math.round((a.count / p.total) * 100) : 0;
+        return (
+          <div key={a.id} className={`poll__a ${ended && a.count === max && p.total ? 'is-win' : ''}`}>
+            <div className="poll__bar" style={{ width: `${pct}%` }} />
+            <span className="poll__text">
+              {a.emoji ? `${a.emoji} ` : ''}
+              {a.text}
+            </span>
+            <span className="poll__pct">
+              {pct} % · {a.count}
+            </span>
+          </div>
+        );
+      })}
+      <div className="poll__foot">
+        <span>
+          {p.total} Stimme{p.total === 1 ? '' : 'n'} · {ended ? (p.finalized ? 'beendet ✓' : 'beendet') : p.expiresTimestamp ? timeLeft(p.expiresTimestamp) : 'läuft'}
+          {p.allowMultiselect ? ' · Mehrfachwahl' : ''}
+        </span>
+        {message.canEdit && !ended && actions?.endPoll && (
+          <button className="btn btn--small btn--ghost" onClick={() => actions.endPoll(message)}>
+            Jetzt beenden
+          </button>
+        )}
+      </div>
+    </div>
+  );
+});
+
 // F12: Hinweis "Thread mit N Nachrichten" → öffnet den Thread
 export const ThreadChip = memo(function ThreadChip({ thread }) {
   const actions = useContext(MessageActionsContext);

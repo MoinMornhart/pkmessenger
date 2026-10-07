@@ -1,7 +1,7 @@
 import { memo, useState } from 'react';
 import { formatShortTime, formatFull, formatDayPill } from '../../shared/format';
 import MessageContent from './MessageContent.jsx';
-import { ReplyQuote, Reactions, Embeds, ThreadChip, MessageActionBar } from './MessageExtras.jsx';
+import { ReplyQuote, Reactions, Embeds, ThreadChip, MessageActionBar, PollCard } from './MessageExtras.jsx';
 import { hueFor } from './ChatList.jsx';
 
 function Avatar({ author }) {
@@ -86,6 +86,7 @@ function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
         )}
         <MessageContent content={m.content} mentions={m.mentions} />
         <Attachments items={m.attachments} />
+        <PollCard message={m} />
         <Embeds embeds={m.embeds} />
         <ThreadChip thread={m.thread} />
         <span className="bubble__meta" title={formatFull(m.createdTimestamp)}>

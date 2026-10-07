@@ -131,6 +131,13 @@ function makeChannel(guild, { id, name, type = ChannelType.GuildText, parentId =
       channel.store.push(msg);
       // wie Discord: Antwort-Verknüpfung kommt mit der gesendeten Nachricht zurück
       if (options.reply?.messageReference) msg.reference = { messageId: options.reply.messageReference, channelId: channel.id };
+      // Umfrage wie discord.js: answers als Map, voteCount, end()
+      if (options.poll) {
+        const poll = { question: { text: options.poll.question.text }, allowMultiselect: options.poll.allowMultiselect, expiresTimestamp: Date.now() + options.poll.duration * 3600000, resultsFinalized: false, channel, messageId: msg.id, answers: new Map() };
+        options.poll.answers.forEach((a, i) => poll.answers.set(i + 1, { id: i + 1, text: a.text, voteCount: 0, poll }));
+        poll.end = async () => { poll.resultsFinalized = true; poll.expiresTimestamp = Date.now(); };
+        msg.poll = poll;
+      }
       return msg;
     },
     async sendTyping() {

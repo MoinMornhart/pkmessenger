@@ -105,6 +105,20 @@ function embedList(embeds) {
   return out;
 }
 
+// Umfragen – Discord-Limits: Frage 300, 1–10 Antworten à 55 Zeichen, Laufzeit 1 Std. bis 32 Tage (768 Std.)
+function pollOf(poll) {
+  if (poll === undefined || poll === null) return null;
+  const { question, answers, durationHours, allowMultiselect } = obj(poll);
+  if (typeof question !== 'string' || question.trim().length === 0 || question.length > 300) throw new ValidationError('Die Frage muss 1–300 Zeichen haben.');
+  if (!Array.isArray(answers) || answers.length < 1 || answers.length > 10) throw new ValidationError('Eine Umfrage braucht 1–10 Antworten.');
+  const clean = answers.map((a) => (typeof a === 'string' ? a.trim() : ''));
+  if (clean.some((a) => a.length === 0 || a.length > 55)) throw new ValidationError('Jede Antwort muss 1–55 Zeichen haben.');
+  if (new Set(clean.map((a) => a.toLowerCase())).size !== clean.length) throw new ValidationError('Antworten dürfen nicht doppelt vorkommen.');
+  if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 768) throw new ValidationError('Laufzeit muss zwischen 1 Stunde und 32 Tagen liegen.');
+  if (allowMultiselect !== undefined && typeof allowMultiselect !== 'boolean') throw new ValidationError('Ungültiges Feld "allowMultiselect".');
+  return { question: question.trim(), answers: clean, durationHours, allowMultiselect: allowMultiselect === true };
+}
+
 const validators = {
   guildRef(p) {
     const { guildId } = obj(p);
@@ -121,14 +135,15 @@ const validators = {
     return { channelId: snowflake(channelId, 'channelId'), before: optionalSnowflake(before, 'before'), limit: lim };
   },
   sendMessage(p) {
-    const { channelId, content, mentions, nonce, replyTo, pingReply, files, embeds } = obj(p);
+    const { channelId, content, mentions, nonce, replyTo, pingReply, files, embeds, poll } = obj(p);
     if (typeof content !== 'string') throw new ValidationError('Nachricht fehlt.');
     if (content.length > MESSAGE_CONTENT_MAX) throw new ValidationError(`Nachricht ist länger als ${MESSAGE_CONTENT_MAX} Zeichen.`);
     if (nonce !== undefined && !(typeof nonce === 'string' && /^[A-Za-z0-9]{1,25}$/.test(nonce))) throw new ValidationError('Ungültige Nonce.');
     if (pingReply !== undefined && typeof pingReply !== 'boolean') throw new ValidationError('Ungültiges Feld "pingReply".');
     const cleanFiles = fileList(files);
     const cleanEmbeds = embedList(embeds);
-    if (content.trim().length === 0 && cleanFiles.length === 0 && cleanEmbeds.length === 0) throw new ValidationError('Leere Nachrichten können nicht gesendet werden.');
+    const cleanPoll = pollOf(poll);
+    if (content.trim().length === 0 && cleanFiles.length === 0 && cleanEmbeds.length === 0 && !cleanPoll) throw new ValidationError('Leere Nachrichten können nicht gesendet werden.');
     return {
       channelId: snowflake(channelId, 'channelId'),
       content,
@@ -138,6 +153,7 @@ const validators = {
       pingReply: pingReply === true,
       files: cleanFiles,
       embeds: cleanEmbeds,
+      poll: cleanPoll,
     };
   },
   editMessage(p) {
