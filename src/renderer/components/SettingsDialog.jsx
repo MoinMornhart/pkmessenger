@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { prefs } from '../prefs';
 import AiSection from './AiSection.jsx';
+import UpdateSection from './UpdateSection.jsx';
 import { THEMES, ACCENTS, MOTIONS } from '../theme';
 
 function TokenSection({ toast }) {
@@ -353,7 +354,6 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const u = appInfo?.update || {};
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal settings" role="dialog" aria-label="Einstellungen" onMouseDown={(e) => e.stopPropagation()}>
@@ -381,15 +381,7 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
         </section>
         <section>
           <h4>🔄 Updates</h4>
-          <p>
-            PKMessenger v{appInfo?.version || '?'} ·{' '}
-            {u.state === 'disabled' ? u.reason : u.state === 'current' ? 'aktuell ✓' : u.state === 'ready' ? 'Update bereit – beim Neustart installiert' : u.state || '–'}
-          </p>
-          {u.enabled && (
-            <button className="btn btn--small" onClick={() => api.checkForUpdates().catch(() => {})}>
-              Jetzt nach Updates suchen
-            </button>
-          )}
+          <UpdateSection appInfo={appInfo} toast={toast} />
         </section>
         <section>
           <h4>🧪 Beta</h4>

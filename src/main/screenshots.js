@@ -328,6 +328,20 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   const lila = await js(win, `JSON.stringify({ theme: document.documentElement.dataset.theme, akzent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(), dichte: document.documentElement.dataset.density })`);
   console.log(`[look] ${look} · Hell: ${hell} · Lila: ${lila}`);
   await js(win, `localStorage.removeItem('pk.prefs.v1')`);
+  // Updates: Knopf „Jetzt nach Updates suchen“ muss eine Rückmeldung geben (Issue #1)
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+  await wait(500);
+  await clickText('.settings .btn', 'nach Updates suchen');
+  await wait(300);
+  const during = await js(win, `[...document.querySelectorAll('.settings .btn')].map(b=>b.textContent).find(t=>t.includes('Suche'))||null`);
+  await wait(1800);
+  await js(win, `[...document.querySelectorAll('.settings h4')].find(h=>h.textContent.includes('Updates'))?.scrollIntoView({block:'center'})`);
+  await wait(300);
+  await shoot(win, dir, '31-updates');
+  const updAfter = await js(win, `JSON.stringify({ status: [...document.querySelectorAll('.settings p')].map(p=>p.textContent).find(t=>t.includes('PKMessenger v'))?.slice(0,90), hinweis: [...document.querySelectorAll('.toast')].map(t=>t.textContent).find(t=>t.includes('Update'))?.slice(0,70) || null })`);
+  const upd = JSON.stringify({ waehrend: during, ...JSON.parse(updAfter) });
+  console.log(`[update] ${upd}`);
+  await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
 }
 
 module.exports = { runScreenshots };
