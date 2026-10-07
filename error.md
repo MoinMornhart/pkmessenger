@@ -170,3 +170,16 @@ esbuild schreibt seine normale Erfolgsmeldung (`build\renderer\app.js 276.3kb �
 6. **Prävention:** Neue Overlays im Screenshot-Lauf per `getBoundingClientRect` auf Überlappung prüfen.
 
 Nebenbei: iCloud hat erneut eine Datei umbenannt (`SettingsDialog.jsx` → `SettingsDialog 2.jsx`, Build schlug fehl) und beim Einfügen per `node -e` ging wieder ein `\d` verloren (#11). Beides vor dem Commit bemerkt und behoben.
+
+---
+
+## #14 – Eigene Hinweise bei Eingabefehlern kamen nie in der Oberfläche an
+
+1. **Datum & Uhrzeit:** 07.10.2026
+2. **Was passiert ist:** Beim Bau der KI-Agenten aufgefallen. `describeError` gab bei `code: 'VALIDATION'` immer den Standardhinweis „Eingabe prüfen …“ zurück. Der eigene Hinweis beim Bot-Profil („Name vergeben oder zu oft geändert, max. 2× pro Stunde“) ging dadurch verloren.
+3. **Ursache (geprüft):** `src/main/errors.js` hat `err.hint` bei VALIDATION ignoriert. Der Test in `test-profile.js` prüfte den Fehler direkt am Service, nicht nach der IPC-Übersetzung.
+4. **Lösung:** `hint: err.hint || 'Eingabe prüfen …'`, dazu ein eigener Code `AI` für Meldungen der KI-Agenten. Regressionstest in `test-ai.js`.
+5. **Testergebnis:** 156/156 Tests grün.
+6. **Prävention:** Fehlermeldungen immer auch nach `describeError` prüfen (so, wie sie die Oberfläche sieht).
+
+Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zweiten Lauf versehentlich **aus**, weil `settings-dev-demo.json` den Zustand vom letzten Lauf behielt („Illegal invocation“ beim Ausfüllen eines nicht mehr vorhandenen Feldes). Der Lauf setzt jetzt KI-Beta, Privatchats und Bildschirmschutz beim Start zurück.

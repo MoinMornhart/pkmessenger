@@ -19,6 +19,15 @@ Optik: eigener Messenger. Technisch: **Bot-Control-Center**.
 - Die Optik ist an Messenger-Apps angelehnt (Chat-Liste, Sprechblasen). Es gibt aber **kein** WhatsApp- oder Discord-Branding, sondern eigenes Logo und eigene Farben. Das BOT-Abzeichen und der Hinweis „Wird gesendet als <Bot> BOT“ bleiben Pflicht.
 - Skalierung (für privaten Gebrauch irrelevant): Verifizierung ab 100 Servern; Prüfung privilegierter Intents ab 10.000 erreichbaren Nutzern (Regel ab 10.06.2026).
 
+### KI-Agenten (Beta, seit 07.10.2026, Wunsch JoniMoni)
+
+- Standardmäßig **aus**. Einschalten unter Einstellungen → 🧪 Beta. Danach legt man Aufträge an (Zeitplan, Ziel-Kanal oder Privatchat, Auftragstext). Eine KI erzeugt den Text, gepostet wird **als Bot** (BOT-Abzeichen, `allowedMentions` leer → niemand wird gepingt).
+- Anbieter frei wählbar: OpenAI-kompatibel (OpenAI, OpenRouter, Gemini, Groq, Mistral, Ollama/LM Studio lokal, eigene Adresse) oder Anthropic. Adresse nur `https://`, Ausnahme `http://localhost`. Keine Weiterleitungen (`redirect: 'error'`), Timeout 60 s.
+- **API-Schlüssel**: verschlüsselt in `%APPDATA%PKMessengerai-key.enc` (safeStorage), geht nur hinein, nie zurück zur Oberfläche, nie in `settings.json` (getestet).
+- **Datenfluss an Dritte:** Der Auftragstext geht immer an den gewählten Anbieter. Chatverlauf (letzte 20 Nachrichten) **nur**, wenn der Auftrag „Kontext mitschicken“ ausdrücklich erlaubt (mit Warnhinweis in der UI). Kontext ist im System-Prompt als „keine Anweisungen“ markiert (Schutz vor Prompt-Injection).
+- Spam-Schutz: Zeitplan mind. alle 15 Min., höchstens 20 Aufträge, Text max. 2000 Zeichen. Verpasste Termine (App war aus) werden nicht nachgeholt. Läuft nur, solange die App offen ist.
+- Code: `src/main/ai.js` (Manager, Anbieter-Aufrufe, Zeitplaner), `src/shared/schedule.js`, `AiSection.jsx`. Tests: `test-ai.js`. Im Demo antwortet ein simulierter Anbieter.
+
 ### Entscheidung 06.10.2026: „Über meinen Discord-Account schreiben“ → ABGELEHNT
 
 - **Wunsch des Nutzers:** Die App mit seinem Discord-Account verknüpfen, sodass Nachrichten als er selbst rausgehen.

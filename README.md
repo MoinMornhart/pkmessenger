@@ -90,6 +90,9 @@ PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau
     <td><img src="docs/images/privatchat.png" alt="Privatchat mit dem Bot"><br><sub><b>Privatnachrichten:</b> privat mit einzelnen Leuten schreiben (als Bot).</sub></td>
     <td><img src="docs/images/kategorien.png" alt="Chatliste nach Kategorien"><br><sub><b>Kategorien einklappen</b> und Bildschirmschutz.</sub></td>
   </tr>
+  <tr>
+    <td colspan="2"><img src="docs/images/ki-agenten.png" alt="KI-Agenten (Beta) in den Einstellungen"><br><sub><b>🧪 KI-Agenten (Beta):</b> Aufträge wie „jeden Werktag um 8 Uhr einen Morgengruß posten“ – mit OpenAI, Claude, Gemini, OpenRouter, Ollama u. v. m. Dein Schlüssel bleibt verschlüsselt auf deinem PC.</sub></td>
+  </tr>
 </table>
 
 ---
@@ -246,6 +249,7 @@ Mehr Details: [AGENTS.md](AGENTS.md) (Architektur, Entscheidungen, Teststand) ·
 - [x] Chatliste nach Kategorien, einklappbar (☰ oben in der Liste)
 - [x] Bildschirmschutz: Screenshots und Aufnahmen anderer Programme verbieten (Einstellungen → Datenschutz)
 - [x] Privatnachrichten mit dem Bot (💬 in der Leiste links)
+- [x] 🧪 Beta: KI-Agenten – eine KI postet zu festen Zeiten (beliebiger Anbieter, eigener API-Schlüssel)
 - [ ] Designs und Animationen zum Umschalten
 - [ ] Moderation per Rechtsklick (Rollen, Timeout, Kick, Bann)
 - [ ] Live-Test aller Funktionen auf einem echten Server

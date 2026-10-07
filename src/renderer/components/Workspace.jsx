@@ -378,6 +378,14 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     [channelById, openChannel, toast],
   );
 
+  // KI-Agenten (Beta): Ziele, in die der Bot schreiben darf
+  const aiTargets = useMemo(() => {
+    const gName = new Map((guilds || []).map((g) => [g.id, g.name]));
+    return flatChannels
+      .filter((c) => c.canSend && (c.type === 'text' || c.type === 'announcement' || c.type === 'dm'))
+      .map((c) => ({ id: c.id, label: c.type === 'dm' ? `💬 ${c.name} (privat)` : `#${c.name} · ${gName.get(c.guildId) || ''}` }));
+  }, [flatChannels, guilds]);
+
   const guild = guildId === DM_ID ? DM_GUILD : guilds?.find((g) => g.id === guildId) || null;
   const typingNames = channelId ? Object.values(typing[channelId] || {}).map((v) => v.name) : [];
 
@@ -445,7 +453,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           />
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
-        {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} guildId={guildId === DM_ID ? null : guildId} />}
+        {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} guildId={guildId === DM_ID ? null : guildId} aiTargets={aiTargets} />}
         {newDmOpen && (
           <NewDMDialog
             guilds={guilds || []}

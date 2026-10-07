@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { prefs } from '../prefs';
+import AiSection from './AiSection.jsx';
 
 function TokenSection({ toast }) {
   const [info, setInfo] = useState(null);
@@ -288,7 +289,7 @@ function AudioSection() {
   );
 }
 
-export default function SettingsDialog({ onClose, toast, appInfo, guildId }) {
+export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTargets = [] }) {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -328,6 +329,10 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId }) {
               Jetzt nach Updates suchen
             </button>
           )}
+        </section>
+        <section>
+          <h4>🧪 Beta</h4>
+          <AiSection toast={toast} targets={aiTargets} />
         </section>
         <section>
           <h4>🔒 Datenschutz</h4>

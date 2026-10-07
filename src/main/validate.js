@@ -2,6 +2,7 @@
 
 const { isSnowflake } = require('../shared/snowflake');
 const { parseInviteCode } = require('../shared/invites');
+const { isValidSchedule } = require('../shared/schedule');
 const { MESSAGE_CONTENT_MAX, MESSAGES_PER_FETCH_MAX, ALLOWED_MENTIONS_IDS_MAX, UPLOAD_MAX_BYTES, EMBEDS_PER_MESSAGE_MAX, EMBED_TOTAL_CHARS_MAX, FILES_PER_MESSAGE_MAX } = require('../shared/limits');
 
 // Jeder IPC-Payload aus dem Renderer wird hier geprüft, bevor er discord.js erreicht.
@@ -149,7 +150,50 @@ function usernameOf(name) {
   return n;
 }
 
+// KI-Agenten (Beta): Anbieter-Adresse nur https – Ausnahme: lokale Modelle (Ollama, LM Studio) auf diesem PC
+function aiBaseUrl(value) {
+  let u;
+  try {
+    u = new URL(value);
+  } catch {
+    throw new ValidationError('Ungültige Adresse des KI-Anbieters.');
+  }
+  const local = u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
+  if (u.protocol !== 'https:' && !local) throw new ValidationError('Die Adresse muss mit https:// beginnen (lokal auch http://localhost).');
+  if (u.username || u.password || u.search || u.hash) throw new ValidationError('Die Adresse darf keine Zugangsdaten oder Parameter enthalten.');
+  return u.toString().replace(/\/+$/, '');
+}
+
 const validators = {
+  aiConfig(p) {
+    const { enabled, provider, baseUrl, model } = obj(p);
+    if (typeof enabled !== 'boolean') throw new ValidationError('Ungültiges Feld "enabled".');
+    if (provider !== 'openai' && provider !== 'anthropic') throw new ValidationError('Unbekannter KI-Anbieter-Typ.');
+    if (typeof model !== 'string' || model.length > 100 || /[\s<>"'`]/.test(model.trim())) throw new ValidationError('Ungültiger Modellname.');
+    return { enabled, provider, baseUrl: aiBaseUrl(baseUrl), model: model.trim() };
+  },
+  aiKey(p) {
+    const { key } = obj(p);
+    if (typeof key !== 'string' || key.trim().length < 8 || key.length > 400 || /\s/.test(key.trim())) throw new ValidationError('Das sieht nicht wie ein API-Schlüssel aus.');
+    return key.trim();
+  },
+  aiJob(p) {
+    const { id, name, channelId, channelName, prompt, schedule, context, enabled } = obj(p);
+    if (id !== undefined && !(typeof id === 'string' && /^[0-9a-f-]{36}$/.test(id))) throw new ValidationError('Ungültige Auftrags-ID.');
+    if (typeof name !== 'string' || name.trim().length < 1 || name.length > 60) throw new ValidationError('Der Name muss 1–60 Zeichen haben.');
+    if (typeof prompt !== 'string' || prompt.trim().length < 3 || prompt.length > 2000) throw new ValidationError('Der Auftrag muss 3–2000 Zeichen haben.');
+    if (channelName !== undefined && (typeof channelName !== 'string' || channelName.length > 100)) throw new ValidationError('Ungültiger Kanalname.');
+    if (typeof context !== 'boolean' || typeof enabled !== 'boolean') throw new ValidationError('Ungültige Schalter.');
+    const s = obj(schedule);
+    const clean = s.kind === 'interval' ? { kind: 'interval', minutes: s.minutes } : { kind: 'daily', time: s.time, days: Array.isArray(s.days) ? [...s.days] : s.days };
+    if (!isValidSchedule(clean)) throw new ValidationError('Ungültiger Zeitplan (mind. alle 15 Minuten, Uhrzeit HH:MM, mind. ein Wochentag).');
+    return { ...(id ? { id } : {}), name: name.trim(), channelId: snowflake(channelId, 'channelId'), channelName: channelName?.trim() || '', prompt: prompt.trim(), schedule: clean, context, enabled };
+  },
+  aiJobRef(p) {
+    const { id } = obj(p);
+    if (!(typeof id === 'string' && /^[0-9a-f-]{36}$/.test(id))) throw new ValidationError('Ungültige Auftrags-ID.');
+    return { id };
+  },
   userRef(p) {
     const { userId } = obj(p);
     return { userId: snowflake(userId, 'userId') };

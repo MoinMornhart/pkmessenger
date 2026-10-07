@@ -2500,3 +2500,90 @@ img.chat-avatar {
 .newdm {
   padding: 22px;
 }
+
+/* ---------- KI-Agenten (Beta) ---------- */
+.ai-box {
+  margin-top: 8px;
+  padding: 4px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel-2) 45%, transparent);
+}
+.ai-jobs__title {
+  margin-top: 18px;
+}
+.ai-job {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.ai-job.is-off .ai-job__main {
+  opacity: 0.55;
+}
+.ai-job__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ai-job__main > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-job__actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: none;
+}
+.ai-switch {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.ai-job-form {
+  margin: 8px 0;
+  padding: 4px 12px 12px;
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  border-radius: 12px;
+}
+.ai-days {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+.ai-days button {
+  min-width: 38px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ai-days button.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.settings__row select {
+  width: auto;
+  flex: 1;
+}
+.settings input.ai-time {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 130px;
+  color-scheme: dark;
+}

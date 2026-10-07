@@ -107,6 +107,18 @@ function createDemo() {
   add(channels.ankuendigungen, client.user, '📢 Server-Regeln:\n1. Respektvoll bleiben\n2. Kein Spam\n3. Bot-Befehle nur in #projekt-a', 3 * 24 * 60);
   add(channels.projektA, chiara, 'Projekt A startet nächste Woche!', 300);
   add(channels.nurLesen, bernd, 'Dieser Kanal ist für den Bot nur lesbar.', 500);
+  // Wie echtes Discord: auch eigene Bot-Nachrichten kommen live über das Gateway zurück
+  // (wichtig für Nachrichten, die nicht aus dem Eingabefeld stammen, z. B. KI-Agenten)
+  for (const ch of Object.values(channels)) {
+    if (typeof ch?.send !== 'function') continue;
+    const send = ch.send;
+    ch.send = async (options) => {
+      const m = await send(options);
+      setTimeout(() => client.emit(Events.MessageCreate, m), 60);
+      return m;
+    };
+  }
+
   // Privatchat mit Chiara (sie hat dem Bot privat geschrieben)
   const dm = world.makeDM(chiara);
   add(dm, chiara, 'Hey Bot, kannst du mich morgen an das Treffen erinnern? 🙏', 30);
@@ -196,7 +208,16 @@ function createDemo() {
 
   const envPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pk-demo-')), '.env');
   fs.writeFileSync(envPath, `DISCORD_TOKEN=${FAKE_TOKEN}\n`);
-  return { world, envPath, createClient: () => client, voiceLib, stats };
+  // KI-Agenten (Beta) im Demo: simulierter Anbieter (OpenAI-Format), Schlüssel nur im Speicher – keine echten Anfragen
+  let demoKey = null;
+  const aiSecret = { has: () => Boolean(demoKey), get: () => demoKey, set: (v) => (demoKey = v), clear: () => (demoKey = null) };
+  const aiFetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    const user = body.messages?.at(-1)?.content || '';
+    const content = /Verbindung/.test(user) ? 'OK – Verbindung steht.' : '☀️ **Guten Morgen, Team!** Heute steht das Treffen um 19 Uhr an. Bringt eure Ideen mit 🚀';
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content } }] }) };
+  };
+  return { world, envPath, createClient: () => client, voiceLib, stats, aiSecret, aiFetch };
 }
 
 module.exports = { createDemo };

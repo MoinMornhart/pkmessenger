@@ -13,6 +13,7 @@ const { ensureEnvFile } = require('./env');
 const { registerIpc } = require('./ipc');
 const { createUpdater, parseRepo } = require('./updater');
 const { createVoiceManager } = require('./voice');
+const { createAiManager, createSecretFile } = require('./ai');
 const { createTokenStore } = require('./secrets');
 
 if (!app.requestSingleInstanceLock()) {
@@ -71,6 +72,12 @@ const service = createDiscordService({
   ...(demo ? { createClient: demo.createClient, statusExtra: { demo: true } } : {}),
 });
 const store = createStore(path.join(app.getPath('userData'), demo || SHOTS_ARG ? 'settings-dev-demo.json' : 'settings.json'));
+// Screenshot-Lauf: jedes Mal mit gleichem Ausgangszustand starten (KI-Beta aus, keine gemerkten Privatchats)
+if (SHOTS_ARG) {
+  store.set('ai', null);
+  store.set('dmChannels', []);
+  store.set('screenProtection', false);
+}
 const voice = createVoiceManager({
   voiceLib: demo ? demo.voiceLib : require('@discordjs/voice'),
   getVoiceTarget: (t) => service.getVoiceTarget(t),
@@ -86,6 +93,15 @@ const updater = createUpdater({
   version: app.getVersion(),
   repo: parseRepo(require('../../package.json').repository),
   emit: broadcast,
+});
+
+// KI-Agenten (Beta): API-Schlüssel verschlüsselt in ai-key.enc; im Demo simulierter Anbieter
+const ai = createAiManager({
+  store,
+  service,
+  emit: broadcast,
+  secret: demo ? demo.aiSecret : createSecretFile({ safeStorage, filePath: path.join(app.getPath('userData'), 'ai-key.enc') }),
+  ...(demo ? { fetchImpl: demo.aiFetch } : {}),
 });
 
 function isTrustedSender(event) {
@@ -181,10 +197,11 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
   const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai }, isTrustedSender);
   createWindow();
   service.connect(); // async – blockiert das Fenster nicht
   updater.start();
+  ai.start();
 });
 
 app.on('window-all-closed', () => app.quit());

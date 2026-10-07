@@ -229,6 +229,48 @@ async function runScreenshots(win, dir, { demo, stats }) {
   await wait(800);
   const dmRows2 = await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].map(r=>r.querySelector('.chatrow__name')?.textContent).join(',')`);
   console.log(`[dm] Nach "Neuer Privatchat": ${dmRows2} · offen: ${await js(win, `document.querySelector('.chat__head')?.textContent.slice(0,40)`)}`);
+  // KI-Agenten (Beta): einschalten, Anbieter + Modell + Schlüssel, Verbindung testen, Auftrag anlegen und sofort ausführen
+  const SET = `const setVal=(el,v)=>{ const proto=el instanceof HTMLSelectElement?HTMLSelectElement:el instanceof HTMLTextAreaElement?HTMLTextAreaElement:HTMLInputElement; Object.getOwnPropertyDescriptor(proto.prototype,'value').set.call(el,v); el.dispatchEvent(new Event(el instanceof HTMLSelectElement?'change':'input',{bubbles:true})); };`;
+  const clickText = (sel, text) => js(win, `[...document.querySelectorAll('${sel}')].find(b=>b.textContent.includes('${text}'))?.click()`);
+  await js(win, `document.querySelector('.rail__item:not(.rail__dm):not(.rail__add)')?.click()`);
+  await wait(400);
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+  await wait(600);
+  await js(win, `[...document.querySelectorAll('.settings label.composer__ping')].find(l=>l.textContent.includes('Beta'))?.querySelector('input')?.click()`);
+  await wait(500);
+  await js(win, `(() => { ${SET} setVal(document.querySelector('#ai-model'),'demo-modell'); })()`);
+  await wait(200);
+  await clickText('.ai-box .btn', 'Übernehmen');
+  await wait(300);
+  await js(win, `(() => { ${SET} setVal(document.querySelector('#ai-key'),'sk-demo-1234567890'); })()`);
+  await wait(100);
+  await clickText('.ai-box .btn', 'Speichern');
+  await wait(300);
+  await clickText('.ai-box .btn', 'Verbindung testen');
+  await wait(500);
+  const aiTest = await js(win, `[...document.querySelectorAll('.toast')].map(t=>t.textContent).find(t=>t.includes('KI antwortet'))||'(kein Test-Hinweis)'`);
+  await clickText('.ai-box .btn', 'Neuer Auftrag');
+  await wait(300);
+  await js(win, `(() => { ${SET} setVal(document.querySelector('#ai-job-name'),'Morgengruß'); setVal(document.querySelector('#ai-job-prompt'),'Schreib einen kurzen, fröhlichen Guten-Morgen-Gruß mit dem Plan für heute.'); const t=document.querySelector('#ai-job-target'); const o=[...t.options].find(o=>o.textContent.includes('#allgemein')); if(o) setVal(t,o.value); })()`);
+  await wait(300);
+  await win.webContents.executeJavaScript(`document.querySelector('.ai-job-form')?.scrollIntoView({block:'center'})`);
+  await wait(300);
+  await shoot(win, dir, '24-ki-auftrag');
+  await clickText('.ai-job-form .btn', 'Auftrag speichern');
+  await wait(500);
+  await clickText('.ai-job .btn', 'Jetzt');
+  await wait(1000);
+  await win.webContents.executeJavaScript(`document.querySelector('.ai-box')?.scrollIntoView({block:'end'})`);
+  await wait(300);
+  await shoot(win, dir, '25-ki-agenten');
+  const aiJob = await js(win, `JSON.stringify({ auftraege: document.querySelectorAll('.ai-job').length, status: document.querySelector('.ai-job .small.ok, .ai-job .small.warn')?.textContent.slice(0,90) || null, schluesselSichtbar: document.body.innerHTML.includes('sk-demo-1234567890') })`);
+  console.log(`[ki] Test: ${aiTest.slice(0,60)} · Auftrag: ${aiJob}`);
+  await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+  await wait(400);
+  await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(r=>r.textContent.includes('allgemein'))?.click()`);
+  await wait(800);
+  const posted = await js(win, `[...document.querySelectorAll('.msg--out')].some(m=>m.textContent.includes('Guten Morgen, Team'))`);
+  console.log(`[ki] Nachricht im Kanal sichtbar: ${posted}`);
 }
 
 module.exports = { runScreenshots };

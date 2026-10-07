@@ -9,7 +9,11 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai }) {
+  const requireAi = () => {
+    if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
+    return ai;
+  };
   const requireVoice = () => {
     if (!voice) throw Object.assign(new Error('Sprachfunktion nicht verfügbar.'), { code: 'NOT_FOUND' });
     return voice;
@@ -45,6 +49,15 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:list-emojis': (p) => service.listEmojis(validators.guildRef(p)),
     'pk:commands-state': () => service.getCommandsState(),
     'pk:list-dms': () => service.listDMs(),
+    // KI-Agenten (Beta) – der API-Schlüssel geht nur hinein, nie heraus
+    'pk:ai-get': () => requireAi().getConfig(),
+    'pk:ai-set-config': (p) => requireAi().setConfig(validators.aiConfig(p)),
+    'pk:ai-set-key': (p) => requireAi().setKey(validators.aiKey(p)),
+    'pk:ai-clear-key': () => requireAi().clearKey(),
+    'pk:ai-test': () => requireAi().test(),
+    'pk:ai-save-job': (p) => requireAi().saveJob(validators.aiJob(p)),
+    'pk:ai-delete-job': (p) => requireAi().deleteJob(validators.aiJobRef(p)),
+    'pk:ai-run-job': (p) => requireAi().runJob(validators.aiJobRef(p)),
     'pk:open-dm': (p) => service.openDM(validators.userRef(p)),
     'pk:get-profile': (p) => service.getProfile(validators.profileRef(p)),
     'pk:update-profile': (p) => service.updateProfile(validators.profileUpdate(p)),
