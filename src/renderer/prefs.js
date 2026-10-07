@@ -4,7 +4,7 @@ import { sanitizeVoiceFx } from '../shared/voice-settings';
 import { sanitizeWallpapers } from '../shared/wallpapers';
 // localStorage kann fehlen/werfen → immer mit Standardwerten weiterarbeiten.
 const KEY = 'pk.prefs.v1';
-const DEFAULTS = Object.freeze({ micDeviceId: '', outputDeviceId: '', volume: 1, chatSort: 'recent', collapsed: {}, theme: 'nacht', accent: '', motion: 'voll', density: 'normal', sound: sanitizeSound(null), voiceFx: sanitizeVoiceFx(null), dnd: false, mentionScope: 'server', wallpapers: {}, media: 'fragen', linkWarn: true, spoilerAsk: true, trustedDomains: [], hiddenMessages: [] });
+const DEFAULTS = Object.freeze({ micDeviceId: '', outputDeviceId: '', volume: 1, chatSort: 'recent', collapsed: {}, theme: 'nacht', accent: '', motion: 'voll', density: 'normal', sound: sanitizeSound(null), voiceFx: sanitizeVoiceFx(null), dnd: false, mentionScope: 'server', wallpapers: {}, media: 'fragen', linkWarn: true, spoilerAsk: true, trustedDomains: [], hiddenMessages: [], showWhatsNew: true, lastSeenVersion: '' });
 const THEME_IDS = ['nacht', 'ozean', 'lila', 'amoled', 'hell'];
 const pick = (v, allowed, fallback) => (allowed.includes(v) ? v : fallback);
 const listeners = new Set();
@@ -31,6 +31,8 @@ function read() {
       linkWarn: raw?.linkWarn !== false,
       spoilerAsk: raw?.spoilerAsk !== false,
       trustedDomains: Array.isArray(raw?.trustedDomains) ? raw.trustedDomains.filter((d) => typeof d === 'string' && /^[a-z0-9.-]{3,253}$/.test(d)).slice(0, 200) : [],
+      showWhatsNew: raw?.showWhatsNew !== false,
+      lastSeenVersion: typeof raw?.lastSeenVersion === 'string' && /^d+.d+.d+$/.test(raw.lastSeenVersion) ? raw.lastSeenVersion : '',
       hiddenMessages: Array.isArray(raw?.hiddenMessages) ? raw.hiddenMessages.filter((d) => typeof d === 'string' && /^\d{17,20}$/.test(d)).slice(-500) : [],
       collapsed: raw?.collapsed && typeof raw.collapsed === 'object' && !Array.isArray(raw.collapsed) ? Object.fromEntries(Object.entries(raw.collapsed).filter(([k, v]) => /^\d{17,20}$/.test(k) && v === true)) : {},
     };

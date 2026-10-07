@@ -341,6 +341,13 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
     await wait(300);
     console.log(`[hilfe] Check: ${check} · Ups: ${oops}`);
+    // „Das ist neu“ nach einem Update (#44)
+    await js(win, `window.dispatchEvent(new CustomEvent('pk:whats-new', { detail: { since: '0.0.1' } }))`);
+    await wait(1200);
+    await shoot(win, dir, '72-das-ist-neu');
+    console.log(`[das-ist-neu] ${await js(win, `JSON.stringify({ titel: document.querySelector('.whats-new h3')?.textContent || null, versionen: document.querySelectorAll('.whats-new__list > div').length, punkte: document.querySelectorAll('.whats-new__list li').length })`)}`);
+    await js(win, `[...document.querySelectorAll('.whats-new .btn')].find(b=>b.textContent.includes('weiter'))?.click()`);
+    await wait(300);
     // Einrichtungs-Assistent (#38)
     await js(win, `window.dispatchEvent(new CustomEvent('pk:setup-wizard'))`);
     await wait(1500);

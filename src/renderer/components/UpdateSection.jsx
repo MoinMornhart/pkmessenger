@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
+import { prefs } from '../prefs';
 import { formatShortTime } from '../../shared/format';
 
 // Update-Zustand verständlich anzeigen (Issue #1: „ich drücke nach Updates suchen, aber die App sagt nichts“)
@@ -16,6 +17,17 @@ export const UPDATE_TEXT = {
 const DONE = new Set(['current', 'downloading', 'ready', 'error']);
 const RECENT_MS = 2 * 60 * 1000; // so kurz nach einer Prüfung erst nachfragen (Issue #1: „mehrfach drücken → Prompt“)
 const fmtDate = (ts) => (ts ? new Date(ts).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '');
+
+// „Das ist neu“ nach Updates ein/aus (Issue #44)
+function WhatsNewToggle() {
+  const [on, setOn] = useState(prefs.get().showWhatsNew);
+  useEffect(() => prefs.subscribe((p) => setOn(p.showWhatsNew)), []);
+  return (
+    <label className="composer__ping" data-setting="whats-new">
+      <input type="checkbox" checked={on} onChange={(e) => prefs.set({ showWhatsNew: e.target.checked })} /> 🎉 Nach einem Update kurz zeigen, was neu und was behoben ist
+    </label>
+  );
+}
 
 export default function UpdateSection({ appInfo, toast }) {
   const u = appInfo?.update || { state: 'idle' };
@@ -99,6 +111,7 @@ export default function UpdateSection({ appInfo, toast }) {
         </button>
       </div>
       {u.enabled && <p className="muted small">Die App sucht automatisch beim Start und alle 15 Minuten. „Jetzt suchen“ fragt direkt bei GitHub.</p>}
+      <WhatsNewToggle />
 
       {changes && changes !== 'busy' && (
         <div className="update-changes" role="region" aria-label="Was ist neu?">

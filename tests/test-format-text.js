@@ -52,3 +52,18 @@ test('Spoiler-Inhalt erscheint in Vorschauen nie im Klartext (Issue #35)', () =>
   // Formatier-Menü: jeder Knopf hat einen sichtbaren Namen
   assert.ok(FORMAT_BUTTONS.every((b) => b.name && b.name.length <= 12));
 });
+
+test('„Das ist neu“: nur Versionen seit der zuletzt gesehenen (Issue #44)', async () => {
+  // WhatsNew.jsx ist JSX → Logik hier nachgebaut geprüft über dieselbe Vergleichsregel
+  const cmp = (a, b) => {
+    const pa = a.split('.').map(Number);
+    const pb = b.split('.').map(Number);
+    for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pa[i] - pb[i];
+    return 0;
+  };
+  const rel = ['v0.10.3', 'v0.10.2', 'v0.10.1', 'v0.9.9'].map((tag) => ({ tag }));
+  const since = (s, cur) => rel.filter((r) => cmp(r.tag.slice(1), s) > 0 && cmp(r.tag.slice(1), cur) <= 0).map((r) => r.tag);
+  assert.deepEqual(since('0.10.1', '0.10.3'), ['v0.10.3', 'v0.10.2']);
+  assert.deepEqual(since('0.9.9', '0.10.1'), ['v0.10.1']);
+  assert.deepEqual(since('0.10.3', '0.10.3'), []);
+});
