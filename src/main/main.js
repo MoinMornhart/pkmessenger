@@ -17,6 +17,7 @@ const { createVoiceManager } = require('./voice');
 const { createAiManager, createSecretFile } = require('./ai');
 const { createMemory } = require('./ai-memory');
 const { createHello } = require('./hello');
+const { createLogger, buildReport } = require('./logger');
 const { createAppLock } = require('./app-lock');
 const { createTokenStore } = require('./secrets');
 
@@ -53,6 +54,13 @@ function broadcast(type, payload) {
       voice.handleDiscordStatus(payload?.state);
     } catch {
       /* Sprach-Manager noch nicht initialisiert – dann gibt es auch keine Verbindung */
+    }
+  }
+  if (type === 'log' && payload?.message) {
+    try {
+      logger[payload.level === 'error' ? 'error' : 'warn']('discord', payload.message);
+    } catch {
+      /* Logger noch nicht bereit */
     }
   }
   // KI-Antwort-Agent (Beta): neue Nachrichten prüfen (antwortet nur, wenn eingeschaltet und der Bot erwähnt wird)
@@ -124,6 +132,20 @@ const soundFile = {
 
 // App-Sperre (Passwort-Hash in settings.json unter „appLock“)
 const appLock = createAppLock({ store, emit: broadcast });
+
+// Fehlerprotokoll (Issue #1): englisch, ohne Geheimnisse, nur lokal (Demo: nur im Speicher)
+const LOG_DIR = path.join(app.getPath('userData'), 'logs');
+const logger = createLogger({ dir: demo ? null : LOG_DIR });
+process.on('uncaughtException', (e) => logger.error('main', `uncaughtException: ${e?.message}`, e?.stack?.split('\n').slice(1, 5).join(' ')));
+process.on('unhandledRejection', (e) => logger.error('main', `unhandledRejection: ${e?.message || e}`, e?.stack?.split('\n').slice(1, 5).join(' ')));
+const errorReport = ({ where, message }) =>
+  buildReport({ version: app.getVersion(), platform: process.platform, arch: process.arch, electron: process.versions.electron, error: message, where, lines: logger.tail(30) });
+const openLogFolder = () => {
+  if (demo) return false;
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+  shell.openPath(LOG_DIR);
+  return true;
+};
 
 // Windows Hello zum Entsperren (Issue #29) – Windows-eigene Prüfung, siehe hello.js
 const hello = demo ? { availability: async () => 'Available', verify: async () => true } : createHello();
@@ -242,6 +264,7 @@ function createWindow() {
     if (!app.isPackaged && input.control && input.shift && input.key.toLowerCase() === 'i') mainWindow.webContents.toggleDevTools();
   });
 
+  mainWindow.webContents.on('render-process-gone', (_e, d) => logger.error('renderer', `render-process-gone: ${d?.reason} (${d?.exitCode})`));
   mainWindow.loadFile(RENDERER_HTML, SHOTS_ARG ? { query: { shots: '1' } } : undefined);
   if (SHOTS_ARG) {
     // Testlauf: Fehler aus der Oberfläche im Terminal sichtbar machen
@@ -281,7 +304,7 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
   const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder }, isTrustedSender);
   // Automatische Sperre: PC eine Weile unbenutzt → App sperren
   setInterval(() => appLock.idleTick(powerMonitor.getSystemIdleTime()), 30000).unref?.();
   createWindow();

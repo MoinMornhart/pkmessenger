@@ -26,32 +26,75 @@ export function startTour() {
 const $ = (sel) => (sel ? document.querySelector(sel) : null);
 const SETTINGS_BTN = '.chatlist__head .icon-btn[aria-label="Einstellungen"]';
 
-export const STEPS = [
-  { title: 'Willkommen bei PKMessenger 👋', text: 'Eine kurze Tour (etwa 1 Minute). Du kannst bei manchen Schritten direkt mitmachen. Überspringen geht jederzeit.' },
-  { target: '.rail', title: 'Deine Server', text: 'Links sind die Server, auf denen dein Bot ist. Ganz oben (💬) findest du die Privatchats, unten kannst du einen Server hinzufügen.' },
-  { target: '.chatlist__items', title: 'Deine Chats', text: 'Hier sind die Kanäle. Neue Nachrichten stehen oben. Rechtsklick auf einen Chat zeigt mehr (Hintergrund, umbenennen …).', task: 'Klick jetzt auf einen Chat.', click: '.chatlist__items .chatrow' },
-  { target: '.composer', title: 'Schreiben', text: 'Hier schreibst du. Alles geht als dein Bot raus (mit BOT-Abzeichen). „@“ schlägt Namen vor, „/“ zeigt Befehle wie /münze oder /umfrage.', task: 'Tippe ein „/“ ins Feld.', done: () => ($('.composer textarea')?.value || '').startsWith('/') },
-  { target: '.msglist', title: 'Nachrichten', text: 'Klick auf Bild oder Namen zeigt das Profil. Mit der Maus über eine Nachricht: antworten, reagieren, Thread. Rechtsklick: alle Aktionen.' },
-  { target: '.chat__head', title: 'Oben im Chat', text: 'Suche im Chat (Strg+F), angeheftete Nachrichten, Threads und mehr. Strg+K springt schnell zu jedem Chat, auch mit Tippfehlern.' },
-  { target: SETTINGS_BTN, title: 'Einstellungen', text: 'Hier stellst du alles ein: Aussehen, Töne, Sicherheit, Updates.', task: 'Klick auf das Zahnrad.', click: SETTINGS_BTN },
-  { target: '.settings__nav', title: 'Alles schnell finden', text: 'Links die Bereiche, oben eine Suche („Passwort“, „Töne“ …). Jede Einstellung hat einen kurzen Erklärtext.' },
-  { target: '.settings__nav [data-nav="beta"]', title: 'Beta = experimentell', text: 'Unter „Beta“ liegen neue, noch experimentelle Sachen wie KI-Agenten. Sie können sich noch ändern und sind standardmäßig aus.' },
-  { target: '.settings__nav [data-nav="hilfe"]', title: 'Fertig! 🎉', text: 'Die Tour kannst du jederzeit unter „Hilfe & Tour“ neu starten. Viel Spaß mit PKMessenger!' },
-];
+const has = (sel) => Boolean($(sel));
+
+/**
+ * Schritte passend zum Stand (Issue #1: „Tutorial individuell“): ohne Server → Einladen erklären,
+ * ohne sichtbare Chats → Freigabe erklären, sonst die volle Tour mit allen Knöpfen.
+ * target: CSS-Auswahl (mehrere mit „|“ = alle zusammen hervorheben), task + click/done = Mitmachen.
+ */
+export function buildSteps() {
+  const hasServer = has('.rail__item:not(.rail__dm):not(.rail__add)');
+  const hasChats = has('.chatlist__items .chatrow');
+  const steps = [{ title: 'Willkommen bei PKMessenger 👋', text: 'Eine kurze Tour. Bei manchen Schritten machst du direkt mit. Überspringen geht jederzeit (Esc).' }];
+  if (!hasServer) {
+    steps.push(
+      { target: '.rail [aria-label="Bot einladen"]', title: 'Erst mal: Bot einladen', text: 'Dein Bot ist noch auf keinem Server. Über diesen Knopf lädst du ihn auf deinen Server ein: Server wählen, „Autorisieren“, fertig.', task: 'Klick auf den Knopf.', click: '.rail [aria-label="Bot einladen"]' },
+      { target: '.rail [aria-label="Server beitreten"]', title: 'Server per Einladungslink', text: 'Hast du einen Einladungslink zu einem fremden Server? Hier einfügen, die App zeigt dir den Weg.' },
+      { title: 'Danach geht\'s weiter', text: 'Sobald der Bot auf einem Server ist, erscheint er links. Dann starte die Tour nochmal unter Einstellungen → Hilfe & Tour, und ich zeige dir den Rest 🙂' },
+    );
+    return steps;
+  }
+  steps.push({ target: '.rail', title: 'Deine Server', text: 'Links die Server deines Bots. 💬 oben = Privatchats, unten: Bot einladen und Server per Link beitreten.' });
+  if (!hasChats) {
+    steps.push(
+      { target: '.chatlist', title: 'Noch keine Chats sichtbar', text: 'Der Bot darf hier noch keinen Kanal sehen. Gib der Bot-Rolle in Discord unter Servereinstellungen → Rollen das Recht „Kanäle ansehen“, dann tauchen die Kanäle hier auf (⟳ aktualisiert).' },
+      { title: 'Danach geht\'s weiter', text: 'Wenn Kanäle da sind, starte die Tour nochmal unter Einstellungen → Hilfe & Tour.' },
+    );
+    return steps;
+  }
+  steps.push(
+    { target: '.chatlist__items', title: 'Deine Chats', text: 'Neue Nachrichten stehen oben, ein Punkt zeigt Ungelesenes.', task: 'Klick jetzt auf einen Chat.', click: '.chatlist__items .chatrow' },
+    { target: '.chatlist__items .chatrow', title: 'Rechtsklick auf einen Chat', text: 'Als gelesen markieren, 🖼 eigenen Hintergrund für diesen Chat oder Server, Link kopieren, umbenennen und verschieben (wenn der Bot darf).' },
+    { target: '.chatlist__head [aria-label="Aktualisieren"]|.chatlist__head [aria-label="Sortierung wechseln"]|.chatlist__head [aria-label="Nicht stören"]|.chatlist__head [aria-label="Einstellungen"]', title: 'Oben in der Liste', text: '⟳ neu laden · ☰ sortieren (neueste oder nach Kategorien) · 🔔 Nicht stören (keine Töne) · ⚙ Einstellungen. Töne und eigene Benachrichtigungstöne stellst du in den Einstellungen ein.' },
+    { target: '.composer textarea', title: 'Schreiben', text: 'Alles geht als dein Bot raus (mit BOT-Abzeichen). „@“ schlägt Namen vor, „#“ Kanäle, „/“ Befehle wie /münze, /spoiler oder /umfrage. Text markieren → Menü zum Formatieren.', task: 'Tippe ein „/“ ins Feld.', done: () => ($('.composer textarea')?.value || '').startsWith('/') },
+    { target: '.composer .tool-btn', all: true, title: 'Die Knöpfe unten', text: '📎 Dateien anhängen (bis 25 MB) · ▤ Embed bauen (Kasten mit Titel, Farbe, Bild) · 😀 Smileys · 📊 Umfrage erstellen.' },
+    { target: '.msglist .msg', title: 'Nachrichten', text: 'Klick auf Bild oder Namen zeigt das Profil. Maus drüber: antworten, reagieren, Thread. Rechtsklick: alle Aktionen, auch kopieren, anheften und Person verwalten. Gefährliche Links werden automatisch gesperrt.' },
+    { target: '.chat__head [aria-label="Threads"]|.chat__head [aria-label="Angeheftete Nachrichten"]|.chat__head [aria-label="Suchen"]', title: 'Threads, Pins, Suche', text: '🧵 Threads (Neben-Unterhaltungen) ansehen und starten · 📌 angeheftete Nachrichten · 🔎 im Chat suchen (Strg+F). Strg+K springt zu jedem Chat, auch mit Tippfehlern.' },
+  );
+  if (has('.chatlist__section')) steps.push({ target: '.chatlist__section', title: 'Sprachkanäle', text: 'Klick auf einen Sprachkanal: Der Bot tritt bei und du sprichst über ihn. Alle hören „PK BOT“. Unten erscheint dann die Anrufleiste.' });
+  steps.push(
+    { target: SETTINGS_BTN, title: 'Einstellungen', text: 'Hier stellst du alles ein.', task: 'Klick auf das Zahnrad.', click: SETTINGS_BTN },
+    { target: '.settings__nav', title: 'Alles schnell finden', text: 'Klick links auf einen Bereich, dann siehst du nur diesen. Oben suchen („Passwort“, „Töne“, „Hintergrund“ …), auch mit Tippfehlern.' },
+    { target: '.settings__nav [data-nav="toene"]|.settings__nav [data-nav="aussehen"]', title: 'Töne & Aussehen', text: '🔔 Töne, eigener Ton, Nicht stören · 🎨 Designs, Akzentfarbe, Animationen und Chat-Hintergründe.' },
+    { target: '.settings__nav [data-nav="datenschutz"]|.settings__nav [data-nav="sicherheit"]', title: 'Datenschutz & Sicherheit', text: 'Bilder/GIFs erst nach Rückfrage, Link-Warnungen, vertraute Seiten, Spoiler · App-Passwort, Windows Hello, mit Windows starten, im Hintergrund weiterlaufen.' },
+    { target: '.settings__nav [data-nav="beta"]', title: 'Beta = experimentell', text: 'Hier liegen neue, noch experimentelle Sachen wie KI-Agenten. Sie sind standardmäßig aus und können sich noch ändern.' },
+    { target: '.settings__nav [data-nav="hilfe"]', title: 'Fertig! 🎉', text: 'Unter „Hilfe & Tour“ startest du die Tour neu, prüfst die Einrichtung und findest Tastenkürzel. Viel Spaß!' },
+  );
+  return steps;
+}
 
 const PAD = 8;
 
 export default function Tour() {
   const [step, setStep] = useState(-1); // -1 = aus
+  const [STEPS, setSteps] = useState(() => buildSteps());
   const [rect, setRect] = useState(null);
   const [done, setDone] = useState(false);
 
   // Start: erster Programmstart (nicht im Screenshot-Lauf) oder per „Tour starten“
   useEffect(() => {
-    const onStart = () => setStep(0);
+    const onStart = () => {
+      setSteps(buildSteps()); // passend zum aktuellen Stand
+      setStep(0);
+    };
     window.addEventListener('pk:start-tour', onStart);
     let t;
-    if (!tourState() && !/[?&]shots=1/.test(window.location.search)) t = setTimeout(() => setStep((s) => (s < 0 ? 0 : s)), 1500);
+    if (!tourState() && !/[?&]shots=1/.test(window.location.search))
+      t = setTimeout(() => {
+        setSteps(buildSteps());
+        setStep((s) => (s < 0 ? 0 : s));
+      }, 1500);
     return () => {
       window.removeEventListener('pk:start-tour', onStart);
       clearTimeout(t);
@@ -70,9 +113,17 @@ export default function Tour() {
     setDone(false);
     const s = STEPS[step];
     const tick = () => {
-      const el = s.target ? s.target.split(',').map((x) => $(x.trim())).find(Boolean) : null;
-      const r = el?.getBoundingClientRect();
-      setRect(r && r.width > 0 ? { x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 } : null);
+      // Mehrere Ziele („a|b|c“ oder all: true) → gemeinsamen Rahmen um alle legen
+      const els = !s.target ? [] : s.all ? [...document.querySelectorAll(s.target)] : s.target.split('|').map((x) => $(x.trim())).filter(Boolean);
+      const rs = els.map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0);
+      if (!rs.length) setRect(null);
+      else {
+        const x1 = Math.min(...rs.map((r) => r.left));
+        const y1 = Math.min(...rs.map((r) => r.top));
+        const x2 = Math.max(...rs.map((r) => r.right));
+        const y2 = Math.max(...rs.map((r) => r.bottom));
+        setRect({ x: x1 - PAD, y: y1 - PAD, w: x2 - x1 + PAD * 2, h: y2 - y1 + PAD * 2 });
+      }
       if (s.done && s.done()) setDone(true);
     };
     tick();
@@ -84,14 +135,14 @@ export default function Tour() {
       clearInterval(iv);
       document.removeEventListener('click', onClick, true);
     };
-  }, [step]);
+  }, [step, STEPS]);
 
   // Aufgabe erledigt → kurz zeigen, dann weiter
   useEffect(() => {
     if (!done || step < 0) return undefined;
     const t = setTimeout(() => setStep((x) => Math.min(x + 1, STEPS.length - 1)), 700);
     return () => clearTimeout(t);
-  }, [done, step]);
+  }, [done, step, STEPS.length]);
 
   useEffect(() => {
     if (step < 0) return undefined;

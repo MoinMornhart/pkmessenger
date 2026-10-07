@@ -9,6 +9,7 @@ import SecuritySection from './SecuritySection.jsx';
 import { THEMES, ACCENTS, MOTIONS } from '../theme';
 import WallpaperDialog from './WallpaperDialog.jsx';
 import { tourState, startTour } from './Tour.jsx';
+import { reportError } from './OopsDialog.jsx';
 import { fuzzyFilter } from '../../shared/fuzzy';
 
 function TokenSection({ toast }) {
@@ -470,7 +471,7 @@ const SECTIONS = [
   { id: 'token', icon: '🔑', title: 'Bot-Token', desc: 'Den geheimen Schlüssel deines Bots ersetzen oder entfernen.', keywords: ['token', 'schlüssel', 'anmelden'] },
   { id: 'audio', icon: '🎧', title: 'Audio', desc: 'Mikrofon, Lautsprecher und Stimme für Sprachkanäle.', keywords: ['mikrofon', 'lautsprecher', 'sprachkanal', 'rauschen', 'stimme'] },
   { id: 'updates', icon: '🔄', title: 'Updates', desc: 'Nach neuen Versionen suchen, sehen was neu ist, neu installieren.', keywords: ['update', 'version', 'neu', 'release', 'installieren'] },
-  { id: 'hilfe', icon: '❓', title: 'Hilfe & Tour', desc: 'Die Einführungs-Tour neu starten und Tastenkürzel.', keywords: ['tour', 'hilfe', 'tutorial', 'tasten', 'kürzel'] },
+  { id: 'hilfe', icon: '❓', title: 'Hilfe & Tour', desc: 'Tour neu starten, Einrichtung prüfen, Tastenkürzel, Fehler melden.', keywords: ['tour', 'hilfe', 'tutorial', 'tasten', 'kürzel', 'einrichtung', 'fehler', 'protokoll', 'log', 'intent'] },
   { id: 'beta', icon: '🧪', title: 'Beta', desc: 'Experimentelle Funktionen wie KI-Agenten. Standardmäßig aus, kann sich noch ändern.', keywords: ['ki', 'ai', 'agent', 'openai', 'claude', 'ollama', 'experimentell'] },
 ];
 
@@ -507,7 +508,63 @@ function HelpSection({ onClose }) {
         </li>
       </ul>
       <p className="muted small">💡 Fährst du mit der Maus über einen Knopf, steht dort, was er macht.</p>
+      <SetupCheck />
+      <span className="settings__label">🐞 Fehler melden</span>
+      <div className="settings__row">
+        <button className="btn btn--small" onClick={() => reportError('manuell (Einstellungen → Hilfe)', 'Fehlerbericht von Hand erstellt')}>
+          Fehlerbericht erstellen
+        </button>
+        <button className="btn btn--ghost btn--small" onClick={() => api.openLogFolder().catch(() => {})}>
+          Protokoll-Ordner öffnen
+        </button>
+      </div>
+      <p className="muted small">Das Protokoll (englisch) liegt nur auf deinem PC und enthält keine Passwörter, Tokens oder Nachrichten. Gesendet wird nichts automatisch.</p>
     </>
+  );
+}
+
+// Einrichtungs-Check (Issue #1): prüft über die offizielle Discord-Schnittstelle, was fehlt, mit Link zur richtigen Portal-Seite
+function SetupCheck() {
+  const [res, setRes] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      setRes(await api.setupCheck());
+    } catch (e) {
+      setRes({ items: [{ id: 'err', ok: false, text: e.message, fix: e.hint }] });
+    } finally {
+      setBusy(false);
+    }
+  };
+  useEffect(() => {
+    run();
+  }, []);
+  return (
+    <div className="setup-check" data-setting="setup-check">
+      <span className="settings__label">🩺 Einrichtungs-Check</span>
+      {!res && <p className="muted small">Prüfe …</p>}
+      {res?.items.map((it) => (
+        <div key={it.id} className={`setup-check__item ${it.ok ? 'is-ok' : it.optional ? 'is-optional' : 'is-bad'}`}>
+          <span>{it.ok ? '✅' : it.optional ? '➖' : '❌'}</span>
+          <span>
+            {it.text}
+            {!it.ok && it.fix && <span className="muted small"> – {it.fix}</span>}
+            {!it.ok && it.url && (
+              <>
+                {' '}
+                <button className="linklike small" onClick={() => api.openExternal({ url: it.url }).catch(() => {})}>
+                  Seite öffnen
+                </button>
+              </>
+            )}
+          </span>
+        </div>
+      ))}
+      <button className="btn btn--ghost btn--small" disabled={busy} onClick={run}>
+        {busy ? 'Prüfe …' : '↻ Nochmal prüfen'}
+      </button>
+    </div>
   );
 }
 

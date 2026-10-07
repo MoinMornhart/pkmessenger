@@ -711,6 +711,51 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   }
 
   /** Bot-Einladungslink. Mit guildId ist der Server vorausgewählt und fixiert (offizielle Parameter guild_id + disable_guild_select). */
+  /**
+   * Einrichtungs-Check (Issue #1: „bei der Einrichtung helfen, Status auslesen“) – NUR über die offizielle API,
+   * kein Auslesen der Discord-Webseite. Liefert verständliche Punkte mit direktem Link zur passenden Portal-Seite.
+   */
+  async function setupCheck() {
+    const c = client;
+    const ready = Boolean(c?.isReady?.());
+    const appId = c?.application?.id || null;
+    const portal = appId ? `https://discord.com/developers/applications/${appId}` : 'https://discord.com/developers/applications';
+    const items = [];
+    items.push({ id: 'token', ok: ready, text: ready ? `Bot-Token gültig, angemeldet als ${c.user?.username}` : 'Bot ist nicht angemeldet', fix: ready ? null : 'Token in den Einstellungen prüfen', url: ready ? null : `${portal}/bot` });
+    let flags = null;
+    try {
+      flags = ready ? (await c.application.fetch())?.flags : null;
+    } catch {
+      flags = null;
+    }
+    const has = (name) => Boolean(flags?.has?.(name));
+    // Ohne „Message Content Intent“ lässt Discord den Bot gar nicht erst rein (Fehler 4014) → angemeldet = an
+    items.push({ id: 'content', ok: ready, text: 'Erlaubnis „Message Content Intent“ (Nachrichten lesen)', fix: ready ? null : 'Im Entwicklerportal unter „Bot“ → „Privileged Gateway Intents“ einschalten', url: `${portal}/bot` });
+    items.push({
+      id: 'presence',
+      ok: has('GatewayPresence') || has('GatewayPresenceLimited'),
+      optional: true,
+      text: 'Erlaubnis „Presence Intent“ (nur für den Online-Status, freiwillig)',
+      fix: 'Nur nötig, wenn du sehen willst, wer online ist: Portal → „Bot“ → „Presence Intent“',
+      url: `${portal}/bot`,
+    });
+    const guilds = ready ? [...c.guilds.cache.values()] : [];
+    items.push({ id: 'guilds', ok: guilds.length > 0, text: guilds.length ? `Bot ist auf ${guilds.length} ${guilds.length === 1 ? 'Server' : 'Servern'}` : 'Bot ist noch auf keinem Server', fix: guilds.length ? null : 'Bot über „Bot einladen“ (links unten) auf deinen Server holen', url: null, action: guilds.length ? null : 'invite' });
+    for (const g of guilds.slice(0, 10)) {
+      const text = [...g.channels.cache.values()].filter((ch) => ch && (ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildAnnouncement));
+      const visible = text.filter((ch) => can(ch, PermissionFlagsBits.ViewChannel));
+      const writable = visible.filter((ch) => can(ch, PermissionFlagsBits.SendMessages));
+      items.push({
+        id: `guild:${g.id}`,
+        ok: writable.length > 0,
+        text: `„${g.name}“: ${visible.length} von ${text.length} Kanälen sichtbar, in ${writable.length} darf der Bot schreiben`,
+        fix: writable.length ? null : 'Der Bot-Rolle in den Servereinstellungen → Rollen „Kanäle ansehen“ und „Nachrichten senden“ geben',
+        url: null,
+      });
+    }
+    return { ready, appId, items, portal };
+  }
+
   function getInviteUrl({ guildId } = {}) {
     const appId = client?.application?.id || (() => {
       const t = getToken();
@@ -1307,6 +1352,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     sendTyping,
     searchMentionables,
     searchPeople,
+    setupCheck,
     getUserProfile,
     getInviteUrl,
     serializeMessage,

@@ -9,7 +9,7 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder }) {
   const requireAi = () => {
     if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
     return ai;
@@ -170,20 +170,32 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
       return true;
     },
     'pk:open-external': (p) => openExternal(validators.externalUrl(p).url),
+    // Fehlerprotokoll + „Ups“-Bericht (Issue #1) – nichts wird automatisch gesendet
+    'pk:log-error': (p) => {
+      const { where, message } = validators.logError(p);
+      logger?.error(`renderer:${where}`, message);
+      return true;
+    },
+    'pk:error-report': (p) => (errorReport ? errorReport(validators.logError({ where: p?.where, message: p?.error })) : ''),
+    'pk:open-log-folder': () => (openLogFolder ? openLogFolder() : false),
+    'pk:setup-check': () => service.setupCheck(),
   };
 }
 
 // Diese Kanäle gehen auch, wenn die App gesperrt ist (alles andere wird abgelehnt)
 const ALLOWED_WHILE_LOCKED = new Set(['pk:lock-status', 'pk:lock-verify', 'pk:lock-hello', 'pk:get-status', 'pk:get-app-info']);
 
-function wrap(handler, isTrustedSender, channel = '', isLocked = () => false) {
+function wrap(handler, isTrustedSender, channel = '', isLocked = () => false, logger = null) {
   return async (event, payload) => {
     if (!isTrustedSender(event)) return { ok: false, error: { code: 'FORBIDDEN', message: 'Anfrage aus unbekannter Quelle abgelehnt.', hint: '' } };
     if (isLocked() && !ALLOWED_WHILE_LOCKED.has(channel)) return { ok: false, error: { code: 'LOCKED', message: 'PKMessenger ist gesperrt.', hint: 'Bitte mit dem Passwort entsperren.' } };
     try {
       return { ok: true, data: await handler(payload) };
     } catch (err) {
-      return { ok: false, error: describeError(err) };
+      const error = describeError(err);
+      // Unerwartete Fehler ins Protokoll (Eingabefehler/erwartbare Discord-Fehler nicht – das wäre nur Rauschen)
+      if (logger && !['VALIDATION', 'LOCKED', 'FORBIDDEN', 'MISSING_PERMISSION', 'NOT_FOUND'].includes(error.code)) logger.error(channel, `${error.code}: ${err?.message || error.message}`, err?.stack?.split('\n').slice(1, 4).join(' '));
+      return { ok: false, error };
     }
   };
 }
@@ -191,7 +203,7 @@ function wrap(handler, isTrustedSender, channel = '', isLocked = () => false) {
 function registerIpc(ipcMain, deps, isTrustedSender) {
   const handlers = buildHandlers(deps);
   const isLocked = () => Boolean(deps.appLock?.isLocked());
-  for (const [channel, handler] of Object.entries(handlers)) ipcMain.handle(channel, wrap(handler, isTrustedSender, channel, isLocked));
+  for (const [channel, handler] of Object.entries(handlers)) ipcMain.handle(channel, wrap(handler, isTrustedSender, channel, isLocked, deps.logger));
   // Mikrofon-Pakete: ~50 pro Sekunde → "fire and forget" statt invoke. Prüfung auf Herkunft + Größe in voice.pushPacket().
   if (deps.voice) {
     ipcMain.on('pk:voice-packet', (event, data) => {

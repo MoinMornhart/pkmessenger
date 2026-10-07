@@ -6,6 +6,8 @@ import SetupScreen from './components/SetupScreen.jsx';
 import { ConnectingScreen, ErrorScreen } from './components/StatusScreens.jsx';
 import Toasts from './components/Toasts.jsx';
 import LockScreen from './components/LockScreen.jsx';
+import OopsDialog, { reportError } from './components/OopsDialog.jsx';
+import { Component } from 'react';
 
 // Knöpfe mit Symbol statt Text: Beschriftung (aria-label) auch als Hinweis beim Drüberfahren zeigen
 function useButtonHints() {
@@ -22,8 +24,48 @@ function useButtonHints() {
   }, []);
 }
 
+// Unerwartete Fehler der Oberfläche → Protokoll + „Ups …“ (Issue #1)
+function useErrorCatcher() {
+  useEffect(() => {
+    const onError = (e) => reportError(`window: ${e.filename?.split('/').pop() || ''}:${e.lineno || ''}`, e.error || e.message);
+    const onRejection = (e) => reportError('promise', e.reason);
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
+}
+
+/** Stürzt ein Teil der Oberfläche ab, bleibt die App bedienbar und zeigt „Ups …“ statt eines weißen Fensters. */
+export class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error, info) {
+    reportError(`react: ${(info?.componentStack || '').trim().split('\n')[0] || 'component'}`, error);
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <main className="empty">
+        <h2>😵 Ups, dieser Teil ist abgestürzt</h2>
+        <button className="btn btn--primary" onClick={() => this.setState({ failed: false })}>
+          Nochmal versuchen
+        </button>
+      </main>
+    );
+  }
+}
+
 export default function App() {
   useButtonHints();
+  useErrorCatcher();
   const [status, setStatus] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [appInfo, setAppInfo] = useState({ version: null, update: { state: 'idle' } });
@@ -69,7 +111,8 @@ export default function App() {
 
   return (
     <>
-      {screen}
+      <ErrorBoundary>{screen}</ErrorBoundary>
+      <OopsDialog />
       {appInfo.update?.state === 'ready' && (
         <div className="update-banner" role="status">
           <span>

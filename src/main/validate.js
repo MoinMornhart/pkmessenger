@@ -531,6 +531,10 @@ const validators = {
     if (typeof on !== 'boolean') throw new ValidationError('Ungültiges Feld "on".');
     return on;
   },
+  logError(p) {
+    const { where, message } = obj(p);
+    return { where: typeof where === 'string' ? where.slice(0, 200) : 'renderer', message: typeof message === 'string' ? message.slice(0, 2000) : 'unknown' };
+  },
   externalUrl(p) {
     const { url } = obj(p);
     let parsed;
