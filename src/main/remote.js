@@ -76,7 +76,7 @@ const isPrivateIp = (ip) => ip === '::1' || isLocalAddress(`http://${ip.includes
  * @param {(t:string,p:any)=>void} o.emit
  * @param {string} o.webDir    Ordner der Web-Oberfläche
  */
-function createRemote({ service, validators, store, vault, emit = () => {}, logger = null, now = () => Date.now(), webDir, naclPath, lanAddresses = () => [], bindHost = '0.0.0.0' }) {
+function createRemote({ service, validators, store, vault, emit = () => {}, logger = null, now = () => Date.now(), webDir, naclPath, lanAddresses = () => [], bindHost = '0.0.0.0', hostName = null }) {
   let server = null;
   const pairings = new Map(); // pairId → { key, expires, used }
   const pending = new Map(); // reqId → { resolve, info }
@@ -116,6 +116,7 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
       port: c.port,
       hasPassword: Boolean(c.hash),
       requireApproval: c.requireApproval,
+      host: hostName || null,
       addresses: lanAddresses(),
       devices: loadDevices().map(({ key: _k, ...d }) => d),
       activity: activity.slice(0, 50),
@@ -218,10 +219,13 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
     const key = nacl.randomBytes(32);
     const expires = now() + PAIR_TTL_MS;
     pairings.set(pairId, { key, expires, used: false });
-    const addr = lanAddresses()[0] || '127.0.0.1';
-    const url = `http://${addr}:${server.address().port}/#p=${pairId}&k=${Buffer.from(key).toString('base64url')}`;
+    // Keine IP im Link (Issue #53): Gerätename des PCs über mDNS („name.local“, in Windows eingebaut); Adresse nur als Ersatz
+    const port = server.address().port;
+    const hash = `#p=${pairId}&k=${Buffer.from(key).toString('base64url')}`;
+    const url = `http://${hostName || lanAddresses()[0] || '127.0.0.1'}:${port}/${hash}`;
+    const fallbackUrl = `http://${lanAddresses()[0] || '127.0.0.1'}:${port}/${hash}`;
     log({ action: 'Kopplungs-Code erstellt', device: '', ip: '' });
-    return { pairId, url, expires };
+    return { pairId, url, fallbackUrl, expires, host: hostName || null };
   }
   function cancelPairing({ pairId }) {
     pairings.delete(pairId);

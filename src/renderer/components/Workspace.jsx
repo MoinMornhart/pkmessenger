@@ -211,7 +211,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     () =>
       onEvent((type, p) => {
         if (type !== 'remote:activity' || !p || p.quiet || !p.device) return;
-        toast({ kind: /Falsch|abgelehnt/.test(p.action) ? 'warn' : 'info', title: `📱 ${p.device}: ${p.action}`, text: p.detail ? `„${p.detail}“` : p.ip ? `von ${p.ip}` : '', duration: 5000 });
+        toast({ kind: /Falsch|abgelehnt/.test(p.action) ? 'warn' : 'info', title: `📱 ${p.device}: ${p.action}`, text: p.detail ? `„${p.detail}“` : '', duration: 5000 });
       }),
     [toast],
   );

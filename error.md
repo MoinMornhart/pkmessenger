@@ -105,6 +105,7 @@
 9. **Drittes Mal am 07.10.2026 (nächster Stundenlauf):** erneut `refs/heads/main` → `main 2` (`fatal: your current branch 'main' does not have any commits yet`). Inhalt korrekt (`028f971…`), gleiche Reparatur, `fsck` ok. Ohne Umzug aus iCloud wird das bei fast jedem Lauf wieder passieren.
 10. **Viertes Mal am 07.10.2026, ca. 08:27 – jetzt auch Quellcode:** `src/renderer/api.js` hieß plötzlich `api 2.js`. Der Renderer-Build scheiterte wörtlich mit `X [ERROR] Could not resolve "./api"` (11 Fehler), und `git status` zeigte `D src/renderer/api.js` + `?? "src/renderer/api 2.js"`. Inhalt geprüft (enthält die letzte Änderung `invitePreview`), zurückbenannt, Build ok. **Gefahr:** Ohne Prüfung wäre eine gelöschte `api.js` committet worden. **Ab jetzt vor jedem Commit:** `find . -path ./node_modules -prune -o -name "* 2*" -print` muss leer sein.
 11. **Fünftes Mal am 07.10.2026, ca. 19:35:** `AGENTS.md` → `AGENTS 2.md` und `src/renderer/App.jsx` → `App 2.jsx` (git: `D AGENTS.md`, `D src/renderer/App.jsx`). Inhalt mit HEAD verglichen (`diff --strip-trailing-cr`): identisch, nur Zeilenenden. Gesichert (Scratchpad), zurückbenannt, `git status` sauber. Nichts verloren.
+12. **Sechstes Mal am 07.10.2026, ca. 22:10:** `.git/config` → `.git/config 2` (git meldete keine Remotes/Branches mehr). Inhalt geprüft (origin = Morni-Team/pkmessenger, Branch-Einträge), zurückbenannt, `git fetch` wieder ok. Nichts verloren.
 7. **Prävention:** Das Projekt liegt im iCloud-Ordner, und iCloud verträgt sich schlecht mit `.git` und `node_modules`. **Empfehlung an den Nutzer:** das Projekt in einen Ordner außerhalb von iCloud verschieben (z. B. `C:\Projekte\PKMessenger`), da GitHub ohnehin die Sicherung ist. Bis dahin vor jedem Lauf prüfen: `find .git -name "* 2*"`.
 
 ---
@@ -288,3 +289,9 @@ Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zwei
 4. **Lösung:** (a) Alle Kommentare seit 14:30 nachgelesen, vollständige Liste an Joni geschickt, Arbeitsregel gespeichert (vor jeder Antwort/jedem Schließen erneut abfragen). (b) `ai:busy` ergänzt.
 5. **Testergebnis:** Demo: „🤖 KI schreibt gerade an Anna in #allgemein …“ sichtbar (Bild 60).
 6. **Prävention:** Neuer Test in `tests/test-api-sync.js`: jedes `emit('…')` aus src/main muss in `EVENT_TYPES` stehen.
+
+## #24 – Screenshot-Lauf: Fernzugang-Schritt schlug fehl (07.10.2026, vor Veröffentlichung)
+
+- **Symptom:** `[fernzugang] Zwischenablage: [object Promise] · QR da: false`. Bild 73 zeigte „Passwort ist gesetzt“ und Toast „Fernzugang aus“.
+- **Ursache:** (1) `clipboard.readText()` lieferte im Screenshot-Code ein Promise und wurde nicht abgewartet. (2) Die Fernzugangs-Einstellungen (Passwort, „an“) blieben aus dem vorigen Demo-Lauf in `settings-dev-demo.json` erhalten; der Schritt schaltete dadurch aus statt ein.
+- **Lösung:** `await` + `String(...)`; der Screenshot-Lauf setzt den Store-Schlüssel `remote` wie `appLock` zurück. Lauf danach: `ipSichtbar:false`, `linkHost:"localhost"`, gekoppelt, gesendet.

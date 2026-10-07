@@ -74,7 +74,7 @@ export default function RemoteSection({ toast }) {
       </label>
       {st.enabled && (
         <p className="small">
-          {st.running ? '🟢 Läuft' : '🔴 Läuft nicht'} · Adresse: {st.addresses.length ? st.addresses.map((a) => `${a}:${st.port}`).join(', ') : 'kein WLAN gefunden'}
+          {st.running ? '🟢 Läuft' : '🔴 Läuft nicht'} · {st.addresses.length ? `erreichbar im WLAN${st.host ? ` als „${st.host}“` : ''}` : 'kein WLAN gefunden'}
           <span className="muted"> · Beim ersten Mal fragt die Windows-Firewall nach: „Private Netzwerke“ erlauben, „Öffentliche“ NICHT.</span>
         </p>
       )}
@@ -104,10 +104,12 @@ export default function RemoteSection({ toast }) {
             <p className="small">
               Mit dem Handy scannen (gleiches WLAN). Gültig noch <b>{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</b> Minuten, nur <b>einmal</b> benutzbar.
             </p>
-            <div className="remote__url">{pair.url}</div>
             <div className="settings__row">
               <button className="btn btn--ghost btn--small" onClick={() => api.copyText({ text: pair.url }).then(() => toast({ kind: 'info', title: 'Link kopiert', duration: 1500 }))}>
                 📋 Link kopieren
+              </button>
+              <button className="btn btn--ghost btn--small" title="Nur falls das Handy den PC-Namen nicht findet (ältere Android-Geräte)" onClick={() => api.copyText({ text: pair.fallbackUrl }).then(() => toast({ kind: 'info', title: 'Ersatz-Link kopiert', text: 'Enthält die WLAN-Adresse des PCs.', duration: 2500 }))}>
+                Klappt nicht? Ersatz-Link
               </button>
               <button
                 className="btn btn--ghost btn--small"
@@ -119,7 +121,7 @@ export default function RemoteSection({ toast }) {
                 Widerrufen
               </button>
             </div>
-            <p className="muted small">⚠ Wer diesen Link hat, kann sich mit Passwort und deiner Bestätigung verbinden. Nicht weitergeben.</p>
+            <p className="muted small">🔒 Der Link enthält keine IP-Adresse, nur den Namen deines PCs („{pair.host || 'im WLAN'}“) und einen geheimen Schlüssel. Nicht weitergeben.</p>
           </div>
         </div>
       )}
@@ -129,7 +131,7 @@ export default function RemoteSection({ toast }) {
       {st.devices.map((d) => (
         <div key={d.id} className="ai-memory-row small">
           <span>
-            📱 <b>{d.name}</b> · gekoppelt {fmt(d.pairedAt)} · zuletzt {fmt(d.lastSeen)} · {d.ip}
+            📱 <b>{d.name}</b> · gekoppelt {fmt(d.pairedAt)} · zuletzt {fmt(d.lastSeen)}
           </span>
           <button className="btn btn--danger btn--small" onClick={() => run(async () => setSt(await api.remoteRemoveDevice({ id: d.id })), `${d.name} entfernt`)}>
             Entfernen
@@ -143,7 +145,7 @@ export default function RemoteSection({ toast }) {
           <div className="remote__log">
             {st.activity.map((a, i) => (
               <div key={i} className={`small ${/Falsch|abgelehnt/.test(a.action) ? 'warn' : ''}`}>
-                {fmt(a.at)} · {a.device || 'PC'} {a.ip ? `(${a.ip})` : ''}: {a.action}
+                {fmt(a.at)} · {a.device || 'PC'}: {a.action}
                 {a.detail ? ` – „${a.detail}“` : ''}
               </div>
             ))}
@@ -176,7 +178,7 @@ export function RemoteApprovals() {
       <div className="modal confirm" role="alertdialog" aria-label="Fernzugang bestätigen">
         <h3>{p.kind === 'pair' ? '📱 Neues Gerät will sich verbinden' : '📱 Nachricht von einem anderen Gerät'}</h3>
         <p>
-          <b>{p.device}</b> ({p.ip}) {p.kind === 'pair' ? 'möchte deinen Bot über den Fernzugang bedienen.' : 'möchte als Bot senden:'}
+          <b>{p.device}</b> (aus deinem WLAN) {p.kind === 'pair' ? 'möchte deinen Bot über den Fernzugang bedienen.' : 'möchte als Bot senden:'}
         </p>
         {p.preview && <div className="link-warn__url">{p.preview}</div>}
         <p className="muted small">{new Date().toLocaleTimeString('de-DE')} · Kennst du das Gerät nicht? Dann ablehnen.</p>
