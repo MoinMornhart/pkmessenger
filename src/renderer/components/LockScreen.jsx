@@ -7,8 +7,30 @@ export default function LockScreen({ onUnlocked }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [hello, setHello] = useState(false);
   const ref = useRef(null);
-  useEffect(() => ref.current?.focus(), []);
+  useEffect(() => {
+    ref.current?.focus();
+    api
+      .lockStatus()
+      .then((s) => setHello(Boolean(s.hello)))
+      .catch(() => {});
+  }, []);
+
+  // Windows Hello: Windows zeigt seinen eigenen Dialog (Fingerabdruck/Gesicht/PIN)
+  const unlockHello = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.lockHello();
+      onUnlocked();
+    } catch (err) {
+      setError(`${err.message} ${err.hint || ''}`.trim());
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const unlock = async (e) => {
     e?.preventDefault();
@@ -39,6 +61,11 @@ export default function LockScreen({ onUnlocked }) {
         <button className="btn btn--primary" type="submit" disabled={!password || busy}>
           {busy ? 'Prüfe …' : '🔓 Entsperren'}
         </button>
+        {hello && (
+          <button className="btn" type="button" disabled={busy} onClick={unlockHello}>
+            👆 Mit Windows Hello entsperren
+          </button>
+        )}
         <p className="muted small">Passwort vergessen? Dann App-Daten löschen: %APPDATA%\PKMessenger\settings.json → Eintrag „appLock“ entfernen.</p>
       </form>
     </main>

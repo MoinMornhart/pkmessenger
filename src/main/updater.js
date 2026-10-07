@@ -36,6 +36,40 @@ function directFeedUrl(repo, latestVersion) {
   return `https://github.com/${repo}/releases/download/v${latestVersion}`;
 }
 
+/** Automatische Release-Notizen („* Titel by @x in https://…/pull/31“) → kurze Zeilen „Titel (#31)“. */
+function releaseNotes(body) {
+  return String(body || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => /^[*-] /.test(l))
+    .map((l) => {
+      const pr = /\/pull\/(\d+)/.exec(l)?.[1];
+      const text = l
+        .replace(/^[*-] /, '')
+        .replace(/ by @[\w-]+( in https?:\/\/\S+)?$/, '')
+        .replace(/https?:\/\/\S+/g, '')
+        .trim();
+      return (pr ? `${text} (#${pr})` : text).slice(0, 160);
+    })
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
+/** Commits aus dem Vergleich: neueste zuerst, Merge-Commits als PR-Titel. */
+function commitList(commits) {
+  return (Array.isArray(commits) ? commits : [])
+    .map((c) => {
+      const msg = String(c?.commit?.message || '');
+      const lines = msg.split('\n').map((l) => l.trim()).filter(Boolean);
+      const merge = /^Merge pull request #(\d+)/.exec(lines[0] || '');
+      const title = merge ? `${lines[1] || 'Pull Request'} (#${merge[1]})` : lines[0] || '';
+      return { sha: String(c?.sha || '').slice(0, 7), title: title.slice(0, 140), date: Date.parse(c?.commit?.author?.date) || null, author: String(c?.commit?.author?.name || '').slice(0, 60), merge: Boolean(merge) };
+    })
+    .filter((c) => c.title && !/^Co-Authored-By/i.test(c.title))
+    .reverse()
+    .slice(0, 40);
+}
+
 /** SemVer X.Y.Z vergleichen: <0, 0, >0 */
 function compareVersions(a, b) {
   const pa = String(a).split('.').map(Number);
@@ -121,13 +155,54 @@ function createUpdater({ autoUpdater, isPackaged, version, repo, emit, platform 
     }
   }
 
+  /**
+   * „Was ist neu?“ (Issue #1): letzte Releases mit Notizen und – falls es eine neuere Version gibt – die Änderungen
+   * (Commits) seit der eigenen Version. Öffentliche GitHub-API, ohne Anmeldung (Limit 60 Abfragen/Std. pro IP).
+   */
+  async function changes() {
+    if (!repo) throw Object.assign(new Error('Kein GitHub-Repo eingetragen.'), { code: 'VALIDATION', hint: '' });
+    const get = async (url) => {
+      let res;
+      try {
+        res = await fetchImpl(url, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'PKMessenger-Updater' }, signal: AbortSignal.timeout(10000) });
+      } catch {
+        throw Object.assign(new Error('GitHub ist gerade nicht erreichbar.'), { code: 'VALIDATION', hint: 'Internetverbindung prüfen und später erneut versuchen.' });
+      }
+      if (!res.ok) throw Object.assign(new Error(`GitHub antwortet nicht (${res.status}).`), { code: 'VALIDATION', hint: res.status === 403 ? 'Zu viele Abfragen – in einer Stunde nochmal versuchen.' : 'Später erneut versuchen.' });
+      return res.json();
+    };
+    const gh = (u) => (typeof u === 'string' && u.startsWith('https://github.com/') ? u.slice(0, 500) : null);
+    const list = await get(`https://api.github.com/repos/${repo}/releases?per_page=8`);
+    const releases = (Array.isArray(list) ? list : [])
+      .filter((r) => r && !r.draft && /^v\d+\.\d+\.\d+$/.test(String(r.tag_name)))
+      .map((r) => ({
+        tag: r.tag_name,
+        name: String(r.name || r.tag_name).slice(0, 100),
+        date: Date.parse(r.published_at) || null,
+        notes: releaseNotes(r.body),
+        url: gh(r.html_url),
+        setupUrl: gh((r.assets || []).find((a) => a?.name === 'PKMessenger-Setup.exe')?.browser_download_url),
+      }));
+    const latest = releases[0]?.tag.slice(1) || null;
+    let commits = [];
+    if (latest && compareVersions(latest, version) > 0) {
+      try {
+        const cmp = await get(`https://api.github.com/repos/${repo}/compare/v${version}...v${latest}`);
+        commits = commitList(cmp?.commits);
+      } catch {
+        commits = [];
+      }
+    }
+    return { current: version, latest, newer: Boolean(latest && compareVersions(latest, version) > 0), releases, commits };
+  }
+
   function install() {
     if (state.state !== 'ready') return false;
     autoUpdater.quitAndInstall();
     return true;
   }
 
-  return { start, check, checkNow, install, getState: () => state };
+  return { start, check, checkNow, changes, install, getState: () => state };
 }
 
-module.exports = { createUpdater, parseRepo, feedUrl, directFeedUrl, compareVersions, CHECK_INTERVAL_MS, FIRSTRUN_DELAY_MS };
+module.exports = { createUpdater, parseRepo, feedUrl, directFeedUrl, compareVersions, releaseNotes, commitList, CHECK_INTERVAL_MS, FIRSTRUN_DELAY_MS };

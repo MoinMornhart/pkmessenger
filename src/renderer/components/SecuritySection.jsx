@@ -2,6 +2,15 @@ import { useEffect, useState } from 'react';
 import { api, onEvent } from '../api';
 
 // Einstellungen → Sicherheit & Start: App-Passwort, automatische Sperre, mit Windows starten (Issue #1)
+const HELLO_TEXT = {
+  DeviceNotPresent: 'kein Fingerabdruck-Leser oder keine Hello-Kamera gefunden',
+  NotConfiguredForUser: 'für dein Windows-Konto nicht eingerichtet (Windows-Einstellungen → Konten → Anmeldeoptionen)',
+  DisabledByPolicy: 'auf diesem PC per Richtlinie abgeschaltet',
+  DeviceBusy: 'Gerät gerade belegt',
+  NotSupported: 'gibt es nur unter Windows',
+  Unknown: 'konnte nicht geprüft werden',
+};
+
 const IDLE = [
   [0, 'nie automatisch'],
   [5, 'nach 5 Minuten ohne Eingabe am PC'],
@@ -13,10 +22,14 @@ export default function SecuritySection({ toast }) {
   const [lock, setLock] = useState(null);
   const [auto, setAuto] = useState(null);
   const [form, setForm] = useState(null); // null | { mode: 'set'|'change'|'clear', password, repeat, current }
+  const [bg, setBg] = useState(null); // Im Hintergrund weiterlaufen
+  const [hello, setHello] = useState(null); // Windows-Hello-Verfügbarkeit
 
   useEffect(() => {
     api.lockStatus().then(setLock).catch(() => setLock(null));
     api.autostartGet().then(setAuto).catch(() => setAuto({ available: false, enabled: false }));
+    api.backgroundGet().then(setBg).catch(() => setBg({ enabled: false }));
+    api.helloStatus().then((h) => setHello(h.availability)).catch(() => setHello('Unknown'));
     return onEvent((type, p) => type === 'lock' && setLock(p));
   }, []);
 
@@ -55,6 +68,16 @@ export default function SecuritySection({ toast }) {
         🚀 Mit Windows starten
       </label>
       {auto && !auto.available && <p className="muted small">Gibt es nur in der installierten App (PKMessenger-Setup.exe).</p>}
+      <label className="composer__ping" data-setting="background">
+        <input
+          type="checkbox"
+          checked={Boolean(bg?.enabled)}
+          disabled={!bg}
+          onChange={(e) => run(async () => setBg(await api.backgroundSet({ on: e.target.checked })), e.target.checked ? 'Läuft beim Schließen im Hintergrund weiter' : 'Schließen beendet die App wieder')}
+        />{' '}
+        🌙 Beim Schließen im Hintergrund weiterlaufen
+      </label>
+      <p className="muted small">Dein Bot bleibt online und KI-Aufträge laufen weiter. Das PKMessenger-Symbol unten rechts in der Taskleiste öffnet die App wieder oder beendet sie. Mit App-Passwort wird beim Schließen gesperrt.</p>
 
       <span className="settings__label">🔒 App-Passwort</span>
       {lock?.enabled ? (
@@ -67,6 +90,16 @@ export default function SecuritySection({ toast }) {
               </option>
             ))}
           </select>
+          <label className="composer__ping" data-setting="hello">
+            <input
+              type="checkbox"
+              checked={Boolean(lock.hello)}
+              disabled={hello !== 'Available' && !lock.hello}
+              onChange={(e) => run(async () => setLock(await api.lockSetHello({ on: e.target.checked })), e.target.checked ? 'Windows Hello ist an 👆' : 'Windows Hello aus')}
+            />{' '}
+            👆 Mit Windows Hello entsperren (Fingerabdruck, Gesicht oder PIN)
+          </label>
+          <p className="muted small">{hello === 'Available' ? 'Windows prüft, ob du es bist. Das Passwort bleibt als Ersatz.' : `Windows Hello: ${HELLO_TEXT[hello] || 'wird geprüft …'}`}</p>
           <div className="settings__row">
             <button className="btn btn--small" onClick={() => run(() => api.lockNow())}>
               🔒 Jetzt sperren
@@ -108,6 +141,7 @@ export default function SecuritySection({ toast }) {
           <p className="muted small">Gespeichert wird nur ein verschlüsselter Fingerabdruck (Hash), nie das Passwort selbst.</p>
         </div>
       )}
+      <p className="muted small">ℹ️ „Nur als Administrator starten“ gibt es bewusst nicht: Dann hätte die App bei jedem Start volle Rechte über den PC, und automatische Updates würden hängen. Für den Schutz der App sind App-Passwort und Windows Hello da.</p>
     </>
   );
 }

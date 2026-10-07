@@ -14,7 +14,7 @@ function memStore(init = {}) {
 test('Passwort setzen: nur salziger Hash gespeichert, nie das Passwort', () => {
   const store = memStore();
   const lock = createAppLock({ store });
-  assert.deepEqual(lock.status(), { enabled: false, locked: false, idleMinutes: 0, blockedUntil: null });
+  assert.deepEqual(lock.status(), { enabled: false, locked: false, idleMinutes: 0, hello: false, blockedUntil: null });
   lock.set({ password: 'geheim123', idleMinutes: 15 });
   assert.ok(!JSON.stringify(store.data).includes('geheim123'));
   assert.match(store.data.appLock.hash, /^[0-9a-f]{64}$/);

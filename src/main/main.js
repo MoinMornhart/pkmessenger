@@ -2,7 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, shell, session, Menu, autoUpdater, safeStorage, clipboard, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, session, Menu, autoUpdater, safeStorage, clipboard, powerMonitor, Tray, nativeImage } = require('electron');
 
 // Squirrel-Installer (Windows): beim Installieren/Deinstallieren Verknüpfungen anlegen und sofort beenden.
 if (handleSquirrelEvent()) return;
@@ -15,6 +15,7 @@ const { registerIpc } = require('./ipc');
 const { createUpdater, parseRepo } = require('./updater');
 const { createVoiceManager } = require('./voice');
 const { createAiManager, createSecretFile } = require('./ai');
+const { createHello } = require('./hello');
 const { createAppLock } = require('./app-lock');
 const { createTokenStore } = require('./secrets');
 
@@ -108,7 +109,7 @@ const updater = createUpdater({
   // Installiert per PKMessenger-Setup.exe? Dann liegt Squirrels Update.exe eine Ebene über der App.
   squirrelInstalled: demo ? true : fs.existsSync(path.join(path.dirname(process.execPath), '..', 'Update.exe')),
   // Demo: GitHub-Abfrage simuliert (kein Netz) – „neueste Version“ = eigene Version
-  ...(demo ? { fetchImpl: () => new Promise((r) => setTimeout(() => r({ ok: true, json: async () => ({ tag_name: `v${app.getVersion()}` }) }), 800)) } : {}),
+  ...(demo ? { fetchImpl: (url) => demo.githubFetch(url, app.getVersion()) } : {}),
 });
 
 // Eigener Benachrichtigungston: geprüfte WAV-Datei im App-Ordner (keine Geheimnisse, kein Netz)
@@ -122,6 +123,40 @@ const soundFile = {
 
 // App-Sperre (Passwort-Hash in settings.json unter „appLock“)
 const appLock = createAppLock({ store, emit: broadcast });
+
+// Windows Hello zum Entsperren (Issue #29) – Windows-eigene Prüfung, siehe hello.js
+const hello = demo ? { availability: async () => 'Available', verify: async () => true } : createHello();
+
+// Im Hintergrund weiterlaufen (Issue #29): Fenster schließen = verstecken, Bot bleibt online, Symbol im Infobereich
+let tray = null;
+const ICON_PATH = path.join(__dirname, '..', '..', 'assets', 'icon.png');
+function showWindow() {
+  if (!mainWindow) return createWindow();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  return undefined;
+}
+function updateTray() {
+  const on = store.get().runInBackground === true;
+  if (on && !tray) {
+    tray = new Tray(nativeImage.createFromPath(ICON_PATH).resize({ width: 16, height: 16 }));
+    tray.setToolTip('PKMessenger – dein Bot läuft weiter');
+    tray.setContextMenu(Menu.buildFromTemplate([{ label: 'PKMessenger öffnen', click: showWindow }, { type: 'separator' }, { label: 'Beenden (Bot geht offline)', click: () => app.quit() }]));
+    tray.on('click', showWindow);
+  } else if (!on && tray) {
+    tray.destroy();
+    tray = null;
+  }
+}
+const background = {
+  get: () => ({ enabled: store.get().runInBackground === true }),
+  set: (on) => {
+    store.set('runInBackground', on);
+    updateTray();
+    return background.get();
+  },
+};
 
 // Mit Windows starten: Squirrel-Apps über Update.exe starten (bleibt nach Updates gültig)
 const SQUIRREL_UPDATE = path.join(path.dirname(process.execPath), '..', 'Update.exe');
@@ -218,17 +253,19 @@ function createWindow() {
         .finally(() => app.quit());
     });
   }
+  // Hintergrundbetrieb: Schließen versteckt nur das Fenster (mit App-Passwort wird dabei gesperrt)
+  mainWindow.on('close', (e) => {
+    if (quitting || SHOTS_ARG || store.get().runInBackground !== true) return;
+    e.preventDefault();
+    mainWindow.hide();
+    appLock.lock();
+  });
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 }
 
-app.on('second-instance', () => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
-  }
-});
+app.on('second-instance', () => showWindow());
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
@@ -241,16 +278,19 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
   const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background }, isTrustedSender);
   // Automatische Sperre: PC eine Weile unbenutzt → App sperren
   setInterval(() => appLock.idleTick(powerMonitor.getSystemIdleTime()), 30000).unref?.();
   createWindow();
+  updateTray();
   service.connect(); // async – blockiert das Fenster nicht
   updater.start();
   ai.start();
 });
 
-app.on('window-all-closed', () => app.quit());
+app.on('window-all-closed', () => {
+  if (store.get().runInBackground !== true || quitting) app.quit();
+});
 
 let quitting = false;
 app.on('before-quit', (e) => {

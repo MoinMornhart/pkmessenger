@@ -3775,3 +3775,31 @@ video.embed__image {
 .profile-card > .muted {
   margin: 16px 18px;
 }
+
+/* ---------- Updates: Was ist neu? (Issue #1) ---------- */
+.update-changes {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+}
+.update-changes__list {
+  margin: 0;
+  padding: 0 0 0 4px;
+  list-style: none;
+  display: grid;
+  gap: 3px;
+  font-size: 13px;
+  max-height: 220px;
+  overflow: auto;
+}
+.update-changes__release summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.lock-card .btn + .btn {
+  margin-top: 6px;
+}
