@@ -261,11 +261,12 @@ const validators = {
     };
   },
   aiLimits(p) {
-    const { perHour, perDay } = obj(p);
+    const { mode = 'auto', perHour, perDay } = obj(p);
+    if (!['auto', 'an', 'aus'].includes(mode)) throw new ValidationError('Unbekannter Limit-Modus.');
     if (!Number.isInteger(perHour) || perHour < 1 || perHour > 500) throw new ValidationError('Stundenlimit: 1–500 Anfragen.');
     if (!Number.isInteger(perDay) || perDay < 1 || perDay > 5000) throw new ValidationError('Tageslimit: 1–5000 Anfragen.');
     if (perDay < perHour) throw new ValidationError('Das Tageslimit darf nicht kleiner als das Stundenlimit sein.');
-    return { perHour, perDay };
+    return { mode, perHour, perDay };
   },
   aiProfileName(p) {
     const { name } = obj(p);

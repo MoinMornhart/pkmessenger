@@ -13,6 +13,7 @@ const crypto = require('node:crypto');
 const { nextRun } = require('../shared/schedule');
 const { toPlainText } = require('../shared/mentions');
 const { MESSAGE_CONTENT_MAX } = require('../shared/limits');
+const { limitsActive } = require('../shared/ai-limits');
 
 const TICK_MS = 30000;
 const REQUEST_TIMEOUT_MS = 60000;
@@ -20,7 +21,7 @@ const CONTEXT_MESSAGES = 20;
 const ANTHROPIC_VERSION = '2023-06-01';
 const DEFAULT_RESPONDER = Object.freeze({ enabled: false, channelIds: [], dms: false, allowUsers: [], blockUsers: [], instructions: '', context: false, notify: true });
 // Harte Limits für ALLE KI-Anfragen (Aufträge, Antworten, Vorschau, Test) – Schutz vor Kosten und Spam (Issue #12)
-const DEFAULT_LIMITS = Object.freeze({ perHour: 60, perDay: 300 });
+const DEFAULT_LIMITS = Object.freeze({ mode: 'auto', perHour: 60, perDay: 300 }); // mode: shared/ai-limits.js
 const DEFAULT_CONFIG = Object.freeze({ enabled: false, provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: '', jobs: [], responder: DEFAULT_RESPONDER, limits: DEFAULT_LIMITS, profiles: [] });
 const LANGUAGE_HINT = { auto: 'Schreib in der Sprache des Auftrags.', de: 'Schreib auf Deutsch.', en: 'Write in English.' };
 
@@ -199,7 +200,7 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
   /** Für die Oberfläche – NIE den Schlüssel, nur ob einer da ist. */
   function getConfig() {
     const cfg = read();
-    return { ...cfg, hasKey: secret.has(), running: [...running], recent: [...recent], usage: usage() };
+    return { ...cfg, hasKey: secret.has(), running: [...running], recent: [...recent], usage: usage(), limitsActive: limitsActive(cfg.limits, cfg.baseUrl) };
   }
 
   function setConfig({ enabled, provider, baseUrl, model }) {
@@ -264,8 +265,9 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
     const cfg = read();
     requireUsable(cfg);
     const u = usage();
-    if (u.hour >= cfg.limits.perHour) throw aiError(`KI-Limit erreicht: ${cfg.limits.perHour} Anfragen pro Stunde.`, 'Später erneut versuchen oder das Limit in den KI-Einstellungen erhöhen.');
-    if (u.day >= cfg.limits.perDay) throw aiError(`KI-Limit erreicht: ${cfg.limits.perDay} Anfragen pro Tag.`, 'Morgen erneut versuchen oder das Limit in den KI-Einstellungen erhöhen.');
+    const limited = limitsActive(cfg.limits, cfg.baseUrl);
+    if (limited && u.hour >= cfg.limits.perHour) throw aiError(`KI-Limit erreicht: ${cfg.limits.perHour} Anfragen pro Stunde.`, 'Später erneut versuchen oder das Limit in den KI-Einstellungen erhöhen.');
+    if (limited && u.day >= cfg.limits.perDay) throw aiError(`KI-Limit erreicht: ${cfg.limits.perDay} Anfragen pro Tag.`, 'Morgen erneut versuchen oder das Limit in den KI-Einstellungen erhöhen.');
     calls.push(now());
     emit('ai:changed', {}); // Verbrauchsanzeige aktualisieren
     const ctrl = new AbortController();

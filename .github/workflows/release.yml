@@ -97,8 +97,8 @@ jobs:
           fi
 
           # Normaler autonomer Release:
-          # package.json wurde auf main geändert.
-          if [ "$EVENT" = "push" ] && [ "$GIT_REF" = "refs/heads/main" ]; then
+          # package.json wurde auf main geändert – oder „Run workflow“ auf main ohne Tag (Issue #12).
+          if { [ "$EVENT" = "push" ] || { [ "$EVENT" = "workflow_dispatch" ] && [ -z "$INPUT_TAG" ]; }; } && [ "$GIT_REF" = "refs/heads/main" ]; then
             TAG="v$VERSION"
             TARGET_SHA="$SHA"
 
@@ -148,7 +148,7 @@ jobs:
           if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Ungültiger Release-Tag '$TAG'."
             echo "::error::Erwartet wird ein Tag im Format vX.Y.Z."
-            echo "::error::Alternativ den Workflow auf main ausführen."
+            echo "::error::Alternativ den Workflow auf main ohne Tag ausführen – dann gilt die Version aus package.json."
             exit 1
           fi
 
