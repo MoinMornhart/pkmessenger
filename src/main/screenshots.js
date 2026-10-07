@@ -745,7 +745,7 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     // Sicherheit: Hintergrund + Windows Hello
     await js(win, `[...document.querySelectorAll('.settings h4')].find(h=>h.textContent.includes('Sicherheit'))?.scrollIntoView({block:'start'})`);
     await wait(300);
-    const sec = await js(win, `JSON.stringify({ hintergrund: Boolean(document.querySelector('[data-setting="background"]')), adminHinweis: [...document.querySelectorAll('.settings p')].some(p=>p.textContent.includes('Administrator')) })`);
+    const sec = await js(win, `JSON.stringify({ hintergrund: Boolean(document.querySelector('[data-setting="background"]')) })`);
     await shoot(win, dir, '54-sicherheit-hintergrund');
     console.log(`[update-neu] Rückfrage: ${ask} · Was ist neu: ${news} · Sicherheit: ${sec}`);
   }
