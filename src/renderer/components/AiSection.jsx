@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, onEvent } from '../api';
+import { fuzzyFilter } from '../../shared/fuzzy';
 import { describeSchedule, DAY_NAMES } from '../../shared/schedule';
 import { formatListTime } from '../../shared/format';
 
@@ -337,7 +338,6 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
   };
   return (
     <div className="ai-responder">
-      <h4 className="ai-jobs__title">💬 Auf Erwähnungen antworten</h4>
       <label className="composer__ping">
         <input type="checkbox" checked={r.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> Bot antwortet mit KI, wenn ihn jemand erwähnt
       </label>
@@ -415,6 +415,11 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
               </label>
             </div>
           )}
+          {r.memory && (
+            <label className="composer__ping">
+              <input type="checkbox" checked={r.memoryAuto !== false} onChange={(e) => set({ memoryAuto: e.target.checked })} /> Automatisch zusammenfassen, wenn es voll wird
+            </label>
+          )}
           {r.memory && <p className="muted small">Der Bot merkt sich, was jede Person ihm geschrieben hat. Wird es zu viel, fasst die KI das Alte zu wichtigen Fakten zusammen und löscht den Rest. Das Gedächtnis geht nur an deinen KI-Anbieter und liegt verschlüsselt auf diesem PC.</p>}
           <p className="muted small">💡 Als Erwähnung zählt: @Bot, die Bot-Rolle oder eine Antwort auf eine Nachricht des Bots.</p>
           <label className="composer__ping">
@@ -433,7 +438,6 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
           </button>
         </div>
       )}
-      <MemoryList toast={toast} />
       {cfg.skips?.length > 0 && (
         <div className="ai-recent">
           <span className="settings__label">Nicht geantwortet (warum?)</span>
@@ -459,27 +463,71 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
   );
 }
 
-// Gedächtnis ansehen / vergessen (Inhalte werden erst beim Klick auf „Ansehen“ geladen)
+// Gedächtnis verwalten (Issue #1): alle Personen ansehen, Zusammenfassung bearbeiten, „Jetzt zusammenfassen“
+// auslösen, Erfolg/Fehler sehen, einzeln oder alles vergessen. Inhalte werden erst beim Öffnen geladen.
+const fmtTime = (ts) => (ts ? new Date(ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
+
+function CompactState({ c }) {
+  if (!c?.at) return <span className="muted"> · noch nie zusammengefasst</span>;
+  if (c.ok) return <span className="ok"> · ✓ zusammengefasst {fmtTime(c.at)} ({c.before} → {c.after} Tokens)</span>;
+  return <span className="warn" title={c.error || ''}> · ⚠ Zusammenfassen fehlgeschlagen {fmtTime(c.at)}: {c.error}</span>;
+}
+
 function MemoryList({ toast }) {
   const [list, setList] = useState(null);
   const [view, setView] = useState(null);
+  const [edit, setEdit] = useState(null); // Text der Zusammenfassung beim Bearbeiten
+  const [busyId, setBusyId] = useState('');
+  const [q, setQ] = useState('');
   const [confirmAll, setConfirmAll] = useState(false);
   const load = () => api.aiMemoryList().then(setList).catch(() => setList([]));
   useEffect(() => {
     load();
+    return onEvent((type) => type === 'ai:changed' && load());
   }, []);
-  if (!list || list.length === 0) return null;
   const run = (p) => p.then(setList).catch((e) => toast({ kind: 'error', title: e.message }));
+  const open = (userId) =>
+    api.aiMemoryView({ userId }).then((v) => {
+      setView(v);
+      setEdit(null);
+    });
+  const compact = async (p) => {
+    setBusyId(p.userId);
+    try {
+      const r = await api.aiMemoryCompact({ userId: p.userId });
+      if (r?.ok) toast({ kind: 'info', title: `Gedächtnis von ${p.name} zusammengefasst ✓`, text: `Jetzt ~${r.tokens} Tokens.`, duration: 3000 });
+      else toast({ kind: 'warn', title: 'Zusammenfassen hat nicht geklappt', text: r?.error || 'Unbekannter Fehler' });
+      await load();
+      if (view?.userId === p.userId) await open(p.userId);
+    } catch (e) {
+      toast({ kind: 'error', title: e.message, text: e.hint });
+    } finally {
+      setBusyId('');
+    }
+  };
+  if (!list) return <p className="muted small">Lade …</p>;
+  if (list.length === 0) return <p className="muted small">Noch niemand im Gedächtnis. Schalte unter „Auf Erwähnungen antworten“ das Gedächtnis ein. Dann merkt sich der Bot jede Person, die mit ihm schreibt.</p>;
+  const shown = q.trim() ? fuzzyFilter(list, q, (p) => [p.name]) : list;
+  const total = list.reduce((n, p) => n + p.tokens, 0);
   return (
-    <div className="ai-recent" data-setting="ai-memory-list">
-      <span className="settings__label">🧠 Gedächtnis ({list.length} {list.length === 1 ? 'Person' : 'Personen'})</span>
-      {list.map((p) => (
+    <div className="ai-memory" data-setting="ai-memory-list">
+      <div className="ai-memory__head">
+        <span>
+          🧠 <b>{list.length}</b> {list.length === 1 ? 'Person' : 'Personen'} · ~{total.toLocaleString('de-DE')} Tokens
+        </span>
+        {list.length > 5 && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Person suchen …" aria-label="Person im Gedächtnis suchen" />}
+      </div>
+      {shown.map((p) => (
         <div key={p.userId} className="ai-memory-row small">
           <span>
-            <b>{p.name || 'Unbekannt'}</b> · {p.turns} Wortwechsel · ~{p.tokens} Tokens{p.hasSummary ? ' · zusammengefasst ✓' : ''}
+            <b>{p.name || 'Unbekannt'}</b> · {p.turns} Wortwechsel · ~{p.tokens} Tokens{p.hasSummary ? ' · 📝 Zusammenfassung' : ''}
+            <CompactState c={p.lastCompact} />
           </span>
-          <button className="btn btn--ghost btn--small" onClick={() => api.aiMemoryView({ userId: p.userId }).then(setView)}>
+          <button className="btn btn--ghost btn--small" onClick={() => open(p.userId)}>
             Ansehen
+          </button>
+          <button className="btn btn--ghost btn--small" disabled={busyId === p.userId} onClick={() => compact(p)} title="Die KI fasst das Gedächtnis jetzt zusammen">
+            {busyId === p.userId ? 'Fasse zusammen …' : '🗜 Jetzt zusammenfassen'}
           </button>
           <button className="btn btn--ghost btn--small" onClick={() => run(api.aiMemoryForget({ userId: p.userId }))}>
             Vergessen
@@ -514,7 +562,40 @@ function MemoryList({ toast }) {
               schließen
             </button>
           </div>
-          {view.summary && <div className="ai-preview__text">{view.summary}</div>}
+          <span className="settings__label">📝 Zusammenfassung</span>
+          {edit === null ? (
+            <>
+              <div className="ai-preview__text">{view.summary || <span className="muted">(noch keine – entsteht automatisch oder mit „Jetzt zusammenfassen“)</span>}</div>
+              <button className="btn btn--ghost btn--small" onClick={() => setEdit(view.summary || '')}>
+                ✏️ Bearbeiten
+              </button>
+            </>
+          ) : (
+            <>
+              <textarea className="profile__desc" rows={5} maxLength={4000} value={edit} onChange={(e) => setEdit(e.target.value)} aria-label="Zusammenfassung bearbeiten" />
+              <div className="settings__row">
+                <button
+                  className="btn btn--primary btn--small"
+                  onClick={() =>
+                    api
+                      .aiMemorySetSummary({ userId: view.userId, summary: edit })
+                      .then((v) => {
+                        setView(v);
+                        setEdit(null);
+                        load();
+                      })
+                      .catch((e) => toast({ kind: 'error', title: e.message }))
+                  }
+                >
+                  Speichern
+                </button>
+                <button className="btn btn--ghost btn--small" onClick={() => setEdit(null)}>
+                  Abbrechen
+                </button>
+              </div>
+            </>
+          )}
+          <span className="settings__label">💬 Letzte Wortwechsel</span>
           {view.turns.map((t, i) => (
             <div key={i} className="small">
               <b>{t.role === 'user' ? view.name : '🤖 Bot'}:</b> {t.text}
@@ -674,7 +755,8 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
               </button>
             )}
           </div>
-          <LimitsRow cfg={cfg} onSave={(l) => wrap('limits', async () => setCfg(await api.aiSetLimits(l)))()} />
+          <details className="ai-card" open>
+            <summary>🔌 Verbindung & Modell</summary>
           <ProfilesRow cfg={cfg} draft={draft} setDraft={setDraft} wrap={wrap} setCfg={setCfg} />
           <label className="settings__label" htmlFor="ai-preset">
             KI-Anbieter
@@ -810,9 +892,22 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
           </label>
           <p className="muted small">Dann bekommt die KI Bilder aus Nachrichten (nur von Discords Servern, max. 5 MB). Ohne den Schalter, und bei Ton oder Video, sagt sie locker, dass sie das nicht kann.</p>
 
-          <ResponderSection key={JSON.stringify(cfg.responder)} cfg={cfg} targets={targets} guilds={guilds} toast={toast} />
+          </details>
+          <details className="ai-card" open>
+            <summary>📊 Verbrauch & Limits</summary>
+            <LimitsRow cfg={cfg} onSave={(l) => wrap('limits', async () => setCfg(await api.aiSetLimits(l)))()} />
+          </details>
+          <details className="ai-card" open>
+            <summary>💬 Auf Erwähnungen antworten</summary>
+            <ResponderSection key={JSON.stringify(cfg.responder)} cfg={cfg} targets={targets} guilds={guilds} toast={toast} />
+          </details>
+          <details className="ai-card" open>
+            <summary>🧠 Gedächtnis verwalten</summary>
+            <MemoryList toast={toast} />
+          </details>
+          <details className="ai-card" open>
+            <summary>🤖 Aufträge</summary>
 
-          <h4 className="ai-jobs__title">🤖 Aufträge</h4>
           {cfg.jobs.length === 0 && !editing && <p className="muted small">Noch keine Aufträge.</p>}
           {jobServers.length > 1 && (
             <div className="settings__row ai-target">
@@ -916,6 +1011,7 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
               </button>
             )
           )}
+          </details>
         </div>
       )}
     </>

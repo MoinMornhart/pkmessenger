@@ -112,6 +112,8 @@ export const api = Object.fromEntries(
     'aiMemoryView',
     'aiMemoryForget',
     'aiMemoryForgetAll',
+    'aiMemoryCompact',
+    'aiMemorySetSummary',
     'setActiveChat',
     'openDM',
     'updateProfile',

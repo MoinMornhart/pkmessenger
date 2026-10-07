@@ -24,7 +24,7 @@ const THINKING_EXTRA_TOKENS = 4000;
 const RECONNECT_MS = 5 * 60 * 1000; // Auto-Verbindung: bei Fehler alle 5 Minuten erneut
 const CONTEXT_MESSAGES = 20;
 const ANTHROPIC_VERSION = '2023-06-01';
-const DEFAULT_RESPONDER = Object.freeze({ enabled: false, channelIds: [], dms: false, allowUsers: [], blockUsers: [], instructions: '', context: false, notify: true, web: false, quietWhenOpen: true, memory: false, memoryBudget: 3000 });
+const DEFAULT_RESPONDER = Object.freeze({ enabled: false, channelIds: [], dms: false, allowUsers: [], blockUsers: [], instructions: '', context: false, notify: true, web: false, quietWhenOpen: true, memory: false, memoryBudget: 3000, memoryAuto: true });
 // Harte Limits für ALLE KI-Anfragen (Aufträge, Antworten, Vorschau, Test) – Schutz vor Kosten und Spam (Issue #12)
 const DEFAULT_LIMITS = Object.freeze({ mode: 'auto', perHour: 60, perDay: 300 }); // mode: shared/ai-limits.js
 // options.thinking: „denkende“ Modelle (Qwen3, DeepSeek-R1 …) brauchen mehr Platz/Zeit; options.autoConnect: beim Start verbinden
@@ -592,6 +592,15 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
     list: () => (memory ? memory.list() : []),
     view: ({ userId }) => (memory ? memory.view(userId) : null),
     forget: ({ userId }) => (memory ? memory.forget(userId) : []),
+    setSummary: ({ userId, summary }) => (memory ? memory.setSummary(userId, summary) : null),
+    /** „Jetzt zusammenfassen“: auch unter dem Budget; Ergebnis/Fehler kommt zurück und steht in der Liste */
+    compactNow: async ({ userId }) => {
+      if (!memory) return null;
+      const cfg = read();
+      const res = await memory.compact(userId, cfg.responder.memoryBudget || 3000, (material) => ask({ system: SUMMARY_PROMPT, user: material, maxTokens: 700, kind: 'memory' }), { force: true });
+      emit('ai:changed', {});
+      return res;
+    },
     forgetAll: () => (memory ? memory.forgetAll() : []),
   };
 
@@ -726,7 +735,8 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
       // Gedächtnis: Wortwechsel merken, bei vollem Budget im Hintergrund zusammenfassen
       if (r.memory && memory) {
         memory.remember(m.author.id, m.author.name, question || '(erwähnt)', plainText(text));
-        memory
+        if (r.memoryAuto !== false)
+          memory
           .compact(m.author.id, r.memoryBudget || 3000, (material) => ask({ system: SUMMARY_PROMPT, user: material, maxTokens: 700, kind: 'memory' }))
           .then((res) => res.compacted && emit('ai:changed', {}))
           .catch(() => {});

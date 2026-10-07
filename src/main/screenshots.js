@@ -737,7 +737,15 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await wait(400);
   await js(win, `document.querySelector('[data-setting="ai-memory-list"]')?.scrollIntoView({block:'center'})`);
   await wait(300);
+  await js(win, `[...document.querySelectorAll('.ai-memory-row .btn')].find(b=>b.textContent.includes('zusammenfassen'))?.click()`);
+  await wait(1200);
+  await js(win, `document.querySelector('[data-setting="ai-memory-list"]')?.scrollIntoView({block:'center'})`);
+  await wait(300);
   await shoot(win, dir, '64-ki-gedaechtnis');
+  console.log(`[ki-zusammenfassen] ${await js(win, `document.querySelector('.ai-memory-row')?.textContent.trim().slice(0,140) || null`)}`);
+  await js(win, `document.querySelector('.settings__body')?.scrollTo({top:0})`);
+  await wait(300);
+  await shoot(win, dir, '70-beta-uebersicht');
   const mem = await js(win, `JSON.stringify({ personen: [...document.querySelectorAll('.ai-memory-row b')].map(b=>b.textContent), inhalt: document.querySelector('[data-setting="ai-memory-list"] .ai-preview')?.textContent.slice(0,90) || null })`);
   console.log(`[ki-gedaechtnis] ${mem}`);
   await js(win, `document.querySelector('.settings__nav [data-nav="alle"]')?.click()`);
