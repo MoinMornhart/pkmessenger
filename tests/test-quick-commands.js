@@ -41,8 +41,19 @@ test('Aktionen öffnen Dialoge; Unbekanntes bleibt normaler Text', () => {
 });
 
 test('Vorschläge beim Tippen des ersten Wortes', () => {
-  assert.deepEqual(suggestCommands('/ta', 3).map((s) => s.display), ['/tableflip']);
+  assert.equal(suggestCommands('/ta', 3)[0].display, '/tableflip'); // erst „fängt so an“
+  assert.ok(suggestCommands('/flip', 5).map((s) => s.display).includes('/unflip')); // dann „enthält“ (Issue #29)
+  assert.equal(suggestCommands('/mü', 3)[0].instant, true); // /münze läuft sofort, kein zweites Enter
   assert.ok(suggestCommands('/', 1).length >= 10);
   assert.equal(suggestCommands('/shrug hallo', 12), null); // nach dem Leerzeichen: keine Liste mehr
   assert.equal(suggestCommands('hallo /sh', 9), null);
+});
+
+test('Unbekannte Befehle werden erkannt (Rückfrage statt still als Text senden, Issue #29)', () => {
+  const { unknownCommand } = require('../src/shared/quick-commands');
+  assert.equal(unknownCommand('/ping'), 'ping');
+  assert.equal(unknownCommand('/play song'), 'play');
+  assert.equal(unknownCommand('/shrug'), null);
+  assert.equal(unknownCommand('hallo /ping'), null);
+  assert.equal(unknownCommand('/ hallo'), null);
 });

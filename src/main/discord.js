@@ -455,6 +455,9 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       // Discord-Proxy-Adresse bevorzugen (CSP erlaubt nur Discord-CDN; schützt vor Tracking durch fremde Server)
       image: s(e?.image?.proxyURL ?? e?.image?.proxy_url ?? e?.image?.url, 2048),
       thumbnail: s(e?.thumbnail?.proxyURL ?? e?.thumbnail?.proxy_url ?? e?.thumbnail?.url, 2048),
+      // GIFs (Tenor/Giphy) und Videos: nur die Discord-Proxy-Adresse (Issue #1)
+      type: s(e?.data?.type ?? e?.type, 20),
+      video: s(e?.video?.proxyURL ?? e?.video?.proxy_url, 2048),
       footer: e?.footer?.text ? s(e.footer.text, 2048) : null,
       timestamp: e?.timestamp ? Date.parse(e.timestamp) || null : null,
     };

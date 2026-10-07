@@ -121,6 +121,9 @@ function createDemo() {
 
   channels.ankuendigungen.topic = 'Wichtige Infos';
   add(channels.ankuendigungen, client.user, '📢 Server-Regeln:\n1. Respektvoll bleiben\n2. Kein Spam\n3. Bot-Befehle nur in #projekt-a', 3 * 24 * 60);
+  // Issue #1: GIF (Tenor kommt als „gifv“-Video über Discords Proxy) + Link mit Warnung
+  const gif = add(channels.ankuendigungen, chiara, 'Wenn das Update endlich da ist 😂 https://tenor.com/view/katze-tanzt', 60);
+  gif.embeds = [{ type: 'gifv', url: 'https://tenor.com/view/katze-tanzt', provider: { name: 'Tenor' }, video: { proxyURL: 'https://images-ext-1.discordapp.net/external/demo/https/media.tenor.com/katze.mp4' }, thumbnail: { proxyURL: 'https://images-ext-1.discordapp.net/external/demo/https/media.tenor.com/katze.png' } }];
   add(channels.projektA, chiara, 'Projekt A startet nächste Woche!', 300);
   add(channels.nurLesen, bernd, 'Dieser Kanal ist für den Bot nur lesbar.', 500);
   // Wie echtes Discord: auch eigene Bot-Nachrichten kommen live über das Gateway zurück

@@ -2,6 +2,8 @@ import { memo, useContext, useEffect, useRef, useState } from 'react';
 import { MessageActionsContext, NavContext, QUICK_REACTIONS } from '../state';
 import MessageContent from './MessageContent.jsx';
 import EmojiPicker from './EmojiPicker.jsx';
+import MediaGate from './MediaGate.jsx';
+import { embedMedia } from '../../shared/media';
 
 // F7: Zitat der Nachricht, auf die geantwortet wurde (Klick springt hin)
 export const ReplyQuote = memo(function ReplyQuote({ reference }) {
@@ -32,6 +34,23 @@ export const Reactions = memo(function Reactions({ message }) {
 });
 
 // F11: Embed-Karte mit Farbstreifen
+// GIFs (Tenor/Giphy kommen als „gifv“-Video), Videos und Bilder – nur über Discords Proxy, hinter MediaGate (Issue #1)
+function EmbedMedia({ e }) {
+  const m = embedMedia(e);
+  if (!m) return null;
+  return (
+    <MediaGate kind={m.kind} name={e.title || e.provider || ''}>
+      {m.kind === 'image' ? (
+        <img className="embed__image" src={m.src} alt="" loading="lazy" />
+      ) : m.kind === 'gifv' ? (
+        <video className="embed__image" src={m.src} poster={m.poster || undefined} autoPlay loop muted playsInline />
+      ) : (
+        <video className="embed__image" src={m.src} poster={m.poster || undefined} controls preload="metadata" playsInline />
+      )}
+    </MediaGate>
+  );
+}
+
 export const Embeds = memo(function Embeds({ embeds }) {
   const nav = useContext(NavContext);
   if (!embeds?.length) return null;
@@ -68,7 +87,7 @@ export const Embeds = memo(function Embeds({ embeds }) {
           ))}
         </div>
       )}
-      {e.image && /^https:\/\/(cdn|media)\.discordapp\.(com|net)\//.test(e.image) && <img className="embed__image" src={e.image} alt="" loading="lazy" />}
+      <EmbedMedia e={e} />
       {e.footer && <div className="embed__footer">{e.footer}</div>}
     </div>
   ));

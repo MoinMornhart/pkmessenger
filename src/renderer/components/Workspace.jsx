@@ -15,6 +15,8 @@ import QuickSwitcher from './QuickSwitcher.jsx';
 import CallView from './CallView.jsx';
 import AccessDialog from './AccessDialog.jsx';
 import SettingsDialog from './SettingsDialog.jsx';
+import LinkWarnDialog from './LinkWarnDialog.jsx';
+import { prefs } from '../prefs';
 import JoinServerDialog from './JoinServerDialog.jsx';
 import { ThreadsPanel } from './SidePanels.jsx';
 import { useVoice } from '../voice/useVoice';
@@ -41,6 +43,16 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [accessByGuild, setAccessByGuild] = useState({});
   const [accessOpen, setAccessOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsFocus, setSettingsFocus] = useState(null); // z. B. 'media' → dorthin scrollen
+  const [linkAsk, setLinkAsk] = useState(null); // Link-Warnung (Issue #1)
+  useEffect(() => {
+    const onOpen = (e) => {
+      setSettingsFocus(e.detail?.focus || null);
+      setSettingsOpen(true);
+    };
+    window.addEventListener('pk:open-settings', onOpen);
+    return () => window.removeEventListener('pk:open-settings', onOpen);
+  }, []);
   const [joinOpen, setJoinOpen] = useState(false);
   const [newDmOpen, setNewDmOpen] = useState(false);
   const [chatMenu, setChatMenu] = useState(null); // Rechtsklick auf einen Chat
@@ -406,7 +418,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     () => ({
       channelName: (id) => channelById.get(id)?.name || null,
       openChannel,
-      openExternal: (url) => api.openExternal({ url }).catch((e) => toast({ kind: 'error', title: e.message })),
+      openExternal: (url) => (prefs.get().linkWarn ? setLinkAsk(url) : api.openExternal({ url }).catch((e) => toast({ kind: 'error', title: e.message }))),
     }),
     [channelById, openChannel, toast],
   );
@@ -508,7 +520,18 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           />
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
-        {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} guildId={guildId === DM_ID ? null : guildId} aiTargets={aiTargets} guilds={guilds || []} />}
+        {linkAsk && (
+          <LinkWarnDialog
+            url={linkAsk}
+            onClose={() => setLinkAsk(null)}
+            onOpen={() => {
+              const url = linkAsk;
+              setLinkAsk(null);
+              api.openExternal({ url }).catch((e) => toast({ kind: 'error', title: e.message }));
+            }}
+          />
+        )}
+        {settingsOpen && <SettingsDialog focus={settingsFocus} onClose={() => (setSettingsOpen(false), setSettingsFocus(null))} toast={toast} appInfo={appInfo} guildId={guildId === DM_ID ? null : guildId} aiTargets={aiTargets} guilds={guilds || []} />}
         {chatMenu && <ContextMenu x={chatMenu.x} y={chatMenu.y} items={chatMenu.items} onClose={() => setChatMenu(null)} />}
         {wallFor && <WallpaperDialog {...wallFor} onClose={() => setWallFor(null)} />}
         {renameFor && (

@@ -3611,3 +3611,70 @@ img.chat-avatar {
 .ai-local__item:hover {
   border-color: var(--accent);
 }
+
+/* ---------- Medien-Schutz + Link-Warnung (Issue #1) ---------- */
+.media-off {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text-2);
+  max-width: 420px;
+}
+.media-off__note {
+  width: 100%;
+  font-size: 12px;
+}
+.media-off__note b {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--accent-ink, #fff);
+  font-size: 10.5px;
+}
+.linklike {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+.link-warn__url {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  word-break: break-all;
+  max-height: 90px;
+  overflow: auto;
+}
+.settings [data-setting].is-focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 8px;
+  transition: outline-color 0.3s;
+}
+.settings__field select {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: var(--text);
+  font: inherit;
+}
+video.attachment-img,
+video.embed__image {
+  background: #000;
+}
+.link-warn {
+  max-width: 520px;
+}

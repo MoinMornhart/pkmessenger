@@ -118,6 +118,64 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   console.log(`[chat-rechtsklick] Menü: ${chatMenu} · Hintergrund: ${wall} · Verwalten-Einträge bei #projekt-a: ${manageMenu} · umbenannt: ${renamed}`);
   await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
   await wait(400);
+  // Medien + Link-Warnung (Issue #1): GIF erst nach Rückfrage, Links mit Warnung, „Hier aktivieren“ springt in die Einstellungen
+  {
+    const openChat = (name) => js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.querySelector('.chatrow__name')?.textContent===${JSON.stringify(name)})?.click()`);
+    await openChat('ankuendigungen');
+    await wait(800);
+    const gate = await js(win, `document.querySelector('.media-off')?.textContent.trim().slice(0,60) || null`);
+    await shoot(win, dir, '45-medien-gesperrt');
+    await js(win, `[...document.querySelectorAll('.media-off .btn')].find(b=>b.textContent.includes('Anzeigen'))?.click()`);
+    await wait(300);
+    await shoot(win, dir, '46-medien-rueckfrage');
+    await js(win, `[...document.querySelectorAll('.modal .btn')].find(b=>b.textContent.includes('Nur dieses'))?.click()`);
+    await wait(500);
+    const video = await js(win, `JSON.stringify({ video: Boolean(document.querySelector('video.embed__image')), src: document.querySelector('video.embed__image')?.getAttribute('src')?.slice(0,45) || null })`);
+    await js(win, `[...document.querySelectorAll('.bubble a')].find(l=>l.textContent.includes('tenor'))?.click()`);
+    await wait(300);
+    await shoot(win, dir, '47-link-warnung');
+    const warn = await js(win, `document.querySelector('.link-warn')?.textContent.replace(/\\s+/g,' ').slice(0,90) || null`);
+    await js(win, `[...document.querySelectorAll('.link-warn .btn')].find(b=>b.textContent.includes('Abbrechen'))?.click()`);
+    await wait(200);
+    // Medien „nie“ → Hinweis „Hier aktivieren“ → Einstellungen öffnen sich an der richtigen Stelle
+    await js(win, `(() => { const p=JSON.parse(localStorage.getItem('pk.prefs.v1')||'{}'); p.media='nie'; localStorage.setItem('pk.prefs.v1', JSON.stringify(p)); })()`);
+    await openChat('allgemein');
+    await wait(300);
+    await js(win, `window.dispatchEvent(new CustomEvent('pk:open-settings', { detail: { focus: 'media' } }))`);
+    await wait(200);
+    await js(win, `(() => { const el=document.querySelector('#set-media'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,'nie'); el.dispatchEvent(new Event('change',{bubbles:true})); })()`);
+    await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+    await wait(300);
+    await openChat('ankuendigungen');
+    await wait(600);
+    const off = await js(win, `document.querySelector('.media-off__note')?.textContent.trim() || null`);
+    await js(win, `[...document.querySelectorAll('.media-off__note .linklike')][0]?.click()`);
+    await wait(900);
+    await shoot(win, dir, '48-hier-aktivieren');
+    const focused = await js(win, `Boolean(document.querySelector('.settings [data-setting="media"].is-focus'))`);
+    await js(win, `(() => { const el=document.querySelector('#set-media'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,'fragen'); el.dispatchEvent(new Event('change',{bubbles:true})); })()`);
+    await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+    await wait(300);
+    console.log(`[medien] gesperrt: ${gate} · nach „Nur dieses“: ${video} · Link-Warnung: ${warn} · aus: ${off} · Einstellung angesprungen: ${focused}`);
+    // Schnellbefehle (Issue #29): „/ping“ → Rückfrage statt still senden; „/mü“ + Enter → Münze sofort
+    await openChat('allgemein');
+    await wait(500);
+    await js(win, typeInto('.composer textarea', '/ping'));
+    await wait(200);
+    await js(win, `document.querySelector('.composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+    await wait(300);
+    await shoot(win, dir, '49-unbekannter-befehl');
+    const unknown = await js(win, `document.querySelector('.modal h3')?.textContent || null`);
+    await js(win, `[...document.querySelectorAll('.modal .btn')].find(b=>b.textContent.includes('Abbrechen'))?.click()`);
+    await wait(200);
+    const sentBefore = await js(win, `document.querySelectorAll('.msg--out').length`);
+    await js(win, typeInto('.composer textarea', '/mü'));
+    await wait(300);
+    await js(win, `document.querySelector('.composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+    await wait(900);
+    const coin = await js(win, `JSON.stringify({ neu: document.querySelectorAll('.msg--out').length - ${sentBefore}, text: [...document.querySelectorAll('.msg--out')].at(-1)?.textContent.slice(0,30) || null, feld: document.querySelector('.composer textarea')?.value })`);
+    console.log(`[befehle] /ping: ${unknown} · /mü + Enter: ${coin}`);
+  }
   // Smileys (Issue #1: „mehr Smileys“): 😀 im Eingabefeld, suchen, einfügen; ➕ bei Reaktionen
   await js(win, `document.querySelector('.tool-btn[aria-label="Smileys"]')?.click()`);
   await wait(300);
