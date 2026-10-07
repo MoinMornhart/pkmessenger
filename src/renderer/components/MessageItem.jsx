@@ -3,6 +3,7 @@ import { formatShortTime, formatFull, formatDayPill } from '../../shared/format'
 import MessageContent from './MessageContent.jsx';
 import { ReplyQuote, Reactions, Embeds, ThreadChip, MessageActionBar, PollCard } from './MessageExtras.jsx';
 import { hueFor } from './ChatList.jsx';
+import { systemInfo } from '../../shared/system-messages';
 
 function Avatar({ author }) {
   const [broken, setBroken] = useState(false);
@@ -67,7 +68,21 @@ function Tick({ m }) {
   );
 }
 
+// Systemnachricht (Beitritt, Boost, Pin …): mittig als Hinweis statt als Sprechblase
+function SystemRow({ m, highlighted }) {
+  const info = systemInfo(m) || { icon: 'ℹ️', text: 'Systemnachricht von Discord.' };
+  return (
+    <div className={`msg msg--system ${highlighted ? 'msg--highlight' : ''}`} data-mid={m.id} role="note">
+      <span className="sysmsg">
+        <span aria-hidden="true">{info.icon}</span> {info.text}
+        <span className="sysmsg__time">{formatShortTime(m.createdTimestamp)}</span>
+      </span>
+    </div>
+  );
+}
+
 function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
+  if (m.system && !m.pending) return <SystemRow m={m} highlighted={highlighted} />;
   const out = m.isOwn || m.pending || m.failed;
   const cls = ['msg', out ? 'msg--out' : 'msg--in', grouped && 'msg--grouped', m.pending && 'msg--pending', m.failed && 'msg--failed', highlighted && 'msg--highlight', m.mentions?.everyone && 'msg--mass']
     .filter(Boolean)

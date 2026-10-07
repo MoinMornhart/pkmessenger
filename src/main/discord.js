@@ -5,6 +5,7 @@ const { loadToken, botIdFromToken } = require('./env');
 const { describeError, appError } = require('./errors');
 const { buildAllowedMentions } = require('../shared/mentions');
 const { compareSnowflakes } = require('../shared/snowflake');
+const { isSystemType, systemInfo } = require('../shared/system-messages');
 const { TYPING_THROTTLE_MS } = require('../shared/limits');
 
 const LOGIN_TIMEOUT_MS = 45000;
@@ -374,7 +375,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       content: typeof msg?.content === 'string' ? msg.content : '',
       createdTimestamp: ts,
       editedTimestamp: msg?.editedTimestamp || null,
-      system: Boolean(msg?.system),
+      type: Number.isInteger(msg?.type) ? msg.type : 0,
+      system: Boolean(msg?.system) || isSystemType(msg?.type),
       isOwn: Boolean(author?.id) && author.id === client?.user?.id,
       attachments: valuesOf(msg?.attachments).map((a) => ({
         id: a.id ?? '',
@@ -481,12 +483,16 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   function previewOf(msg) {
     const raw = msg?.cleanContent ?? msg?.content ?? '';
     const text = (typeof raw === 'string' ? raw : '').replace(/\s+/g, ' ').trim();
+    // Systemnachricht (Beitritt, Boost …) → verständlicher Satz statt leerer Vorschau
+    const sys = systemInfo({ type: msg?.type, author: { name: displayNameOf(msg?.author, msg?.member) }, content: text, embeds: (Array.isArray(msg?.embeds) ? msg.embeds : []).map(serializeEmbed) });
+    const ts = Number.isFinite(msg?.createdTimestamp) ? msg.createdTimestamp : 0;
+    if (sys) return { channelId: msg?.channelId ?? null, messageId: msg?.id ?? null, authorName: '', isOwn: false, system: true, text: `${sys.icon} ${sys.text}`.slice(0, 120), timestamp: ts };
     return {
       channelId: msg?.channelId ?? null,
       messageId: msg?.id ?? null,
       authorName: displayNameOf(msg?.author, msg?.member),
       isOwn: Boolean(msg?.author?.id) && msg.author.id === client?.user?.id,
-      text: text ? text.slice(0, 120) : msg?.attachments?.size ? '📎 Anhang' : msg?.embeds?.length ? '[Embed]' : '',
+      text: text ? text.slice(0, 120) : msg?.poll?.question?.text ? `📊 ${msg.poll.question.text}`.slice(0, 120) : msg?.attachments?.size ? '📎 Anhang' : msg?.embeds?.length ? `▤ ${msg.embeds[0]?.title || 'Embed'}`.slice(0, 120) : '',
       timestamp: Number.isFinite(msg?.createdTimestamp) ? msg.createdTimestamp : 0,
     };
   }

@@ -3,6 +3,7 @@ import { api } from '../api';
 import { bus, messageStore, NavContext } from '../state';
 import { compareSnowflakes, timestampOf } from '../../shared/snowflake';
 import { toPlainText } from '../../shared/mentions';
+import { systemInfo } from '../../shared/system-messages';
 import ServerRail, { DM_ID } from './ServerRail.jsx';
 import NewDMDialog from './NewDMDialog.jsx';
 import ChatList from './ChatList.jsx';
@@ -161,9 +162,17 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           [p.channelId]: {
             channelId: p.channelId,
             messageId: p.id,
-            authorName: p.author.name,
-            isOwn: p.isOwn,
-            text: toPlainText(p.content, p.mentions).slice(0, 120) || (p.attachments.length ? '📎 Anhang' : p.embedsCount ? '[Embed]' : ''),
+            authorName: p.system ? '' : p.author.name,
+            isOwn: p.isOwn && !p.system,
+            system: Boolean(p.system),
+            text: (() => {
+              const sys = p.system ? systemInfo(p) : null;
+              if (sys) return `${sys.icon} ${sys.text}`.slice(0, 120);
+              return (
+                toPlainText(p.content, p.mentions).slice(0, 120) ||
+                (p.poll ? `📊 ${p.poll.question}`.slice(0, 120) : p.attachments.length ? '📎 Anhang' : p.embedsCount ? `▤ ${p.embeds?.[0]?.title || 'Embed'}`.slice(0, 120) : '')
+              );
+            })(),
             timestamp: p.createdTimestamp,
           },
         }));

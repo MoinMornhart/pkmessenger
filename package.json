@@ -9,6 +9,7 @@
   "author": "pmorn",
   "repository": "github:Morni-Team/pkmessenger",
   "scripts": {
+    "icon": "electron scripts/make-icon.js",
     "build:renderer": "node scripts/build-renderer.js",
     "start": "npm run build:renderer && node scripts/start.js",
     "demo": "npm run build:renderer && node scripts/start.js --demo",

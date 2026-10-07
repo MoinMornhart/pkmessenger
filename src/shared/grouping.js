@@ -25,6 +25,8 @@ function buildRows(messages) {
       prev &&
       prev.author.id === msg.author.id &&
       !msg.reference &&
+      !msg.system &&
+      !prev.system &&
       msg.createdTimestamp - prev.createdTimestamp < GROUPING_WINDOW_MS;
     rows.push({ kind: 'message', key: msg.nonce && msg.pending ? `n-${msg.nonce}` : msg.id, message: msg, grouped: Boolean(grouped) });
     prev = msg;

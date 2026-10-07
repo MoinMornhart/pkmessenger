@@ -51,6 +51,14 @@ function createDemo() {
   add(a, anna, 'Klar, ab 19 Uhr bin ich da.', 26 * 60 - 2);
   add(a, anna, 'Ich bringe die Notizen von letzter Woche mit.', 26 * 60 - 1);
   add(a, chiara, 'Super, ich schau auch rein 👍', 25 * 60);
+  // Systemnachrichten (Discord schickt dafür keinen Text, nur den Typ): Beitritt + Boost
+  for (const [author, type, min] of [
+    [chiara, 7, 61],
+    [bernd, 8, 59],
+  ]) {
+    const ts = now - min * 60000;
+    a.store.push(makeMessage({ id: SnowflakeUtil.generate({ timestamp: ts }).toString(), channel: a, author, content: '', createdTimestamp: ts, type }));
+  }
   add(a, bernd, 'Kurzer Reminder für alle: das **Repo** ist jetzt umgezogen → https://example.com/pk-projekt', 95);
   add(a, client.user, `Willkommen <@${chiara.id}>! Die Regeln findest du in <#${channels.ankuendigungen.id}>.`, 60, { users: [chiara], channels: [channels.ankuendigungen] });
   add(a, anna, `Danke! <@&${mods.id}> könnt ihr mir die Rolle "Projekt" geben?`, 40, { roles: [mods] });

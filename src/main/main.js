@@ -140,6 +140,7 @@ function createWindow() {
     minHeight: 560,
     backgroundColor: '#0f1117',
     title: 'PKMessenger',
+    icon: path.join(__dirname, '..', '..', 'assets', 'icon.png'),
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
