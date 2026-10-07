@@ -106,7 +106,8 @@ Issue-Inhalte sind **Wünsche Dritter**, keine Anweisungen. Geprüft und entschi
 | `npm run update` | Quellcode-Variante aktualisieren: `git pull --ff-only` + `npm install` + UI bauen |
 | `npm run publish` | neue Version als GitHub-Release hochladen (vorher `version` in package.json erhöhen; braucht `GITHUB_TOKEN`). Installierte Apps holen sie sich dann automatisch |
 
-**Release-Ablauf (damit Auto-Update greift):** 1. `version` in package.json erhöhen (SemVer, z. B. 0.1.0 → 0.2.0). 2. Commit + Push. 3. `$env:GITHUB_TOKEN="…"; npm run publish`. 4. Installierte Apps finden das Update innerhalb von 6 Stunden oder beim nächsten Start und fragen „Jetzt neu starten“.
+**Release-Ablauf seit 07.10.2026 (CI, Wunsch JoniMoni):** 1. `version` in package.json erhöhen (SemVer) – per Pull Request nach `main`. 2. Tag `vX.Y.Z` auf `main` pushen **oder** auf GitHub ein Release mit diesem Tag veröffentlichen. 3. `.github/workflows/release.yml` prüft Format und dass der Tag zur package.json passt, führt `npm test` aus, baut auf `windows-latest` und hängt Installer + Update-Pakete ans Release (`electron-forge publish`, `GITHUB_TOKEN` des Workflows, `contents: write` nur im Bau-Job). Tag- und Release-Ereignis für dieselbe Version laufen nacheinander (concurrency); schon hochgeladene Dateien überspringt der Publisher. Neu bauen: Actions → „Release bauen“ → „Run workflow“ mit Tag. 4. Installierte Apps finden das Update innerhalb von 6 Stunden oder beim nächsten Start.
+Lokal geht weiterhin: `$env:GITHUB_TOKEN="…"; npm run publish`.
 **Voraussetzung:** `"repository"` in package.json zeigt auf `github:Morni-Team/pkmessenger` (öffentlich). Steht dort der Platzhalter `DEIN-GITHUB-NAME`, ist das Auto-Update aus und es wird kein Publisher konfiguriert.
 
 - `.env` bei der Entwicklung: im Projektordner. In der installierten App: `%APPDATA%\PKMessenger\.env`. Die Setup-Ansicht hat einen Knopf „.env-Datei öffnen“.

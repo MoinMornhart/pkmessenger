@@ -225,6 +225,7 @@ npm start        # echte App
 | `npm test` | Alle Tests (Node-Testrunner) |
 | `npm run make` | Windows-Installer + ZIP bauen |
 | `npm run publish` | Neue Version als GitHub-Release veröffentlichen (`GITHUB_TOKEN` nötig) |
+| Tag `vX.Y.Z` pushen | **Automatisch:** GitHub Actions prüft, testet, baut den Installer und hängt ihn ans Release (`.github/workflows/release.yml`) |
 | `npm run update` | Quellcode auf den neuesten Stand holen (git pull + Build) |
 
 **Technik:** Electron 44 · discord.js 14 · @discordjs/voice (DAVE) · React 19 · react-window · esbuild · Electron Forge.
