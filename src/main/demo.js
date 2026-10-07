@@ -5,7 +5,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { SnowflakeUtil } = require('discord.js');
+const { SnowflakeUtil, PermissionFlagsBits: PF } = require('discord.js');
 const { createFakeWorld, FAKE_TOKEN, makeMessage, Events } = require('../../tests/helpers/fake-discord');
 const { createFakeVoiceLib } = require('../../tests/helpers/fake-voice');
 
@@ -36,7 +36,7 @@ function createDemo() {
   const [anna, bernd, chiara] = people;
   const mods = guild.roles.cache.get('333333333333333301');
 
-    const now = Date.now();
+  const now = Date.now();
   const add = (ch, author, content, minutesAgo, mentions) => {
     const ts = now - minutesAgo * 60000;
     const m = makeMessage({ id: SnowflakeUtil.generate({ timestamp: ts }).toString(), channel: ch, author, content, createdTimestamp: ts, mentions });
@@ -56,7 +56,46 @@ function createDemo() {
   add(a, anna, `Danke! <@&${mods.id}> könnt ihr mir die Rolle "Projekt" geben?`, 40, { roles: [mods] });
   add(a, chiara, 'Hier ein Code-Beispiel aus dem Bot:\n```js\nchannel.send({ content: "Hallo", allowedMentions: { parse: [] } });\n```', 12);
   add(a, bernd, 'Sieht gut aus. `allowedMentions` ist wichtig, damit niemand aus Versehen gepingt wird.', 9);
-  add(a, anna, 'Genau, und @everyone nur mit Bestätigung 😄', 8);
+  const last = add(a, anna, 'Genau, und @everyone nur mit Bestätigung 😄', 8);
+
+  // F7–F13 in der Demo: Rechte, Reaktionen, Antwort, Embed, Pin, Thread
+  const extra = new Set([PF.AddReactions, PF.AttachFiles, PF.EmbedLinks, PF.PinMessages, PF.CreatePublicThreads, PF.SendMessagesInThreads, PF.ManageMessages]);
+  const basePerms = a.permissionsFor;
+  a.permissionsFor = (me) => ({ has: (f) => extra.has(f) || basePerms(me).has(f) });
+  const repoMsg = a.store.find((m) => m.content.includes('Repo'));
+  repoMsg.pinned = true;
+  // Reaktionen über die Fake-Logik anlegen (Entfernen funktioniert so wie echt)
+  repoMsg.react('👍');
+  repoMsg.reactions.cache.get('👍').count = 3;
+  repoMsg.react('🎉');
+  Object.assign(repoMsg.reactions.cache.get('🎉'), { count: 2, me: false });
+  last.react('😂');
+  Object.assign(last.reactions.cache.get('😂'), { count: 2, me: false });
+  const reply = add(a, client.user, 'Wir treffen uns um 19 Uhr im Sprachkanal 🔊 Lounge!', 5);
+  reply.reference = { messageId: a.store.find((m) => m.content.startsWith('Klar, ab 19 Uhr')).id, channelId: a.id };
+  const rel = add(a, client.user, '', 3);
+  rel.embeds = [{ title: 'PKMessenger 0.3.0', description: 'Neu: **Antworten**, **Reaktionen**, Threads, Pins, Dateien und die Serversuche.', color: 0x2dd4bf, footer: { text: 'Release-Notizen' }, fields: [{ name: 'Tests', value: '129/129 grün', inline: true }, { name: 'Lizenz', value: 'MIT', inline: true }] }];
+  // Thread an Bernds Nachricht
+  const threadMsg = a.store.find((m) => m.content.startsWith('Moin zusammen'));
+  const thread = { id: '777000000000000001', name: 'Projekt-Abend', parentId: a.id, guildId: guild.id, guild, type: 11, archived: false, messageCount: 4, lastMessageId: threadMsg.id, permissionsFor: (me) => a.permissionsFor(me), messages: { cache: new Map(), fetch: async () => new Map(), fetchPins: async () => ({ items: [], hasMore: false }) }, send: async () => threadMsg, sendTyping: async () => {} };
+  threadMsg.hasThread = true;
+  threadMsg.thread = thread;
+  a.threads.list.push(thread);
+  client.channels.cache.set(thread.id, thread);
+  // eigenes Server-Emoji für die Reaktionsauswahl
+  guild.emojis = { cache: new Map() };
+
+  // F14 Serversuche in der Demo: durchsucht die Demo-Nachrichten wie der echte Endpoint
+  client.rest.get = async (route, { query } = {}) => {
+    if (!String(route).includes('/messages/search')) throw new Error('Demo: Route nicht simuliert');
+    const needle = (query?.get?.('content') || '').toLowerCase();
+    const hits = [];
+    for (const ch of Object.values(channels)) for (const m of ch.store || []) if (needle && (m.content || '').toLowerCase().includes(needle)) hits.push(m);
+    return {
+      total_results: hits.length,
+      messages: hits.slice(-25).reverse().map((m) => [{ id: m.id, channel_id: m.channelId, author: { username: m.author.username, global_name: m.author.globalName }, content: m.content, timestamp: new Date(m.createdTimestamp).toISOString(), attachments: [] }]),
+    };
+  };
 
   channels.ankuendigungen.topic = 'Wichtige Infos';
   add(channels.ankuendigungen, client.user, '📢 Server-Regeln:\n1. Respektvoll bleiben\n2. Kein Spam\n3. Bot-Befehle nur in #projekt-a', 3 * 24 * 60);
@@ -83,7 +122,6 @@ function createDemo() {
   // Sprachkanal "Lounge" mit Anna und Bernd; der Bot darf verbinden und sprechen.
   const vc = channels.voice;
   vc.name = 'Lounge';
-  const { PermissionFlagsBits: PF } = require('discord.js');
   const vcPerms = new Set([PF.ViewChannel, PF.Connect, PF.Speak]);
   vc.permissionsFor = () => ({ has: (f) => vcPerms.has(f) });
   for (const [u, muted] of [

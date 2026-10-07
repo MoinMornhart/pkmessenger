@@ -130,13 +130,29 @@ function VoiceRows({ channels, members, speaking, activeId, voice, onSelect }) {
 const OTHER_LABEL = { forum: ['🗂', 'Forum – Beiträge kommen mit Threads (F12)'], media: ['🖼', 'Medienkanal – kommt mit Threads (F12)'], stage: ['🎙', 'Stage-Kanal – noch nicht unterstützt'] };
 
 // Erkannte, aber noch nicht bedienbare Kanäle: sichtbar statt "verschwunden" (Issue #1)
-function OtherRows({ channels }) {
+function OtherRows({ channels, activeId, onOpenForum }) {
   if (!channels.length) return null;
   return (
     <>
       <div className="chatlist__section">Weitere Kanäle</div>
       {channels.map((c) => {
-        const [icon, text] = OTHER_LABEL[c.type] || ['#', 'noch nicht unterstützt'];
+        const [icon, text] = c.type === 'forum' ? ['🗂', 'Forum – Beiträge ansehen und erstellen'] : OTHER_LABEL[c.type] || ['#', 'noch nicht unterstützt'];
+        if (c.type === 'forum')
+          return (
+            <button key={c.id} className={`chatrow ${c.id === activeId ? 'is-active' : ''}`} title={text} onClick={() => onOpenForum(c)}>
+              <div className="chat-avatar chat-avatar--muted" aria-hidden="true">
+                {icon}
+              </div>
+              <div className="chatrow__main">
+                <div className="chatrow__top">
+                  <span className="chatrow__name">{c.name}</span>
+                </div>
+                <div className="chatrow__bottom">
+                  <span className="chatrow__preview muted">{text}</span>
+                </div>
+              </div>
+            </button>
+          );
         return (
           <div key={c.id} className="chatrow chatrow--disabled" title={text}>
             <div className="chat-avatar chat-avatar--muted" aria-hidden="true">
@@ -157,7 +173,7 @@ function OtherRows({ channels }) {
   );
 }
 
-function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings }) {
+function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings, onOpenForum = () => {} }) {
   const [filter, setFilter] = useState('');
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase().replace(/^#/, '');
@@ -245,7 +261,7 @@ function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, on
         {!loading && !filter && (
           <VoiceRows channels={voiceChannels} members={voiceMembers} speaking={speaking} activeId={activeId} voice={voice} onSelect={onSelect} />
         )}
-        {!loading && !filter && <OtherRows channels={otherChannels} />}
+        {!loading && !filter && <OtherRows channels={otherChannels} activeId={activeId} onOpenForum={onOpenForum} />}
       </div>
       <CallBar voice={voice} onOpen={() => onSelect(voice.channelId)} onToggleMic={onToggleMic} onLeave={onLeaveVoice} />
       <BotFooter status={status} />

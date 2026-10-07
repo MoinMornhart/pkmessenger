@@ -3,17 +3,27 @@ import { api } from '../api';
 import { applyMentionTokens, findMentionQuery } from '../../shared/mentions';
 import { MESSAGE_CONTENT_MAX, TYPING_THROTTLE_MS } from '../../shared/limits';
 import ConfirmDialog from './ConfirmDialog.jsx';
+import EmbedDialog from './EmbedDialog.jsx';
+import { UPLOAD_MAX_BYTES, FILES_PER_MESSAGE_MAX } from '../../shared/limits';
+
+const fmtSize = (b) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} MB`);
 
 /**
  * Eingabefeld: Enter = senden, Umschalt+Enter = neue Zeile.
  * "@" / "#" öffnet die Autovervollständigung. Im Feld stehen lesbare Namen (@Anna),
  * beim Senden werden sie in <@ID>-Tokens umgewandelt (shared/mentions.js).
  */
-export default function Composer({ guild, channel, bot, allChannels, onSend }) {
+export default function Composer({ guild, channel, bot, allChannels, onSend, replyTo = null, onCancelReply = () => {}, editing = null, onCancelEdit = () => {}, onSaveEdit = () => {} }) {
   const [text, setText] = useState('');
   const [inserted, setInserted] = useState([]);
   const [suggest, setSuggest] = useState(null); // { query, start, trigger, items, sel }
   const [confirm, setConfirm] = useState(null);
+  const [files, setFiles] = useState([]); // F10: { name, size, data: Uint8Array, preview: dataURL|null }
+  const [fileError, setFileError] = useState(null);
+  const [embeds, setEmbeds] = useState([]); // F11
+  const [embedOpen, setEmbedOpen] = useState(false);
+  const [pingReply, setPingReply] = useState(false); // F7
+  const fileInputRef = useRef(null);
   const taRef = useRef(null);
   const lastTypingRef = useRef(0);
   const searchSeq = useRef(0);
@@ -21,7 +31,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend }) {
   const final = useMemo(() => applyMentionTokens(text, inserted), [text, inserted]);
   const length = final.content.length;
   const tooLong = length > MESSAGE_CONTENT_MAX;
-  const empty = text.trim().length === 0;
+  const empty = text.trim().length === 0 && (editing || (files.length === 0 && embeds.length === 0));
 
   // Höhe automatisch anpassen
   useLayoutEffect(() => {
@@ -37,6 +47,47 @@ export default function Composer({ guild, channel, bot, allChannels, onSend }) {
   useEffect(() => {
     taRef.current?.focus();
   }, [channel.id]);
+
+  // F9: Bearbeiten – Text der eigenen Nachricht ins Feld übernehmen
+  useEffect(() => {
+    if (editing) {
+      setText(editing.content || '');
+      setInserted([]);
+      requestAnimationFrame(() => taRef.current?.focus());
+    }
+  }, [editing]);
+
+  useEffect(() => {
+    if (replyTo) {
+      setPingReply(false);
+      taRef.current?.focus();
+    }
+  }, [replyTo]);
+
+  // F10: Dateien hinzufügen (📎, Einfügen, Ziehen) – Grenzen wie bei Discord prüfen
+  const addFiles = async (list) => {
+    setFileError(null);
+    const incoming = [...(list || [])].filter(Boolean);
+    if (!incoming.length) return;
+    if (files.length + incoming.length > FILES_PER_MESSAGE_MAX) return setFileError(`Höchstens ${FILES_PER_MESSAGE_MAX} Dateien pro Nachricht.`);
+    const total = files.reduce((a, f) => a + f.size, 0) + incoming.reduce((a, f) => a + f.size, 0);
+    if (total > UPLOAD_MAX_BYTES) return setFileError('Zusammen größer als 25 MiB – das ist das Discord-Limit pro Nachricht.');
+    const read = await Promise.all(
+      incoming.map(async (file) => {
+        const data = new Uint8Array(await file.arrayBuffer());
+        let preview = null;
+        if (file.type?.startsWith('image/') && file.size < 4 * 1024 * 1024)
+          preview = await new Promise((res) => {
+            const r = new FileReader();
+            r.onload = () => res(typeof r.result === 'string' ? r.result : null);
+            r.onerror = () => res(null);
+            r.readAsDataURL(file);
+          });
+        return { name: file.name || 'datei', size: file.size, data, preview };
+      }),
+    );
+    setFiles((f) => [...f, ...read]);
+  };
 
   const updateSuggestions = useCallback(
     async (value, caret) => {
@@ -101,11 +152,20 @@ export default function Composer({ guild, channel, bot, allChannels, onSend }) {
     setText('');
     setInserted([]);
     setSuggest(null);
+    setFiles([]);
+    setEmbeds([]);
+    setFileError(null);
   };
 
   const doSend = (everyone) => {
     setConfirm(null);
-    onSend({ content: final.content, mentions: { users: final.users, roles: final.roles, everyone } });
+    const mentions = { users: final.users, roles: final.roles, everyone };
+    if (editing) {
+      onSaveEdit({ content: final.content, mentions });
+    } else {
+      onSend({ content: final.content, mentions, files: files.map(({ name, data }) => ({ name, data })), embeds, replyTo: replyTo?.id || null, pingReply });
+      onCancelReply();
+    }
     reset();
   };
 
@@ -156,6 +216,14 @@ export default function Composer({ guild, channel, bot, allChannels, onSend }) {
         return;
       }
     }
+    if (e.key === 'Escape' && (editing || replyTo)) {
+      e.preventDefault();
+      if (editing) {
+        reset();
+        onCancelEdit();
+      } else onCancelReply();
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       submit();
@@ -201,23 +269,122 @@ export default function Composer({ guild, channel, bot, allChannels, onSend }) {
           ))}
         </div>
       )}
-      <div className={`composer__box ${tooLong ? 'is-error' : ''}`}>
+      {/* F7 Antworten / F9 Bearbeiten */}
+      {replyTo && !editing && (
+        <div className="composer__bar">
+          <span>
+            ↩ Antwort an <b>{replyTo.author?.name || 'Nachricht'}</b>
+            <span className="muted"> – {(replyTo.content || '').slice(0, 80) || '…'}</span>
+          </span>
+          <label className="composer__ping" title="Der Verfasser bekommt eine Benachrichtigung">
+            <input type="checkbox" checked={pingReply} onChange={(e) => setPingReply(e.target.checked)} /> @ pingen
+          </label>
+          <button className="icon-btn" onClick={onCancelReply} aria-label="Antwort abbrechen">
+            ×
+          </button>
+        </div>
+      )}
+      {editing && (
+        <div className="composer__bar composer__bar--edit">
+          <span>✏️ Nachricht bearbeiten · Enter speichert, Esc bricht ab</span>
+          <button
+            className="icon-btn"
+            onClick={() => {
+              reset();
+              onCancelEdit();
+            }}
+            aria-label="Bearbeiten abbrechen"
+          >
+            ×
+          </button>
+        </div>
+      )}
+      {/* F10 Dateien / F11 Embeds als Vorschau */}
+      {(files.length > 0 || embeds.length > 0 || fileError) && !editing && (
+        <div className="composer__attachments">
+          {files.map((f, i) => (
+            <div key={`${f.name}-${i}`} className="att">
+              {f.preview ? <img src={f.preview} alt="" /> : <span className="att__icon">📄</span>}
+              <span className="att__name" title={f.name}>
+                {f.name}
+              </span>
+              <span className="muted small">{fmtSize(f.size)}</span>
+              <button className="icon-btn" onClick={() => setFiles((l) => l.filter((_, j) => j !== i))} aria-label={`${f.name} entfernen`}>
+                ×
+              </button>
+            </div>
+          ))}
+          {embeds.map((e, i) => (
+            <div key={`embed-${i}`} className="att att--embed" style={e.color ? { '--embed': e.color } : undefined}>
+              <span className="att__icon">▤</span>
+              <span className="att__name">{e.title || e.description?.slice(0, 40) || 'Embed'}</span>
+              <button className="icon-btn" onClick={() => setEmbeds((l) => l.filter((_, j) => j !== i))} aria-label="Embed entfernen">
+                ×
+              </button>
+            </div>
+          ))}
+          {fileError && <span className="warn small">{fileError}</span>}
+        </div>
+      )}
+      <div
+        className={`composer__box ${tooLong ? 'is-error' : ''}`}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          if (!editing) addFiles(e.dataTransfer?.files);
+        }}
+      >
+        {!editing && (
+          <>
+            <button className="tool-btn" onClick={() => fileInputRef.current?.click()} title="Datei anhängen (max. 25 MiB)" aria-label="Datei anhängen">
+              📎
+            </button>
+            <button className="tool-btn" onClick={() => setEmbedOpen(true)} title="Embed erstellen" aria-label="Embed erstellen">
+              ▤
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+          </>
+        )}
         <textarea
           ref={taRef}
           rows={1}
           value={text}
           onChange={onChange}
           onKeyDown={onKeyDown}
+          onPaste={(e) => {
+            if (!editing && e.clipboardData?.files?.length) {
+              e.preventDefault();
+              addFiles(e.clipboardData.files);
+            }
+          }}
           onClick={(e) => updateSuggestions(text, e.currentTarget.selectionStart)}
           onBlur={() => setTimeout(() => setSuggest(null), 150)}
-          placeholder={`Nachricht an #${channel.name}`}
+          placeholder={editing ? 'Nachricht bearbeiten' : `Nachricht an #${channel.name}`}
           aria-label={`Nachricht an #${channel.name}`}
           spellCheck
         />
-        <button className="send-btn" onClick={submit} disabled={empty || tooLong} aria-label="Senden" title="Senden (Enter)">
-          ➤
+        <button className="send-btn" onClick={submit} disabled={empty || tooLong} aria-label={editing ? 'Speichern' : 'Senden'} title={editing ? 'Speichern (Enter)' : 'Senden (Enter)'}>
+          {editing ? '✓' : '➤'}
         </button>
       </div>
+      {embedOpen && (
+        <EmbedDialog
+          onClose={() => setEmbedOpen(false)}
+          onAdd={(e) => {
+            setEmbeds((l) => [...l, e].slice(0, 10));
+            setEmbedOpen(false);
+          }}
+        />
+      )}
       <div className="composer__meta">
         <span className="muted small">
           Wird gesendet als <b>{bot?.displayName || 'Bot'}</b> <span className="bot-tag">BOT</span> · Enter senden · Umschalt+Enter neue Zeile · @ erwähnen

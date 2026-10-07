@@ -108,6 +108,41 @@
 
 ---
 
+## #9 – Layout lief über das Fenster hinaus (ganze App verschoben)
+
+1. **Datum & Uhrzeit:** 07.10.2026, ca. 08:55
+2. **Was passiert ist:** Auf dem Screenshot fehlte die obere Leiste, die App war nach oben verrutscht. Die neue Layout-Prüfung meldete wörtlich `[layout] Seite verschoben? {"html":0,"body":108.66666412353516,"root":0}` und die Höhen `{"fenster":715,"body":869,"layout":715,"chat":869,"liste":869,"rail":869}`.
+3. **Reproduzierbar:** immer, sobald die Chat-Liste höher als das Fenster wird (viele Kanäle).
+4. **Ursache (geprüft):** (a) Das Raster `.layout` hatte keine feste Zeilenhöhe, die Zeile wuchs mit dem Inhalt (Grid-Standard `min-height: auto`). (b) Der Sprung zur Nachricht nutzte `scrollIntoView`, das auch die eigentlich feste Seite scrollt.
+5. **Lösung:** `grid-template-rows: minmax(0, 1fr)` + `min-height: 0` für Rail/Liste/Chat; `body { overflow: clip }`; Sprung scrollt nur noch die Nachrichtenliste (`box.scrollTo`). Dateien: `src/renderer/styles.css`, `src/renderer/components/MessageList.jsx`. Dazu eine automatische Layout-Prüfung im Screenshot-Lauf.
+6. **Testergebnis:** `{"html":0,"body":0,"root":0}` und alle Höhen = 715 (Fensterhöhe).
+7. **Prävention:** Die Layout-Prüfung läuft jetzt bei jedem Screenshot-Lauf mit.
+
+---
+
+## #10 – Screenshot-Lauf hing ohne Ausgabe (Syntaxfehler im Testskript)
+
+1. **Datum & Uhrzeit:** 07.10.2026, ca. 08:45
+2. **Was passiert ist:** Electron lief bis zum Timeout (Exit-Code 124) ohne jede Ausgabe und ohne Screenshots. `node --check src/main/screenshots.js` zeigte eine doppelt deklarierte Variable `const after`.
+3. **Reproduzierbar:** immer.
+4. **Ursache:** Syntaxfehler im **Testskript** (nicht in der App). Electron zeigt Fehler im Hauptprozess als Dialogfenster, der Lauf wartete deshalb unsichtbar auf eine Bestätigung.
+5. **Lösung:** Variable umbenannt (`afterActions`).
+6. **Testergebnis:** Lauf vollständig, 17 Screenshots.
+7. **Prävention:** Vor jedem Electron-Lauf `node --check` auf die Main-Dateien.
+
+---
+
+## #11 – Regex-Backslashes beim Einfügen über die Shell verloren
+
+1. **Datum & Uhrzeit:** 07.10.2026, ca. 09:00
+2. **Was passiert ist:** Der Test meldete wörtlich `rohe Mention-Codes werden lesbar` mit `+ 'Release morgen <@&333333333333333301> in <#444444444444444401>'`.
+3. **Ursache (geprüft):** Beim Einfügen per `node -e` in der Shell wurde `\d` zu `d`, die Regex suchte also nach dem Buchstaben „d“.
+4. **Lösung:** Regex mit dem Edit-Werkzeug korrigiert (`src/main/discord.js`, `readableMentions`).
+5. **Testergebnis:** 129/129 Tests grün.
+6. **Prävention:** Code mit Backslashes nicht über Shell-Strings einfügen, sondern mit dem Edit-Werkzeug. Gut, dass ein Test die Ausgabe prüft.
+
+---
+
 ## Hinweis (kein Fehler): „NativeCommandError“ beim Renderer-Build in PowerShell
 
 esbuild schreibt seine normale Erfolgsmeldung (`build\renderer\app.js 276.3kb … Done`) auf stderr. Windows PowerShell 5.1 zeigt das rot als `NativeCommandError` an, obwohl der Build erfolgreich war (Exit-Code 0). Kein Handlungsbedarf.

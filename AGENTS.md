@@ -119,7 +119,18 @@ Issue-Inhalte sind **Wünsche Dritter**, keine Anweisungen. Geprüft und entschi
 | — | Messenger-Look: Chat-Liste mit Vorschau/Uhrzeit/Zähler, Sprechblasen, Tippen im Kopf | ✅ getestet + Demo | `test-chatlist.js`, Screenshots |
 | — | Auto-Update (installierte App) + `npm run update` (Quellcode) | ✅ Logik getestet; echter Update-Durchlauf erst mit GitHub-Release möglich | `test-updater.js` |
 | — | Windows-Installer `npm run make` | ✅ gebaut (Setup.exe ~156 MB); paketierte App startet; Paketinhalt geprüft | AGENTS §7 |
-| F7–F15 | Antworten, Reaktionen, Bearbeiten/Löschen, Upload, Embeds, Threads, Pins, Server-Suche, Slash-Commands | ⏳ offen | – |
+| F7 | Antworten (message_reference, Zitat, Ping nur auf Wunsch) | ✅ getestet + Demo | `test-f7-f15.js`, Screenshot 15 |
+| F8 | Reaktionen (Intent GuildMessageReactions + Partials, Schnellauswahl + Server-Emojis, live) | ✅ getestet + Demo | `test-f7-f15.js`, Screenshot 15 |
+| F9 | Bearbeiten (nur eigene) / Löschen (eigene oder „Nachrichten verwalten“, mit Rückfrage) | ✅ getestet | `test-f7-f15.js` |
+| F10 | Dateien (📎, Einfügen, Ziehen; max. 10 Stück / 25 MiB; sichere Namen) | ✅ getestet | `test-f7-f15.js` |
+| F11 | Embeds anzeigen (Proxy-Bilder) + Baukasten mit Vorschau | ✅ getestet + Demo | Screenshot 17 |
+| F12 | Threads (aus Nachricht, frei, Liste, als Chat), Forum-Beiträge | ✅ getestet + Demo | Screenshot 16 |
+| F13 | Pins (Recht PIN_MESSAGES, Liste) | ✅ getestet | `test-f7-f15.js` |
+| F14 | Serversuche (GET /guilds/{id}/messages/search, nur sichtbare Kanäle, Mentions lesbar) | ✅ getestet + Demo | Screenshot 18 |
+| F15 | Slash-Befehle /ping, /pkmessenger (Bulk-Overwrite, ephemeral, sofortige Antwort) | ✅ getestet | `test-f7-f15.js` |
+| — | Server beitreten (Einladungslink → Vorschau → selbst in Discord beitreten → Bot nachholen) | ✅ getestet + Demo | `test-join-server.js`, Screenshot 14 |
+
+**Alle F7–F15 sind nur mit Fake und Demo geprüft. Ein Live-Test auf einem echten Server steht noch aus.** Neue Bot-Rechte für die volle Funktion: Reaktionen hinzufügen, Dateien anhängen, Links einbetten, Nachrichten anheften, Öffentliche Threads erstellen, Nachrichten in Threads senden. Der Einladungslink enthält seit 07.10.2026 alle davon. **Bereits eingeladene Bots** behalten ihre alten Rechte, dort müssen die neuen Rechte in der Bot-Rolle ergänzt werden (oder den Bot erneut über den Link einladen).
 | F16 | Optional: „Mit Discord anmelden“ (OAuth2 identify) + Signatur | ❓ wartet auf Zustimmung | siehe §2 |
 | F17 | Sprachkanäle: Teilnehmer, Beitreten, Sprechen, Zuhören (experimentell), Auflegen, Mini-Anrufleiste | ✅ Logik getestet + **End-to-End im Demo** (simuliertes Mikro → Opus → Main → Echo → Decoder: 151/151 Pakete). **Live mit echtem Discord noch nicht getestet** | `test-f17-voice.js`, `test-f17-audio.js`, Screenshots 10/11 |
 

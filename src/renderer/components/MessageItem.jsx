@@ -1,6 +1,7 @@
 import { memo, useState } from 'react';
 import { formatShortTime, formatFull, formatDayPill } from '../../shared/format';
 import MessageContent from './MessageContent.jsx';
+import { ReplyQuote, Reactions, Embeds, ThreadChip, MessageActionBar } from './MessageExtras.jsx';
 import { hueFor } from './ChatList.jsx';
 
 function Avatar({ author }) {
@@ -75,6 +76,8 @@ function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
     <div className={cls} data-mid={m.id}>
       {!out && (grouped ? <span className="avatar-spacer" /> : <Avatar author={m.author} />)}
       <div className={`bubble ${grouped ? '' : 'bubble--tail'}`}>
+        <MessageActionBar message={m} out={out} />
+        <ReplyQuote reference={m.reference} />
         {!out && !grouped && (
           <div className="bubble__author" style={{ color: m.author.color || `hsl(${hueFor(m.author.id)} 70% 68%)` }}>
             {m.author.name}
@@ -83,12 +86,15 @@ function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
         )}
         <MessageContent content={m.content} mentions={m.mentions} />
         <Attachments items={m.attachments} />
-        {m.embedsCount > 0 && <div className="muted small">[{m.embedsCount} Embed{m.embedsCount > 1 ? 's' : ''} – Anzeige kommt mit F11]</div>}
+        <Embeds embeds={m.embeds} />
+        <ThreadChip thread={m.thread} />
         <span className="bubble__meta" title={formatFull(m.createdTimestamp)}>
+          {m.pinned && <span title="Angeheftet">📌 </span>}
           {m.editedTimestamp && <span title={`Bearbeitet: ${formatFull(m.editedTimestamp)}`}>bearbeitet · </span>}
           {formatShortTime(m.createdTimestamp)}
           {out && <Tick m={m} />}
         </span>
+        <Reactions message={m} />
       </div>
       {m.failed && (
         <div className="msg__failed">

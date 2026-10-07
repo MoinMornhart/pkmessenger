@@ -11,6 +11,7 @@ import CallView from './CallView.jsx';
 import AccessDialog from './AccessDialog.jsx';
 import SettingsDialog from './SettingsDialog.jsx';
 import JoinServerDialog from './JoinServerDialog.jsx';
+import { ThreadsPanel } from './SidePanels.jsx';
 import { useVoice } from '../voice/useVoice';
 
 const TYPING_MS = 10000;
@@ -33,6 +34,8 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [accessOpen, setAccessOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
+  const [activeThread, setActiveThread] = useState(null); // F12: geöffneter Thread (als Chat)
+  const [forum, setForum] = useState(null); // F12: geöffnetes Forum (Beitragsliste)
   const [refreshing, setRefreshing] = useState(false);
   const lastRefresh = useRef(0);
   const activeRef = useRef(null);
@@ -237,10 +240,31 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
       const c = channelById.get(cid);
       if (!c) return;
       setGuildId(c.guildId);
+      setActiveThread(null);
+      setForum(null);
       setChannelId(cid);
     },
     [channelById],
   );
+
+  // F12: Thread öffnen (aus Nachricht, Thread-Liste oder Forum)
+  const openThread = useCallback(
+    async (threadId) => {
+      try {
+        const t = await api.getThread({ threadId });
+        setActiveThread({ ...t, type: 'thread', canMentionEveryone: false, canPin: true, canCreateThreads: false });
+      } catch (e) {
+        toast({ kind: 'error', title: e.message, text: e.hint });
+      }
+    },
+    [toast],
+  );
+
+  const selectChat = useCallback((id) => {
+    setActiveThread(null);
+    setForum(null);
+    setChannelId(id);
+  }, []);
 
   const selectGuild = useCallback(
     (gid) => {
@@ -346,7 +370,11 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           activeId={channelId}
           isUnread={isUnread}
           unreadCounts={unreadCounts}
-          onSelect={setChannelId}
+          onSelect={selectChat}
+          onOpenForum={(c) => {
+            setActiveThread(null);
+            setForum(c);
+          }}
           status={status}
           hasGuilds={guilds === null || guilds.length > 0}
           loading={guilds === null || (guildId && !channels)}
@@ -379,7 +407,26 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
         {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} />}
-        {channel?.type === 'voice' ? (
+        {activeThread ? (
+          <ChatView
+            key={activeThread.id}
+            guild={guild}
+            channel={activeThread}
+            bot={status.bot}
+            typingNames={[]}
+            onRead={() => {}}
+            toast={toast}
+            searchOpen={searchOpen}
+            onCloseSearch={() => setSearchOpen(false)}
+            onOpenSearch={() => setSearchOpen(true)}
+            allChannels={flatChannels}
+            onOpenThread={openThread}
+            onBack={() => setActiveThread(null)}
+            parentName={(channelById.get(activeThread.parentId) || forum)?.name}
+          />
+        ) : forum ? (
+          <ThreadsPanel key={forum.id} channel={forum} full onOpen={openThread} onClose={() => setForum(null)} toast={toast} />
+        ) : channel?.type === 'voice' ? (
           <CallView
             channel={channel}
             members={(voiceCtl.members[channel.guildId] || {})[channel.id] || []}
@@ -405,6 +452,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
             onCloseSearch={() => setSearchOpen(false)}
             onOpenSearch={() => setSearchOpen(true)}
             allChannels={flatChannels}
+            onOpenThread={openThread}
           />
         )}
         {quickOpen && (

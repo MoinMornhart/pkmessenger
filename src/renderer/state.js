@@ -29,6 +29,12 @@ export const bus = {
 // Navigation & Namensauflösung für Mention-Chips (#kanal anklicken etc.)
 export const NavContext = createContext({ channelName: () => null, openChannel: () => {}, openExternal: () => {} });
 
+// Aktionen an einer Nachricht (F7–F13) – per Context, damit die virtualisierte Liste nicht neu gebaut werden muss
+export const MessageActionsContext = createContext(null);
+
+// Häufige Reaktionen für die Schnellauswahl (F8)
+export const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🎉', '👀', '✅'];
+
 export function randomNonce() {
   const bytes = crypto.getRandomValues(new Uint8Array(12));
   return Array.from(bytes, (b) => (b % 36).toString(36)).join('') + Date.now().toString(36).slice(-6);

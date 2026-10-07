@@ -183,7 +183,7 @@ test('F14 Serversuche: offizieller Endpoint, Filter, nur sichtbare Kanäle, Indi
     return {
       total_results: 2,
       messages: [
-        [{ id: '1', channel_id: world.channels.allgemein.id, author: { username: 'anna', global_name: 'Anna' }, content: 'Release morgen', timestamp: '2026-10-06T10:00:00Z', attachments: [] }],
+        [{ id: '1', channel_id: world.channels.allgemein.id, author: { username: 'anna', global_name: 'Anna' }, content: 'Release morgen <@&333333333333333301> in <#444444444444444401>', timestamp: '2026-10-06T10:00:00Z', attachments: [] }],
         [{ id: '2', channel_id: world.channels.geheim.id, author: { username: 'x' }, content: 'geheim', timestamp: '2026-10-06T10:00:00Z' }],
       ],
     };
@@ -192,6 +192,7 @@ test('F14 Serversuche: offizieller Endpoint, Filter, nur sichtbare Kanäle, Indi
   assert.match(calls[0][0], /\/guilds\/222222222222222222\/messages\/search/);
   assert.equal(calls[0][1], 'content=release&limit=25');
   assert.deepEqual(res.results.map((r) => [r.authorName, r.channelName]), [['Anna', 'allgemein']], 'Treffer aus unsichtbaren Kanälen werden ausgefiltert');
+  assert.equal(res.results[0].content, 'Release morgen @Moderatoren in #allgemein', 'rohe Mention-Codes werden lesbar');
   world.client.rest.get = async () => ({ retry_after: 2.5 });
   assert.deepEqual(await service.searchMessages({ guildId: GUILD_ID, content: 'x' }), { pending: true, retryAfterMs: 2500, total: 0, results: [] });
   assert.throws(() => validators.search({ guildId: GUILD_ID }), /Suchbegriff/);

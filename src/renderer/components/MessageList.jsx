@@ -46,8 +46,10 @@ const PlainRows = forwardRef(function PlainRows({ rows, state, channelName, rend
       if (el.current) el.current.scrollTop = el.current.scrollHeight;
     },
     jumpTo(id) {
-      const target = el.current?.querySelector(`[data-mid="${CSS.escape(id)}"]`);
-      target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      const box = el.current;
+      const target = box?.querySelector(`[data-mid="${CSS.escape(id)}"]`);
+      // Nur die Liste scrollen – scrollIntoView würde auch die (feste) Seite verschieben (Fehler 07.10.2026)
+      if (target) box.scrollTo({ top: Math.max(0, target.offsetTop - box.clientHeight / 2 + target.offsetHeight / 2), behavior: 'smooth' });
       return Boolean(target);
     },
   }));

@@ -129,6 +129,8 @@ function makeChannel(guild, { id, name, type = ChannelType.GuildText, parentId =
       // Wie bei Discord: zeitbasierte, monoton steigende Snowflake-ID (siehe error.md #3).
       const msg = makeMessage({ id: discord.SnowflakeUtil.generate().toString(), channel, author: guild.client.user, content: options.content ?? '', nonce: options.nonce ?? null });
       channel.store.push(msg);
+      // wie Discord: Antwort-Verknüpfung kommt mit der gesendeten Nachricht zurück
+      if (options.reply?.messageReference) msg.reference = { messageId: options.reply.messageReference, channelId: channel.id };
       return msg;
     },
     async sendTyping() {

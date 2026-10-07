@@ -112,6 +112,61 @@ async function runScreenshots(win, dir, { demo, stats }) {
   await shoot(win, dir, '14-server-beitreten');
   const card = await js(win, `document.querySelector('.join__card')?.textContent || '(keine Vorschau)'`);
   console.log(`[join] Vorschau: ${card}`);
+  await js(win, `document.querySelector('.join .icon-btn')?.click()`);
+  await wait(300);
+
+  // ---- F7–F15 ----
+  await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
+  await wait(1200);
+  // Aktionsleiste sichtbar machen (simuliert Hover) und auf "Antworten" klicken
+  await js(win, `(() => { const msgs=[...document.querySelectorAll('.msg--in')]; const m=msgs[msgs.length-1]; m?.classList.add('show-actions'); m?.querySelector('.msg-actions button[aria-label="Antworten"]')?.click(); })()`);
+  await wait(400);
+  await js(win, `(() => { const el=document.querySelector('.composer textarea'); const s=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set; s.call(el,'Stimmt 😄'); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+  await wait(300);
+  await shoot(win, dir, '15-antworten-reaktionen');
+  const shift = await js(win, 'JSON.stringify({ html: document.documentElement.scrollTop, body: document.body.scrollTop, root: document.getElementById("root").scrollTop })');
+  console.log(`[layout] Seite verschoben? ${shift}`);
+  const sizes = await js(win, 'JSON.stringify({ fenster: innerHeight, body: document.body.scrollHeight, layout: document.querySelector(".layout")?.offsetHeight, chat: document.querySelector(".chat")?.offsetHeight, liste: document.querySelector(".chatlist")?.offsetHeight, rail: document.querySelector(".rail")?.offsetHeight })');
+  console.log(`[layout] Höhen: ${sizes}`);
+  const f7 = await js(win, `JSON.stringify({ antwortLeiste: !!document.querySelector('.composer__bar'), reaktionen: document.querySelectorAll('.reaction').length, embeds: document.querySelectorAll('.embed').length, antwortZitate: document.querySelectorAll('.reply-quote').length, threadChips: document.querySelectorAll('.thread-chip').length, pins: [...document.querySelectorAll('.bubble__meta')].filter(x=>x.textContent.includes('📌')).length })`);
+  console.log(`[f7-f15] Ansicht: ${f7}`);
+  await js(win, "document.querySelectorAll('.show-actions').forEach((m) => m.classList.remove('show-actions'))");
+  // Senden der Antwort → Gegenprobe: Antwort-Zitat + Absenden
+  await js(win, `document.querySelector('.composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+  await wait(700);
+  // Reaktion umschalten (👍 ist vom Bot gesetzt → entfernen)
+  await js(win, `[...document.querySelectorAll('.reaction.is-me')][0]?.click()`);
+  await wait(600);
+  const afterActions = await js(win, `JSON.stringify({ gesendeteAntwort: [...document.querySelectorAll('.msg--out')].some(m=>m.textContent.includes('Stimmt') && m.querySelector('.reply-quote')), eigeneReaktionen: document.querySelectorAll('.reaction.is-me').length })`);
+  console.log(`[f7-f15] Nach Aktionen: ${afterActions}`);
+  // Threads-Seitenleiste
+  await js(win, `document.querySelector('.chat__tools button[aria-label="Threads"]')?.click()`);
+  await wait(700);
+  await shoot(win, dir, '16-threads');
+  // Thread öffnen
+  await js(win, `document.querySelector('.thread-hit')?.click()`);
+  await wait(900);
+  const th = await js(win, `document.querySelector('.chat__head h1')?.textContent || ''`);
+  console.log(`[f7-f15] Thread geöffnet: ${th}`);
+  await js(win, `document.querySelector('.chat__head button[aria-label="Zurück"]')?.click()`);
+  await wait(600);
+  // Embed-Baukasten
+  await js(win, `document.querySelector('.tool-btn[aria-label="Embed erstellen"]')?.click()`);
+  await wait(300);
+  await js(win, `(() => { const set=(sel,v,proto)=>{const el=document.querySelector(sel); Object.getOwnPropertyDescriptor(proto.prototype,'value').set.call(el,v); el.dispatchEvent(new Event('input',{bubbles:true}));}; set('#emb-title','Treffen heute',HTMLInputElement); set('#emb-desc','Um **19 Uhr** in der Lounge – bringt Ideen mit!',HTMLTextAreaElement); })()`);
+  await wait(300);
+  await shoot(win, dir, '17-embed-baukasten');
+  await js(win, `[...document.querySelectorAll('.embed-dialog .btn')].find(b=>b.textContent.includes('Abbrechen'))?.click()`);
+  // Serversuche
+  await js(win, `document.querySelector('.chat__tools button[aria-label="Suchen"]')?.click()`);
+  await wait(300);
+  await js(win, `[...document.querySelectorAll('.search-panel__tabs button')].find(b=>b.textContent.includes('Ganzer Server'))?.click()`);
+  await wait(200);
+  await js(win, `(() => { const el=document.querySelector('.search-panel__head input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,'projekt'); el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); })()`);
+  await wait(800);
+  await shoot(win, dir, '18-serversuche');
+  const hits = await js(win, `document.querySelectorAll('.search-hit').length`);
+  console.log(`[f7-f15] Serversuche-Treffer angezeigt: ${hits}`);
 }
 
 module.exports = { runScreenshots };

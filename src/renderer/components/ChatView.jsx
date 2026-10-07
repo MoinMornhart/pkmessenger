@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
-import { messageStore, randomNonce, useChannelMessages } from '../state';
+import { messageStore, randomNonce, useChannelMessages, MessageActionsContext } from '../state';
+import ConfirmDialog from './ConfirmDialog.jsx';
+import { PinsPanel, ThreadsPanel, NameDialog } from './SidePanels.jsx';
 import MessageList from './MessageList.jsx';
 import Composer from './Composer.jsx';
 import SearchPanel from './SearchPanel.jsx';
@@ -44,9 +46,23 @@ function HeaderSubtitle({ names, channel, guild }) {
   );
 }
 
-export default function ChatView({ guild, channel, bot, typingNames, onRead, toast, searchOpen, onCloseSearch, onOpenSearch, allChannels }) {
+export default function ChatView({ guild, channel, bot, typingNames, onRead, toast, searchOpen, onCloseSearch, onOpenSearch, allChannels, onOpenThread, onBack, parentName }) {
   const state = useChannelMessages(channel?.id);
   const listRef = useRef(null);
+  const [replyTo, setReplyTo] = useState(null); // F7
+  const [editing, setEditing] = useState(null); // F9
+  const [confirmDelete, setConfirmDelete] = useState(null); // F9
+  const [threadFrom, setThreadFrom] = useState(null); // F12: Thread aus Nachricht starten
+  const [panel, setPanel] = useState(null); // 'pins' | 'threads'
+  const [emojis, setEmojis] = useState([]); // F8 Server-Emojis
+
+  useEffect(() => {
+    if (guild?.id) api.listEmojis({ guildId: guild.id }).then(setEmojis).catch(() => setEmojis([]));
+  }, [guild?.id]);
+
+  useEffect(() => {
+    if (searchOpen) setPanel(null);
+  }, [searchOpen]);
 
   useEffect(() => {
     if (channel) messageStore.loadInitial(channel.id);
@@ -66,8 +82,9 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
   }, [channel, newestId, onRead]);
 
   const send = useCallback(
-    async ({ content, mentions }) => {
+    async ({ content, mentions, files = [], embeds = [], replyTo: replyId = null, pingReply = false }) => {
       const nonce = randomNonce();
+      const replied = replyId ? state.messages.find((x) => x.id === replyId) : null;
       // Optimistisch: sofort anzeigen, Discord-Bestätigung ersetzt den Platzhalter (über die Nonce).
       messageStore.addPending(channel.id, {
         id: `pending-${nonce}`,
@@ -78,24 +95,28 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
         createdTimestamp: Date.now(),
         author: { id: bot?.id || 'bot', name: bot?.displayName || 'Bot', avatarUrl: bot?.avatarUrl, bot: true, color: null },
         mentions: { users: [], roles: [], channels: [], everyone: false },
-        attachments: [],
-        embedsCount: 0,
+        attachments: files.map((f, i) => ({ id: `p${i}`, name: f.name, size: f.data.byteLength, url: '', contentType: null })),
+        embedsCount: embeds.length,
+        embeds: [],
+        reactions: [],
+        reference: replyId ? { messageId: replyId, authorName: replied?.author?.name ?? null, text: (replied?.content || '').slice(0, 100) } : null,
+        sendArgs: { files, embeds, replyTo: replyId, pingReply },
       });
       listRef.current?.scrollToBottom();
       try {
-        const msg = await api.sendMessage({ channelId: channel.id, content, mentions, nonce });
+        const msg = await api.sendMessage({ channelId: channel.id, content, mentions, nonce, files, embeds, replyTo: replyId || undefined, pingReply });
         messageStore.upsertConfirmed(msg);
       } catch (e) {
         messageStore.markFailed(channel.id, nonce, { message: e.message, hint: e.hint, code: e.code });
       }
     },
-    [channel, bot],
+    [channel, bot, state.messages],
   );
 
   const retry = useCallback(
     (m) => {
       messageStore.discardLocal(m.channelId, m.nonce);
-      send({ content: m.content, mentions: m.sendMentions || { users: [], roles: [], everyone: false } });
+      send({ content: m.content, mentions: m.sendMentions || { users: [], roles: [], everyone: false }, ...(m.sendArgs || {}) });
     },
     [send],
   );
@@ -107,6 +128,60 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
       if (!listRef.current?.jumpTo(id)) toast({ kind: 'warn', title: 'Nachricht ist nicht mehr geladen.' });
     },
     [toast],
+  );
+
+  const fail = useCallback((e) => toast({ kind: 'error', title: e.message, text: e.hint }), [toast]);
+
+  // Aktionen an Nachrichten (F7–F13), per Context an jede Sprechblase
+  const actions = useMemo(
+    () => ({
+      caps: {
+        canSend: Boolean(channel?.canSend),
+        canThread: Boolean(channel?.canCreateThreads) && channel?.type !== 'thread',
+        canPin: Boolean(channel?.canPin),
+      },
+      emojis,
+      jump,
+      reply: (m) => {
+        setEditing(null);
+        setReplyTo(m);
+      },
+      react: (m, emoji, add) =>
+        api
+          .react({ channelId: m.channelId, messageId: m.id, emoji, add })
+          .then((msg) => messageStore.upsertConfirmed(msg))
+          .catch(fail),
+      edit: (m) => {
+        setReplyTo(null);
+        setEditing(m);
+      },
+      remove: (m) => setConfirmDelete(m),
+      pin: (m, pin) =>
+        api
+          .setPinned({ channelId: m.channelId, messageId: m.id, pin })
+          .then((msg) => {
+            messageStore.upsertConfirmed(msg);
+            toast({ kind: 'info', title: pin ? 'Angeheftet 📌' : 'Gelöst', duration: 2000 });
+          })
+          .catch(fail),
+      startThread: (m) => setThreadFrom(m),
+      openThread: (id) => onOpenThread?.(id),
+    }),
+    [channel, emojis, jump, fail, toast, onOpenThread],
+  );
+
+  const saveEdit = useCallback(
+    async ({ content, mentions }) => {
+      const m = editing;
+      setEditing(null);
+      if (!m) return;
+      try {
+        messageStore.upsertConfirmed(await api.editMessage({ channelId: m.channelId, messageId: m.id, content, mentions }));
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [editing, fail],
   );
 
   if (!guild || !channel) {
@@ -123,17 +198,35 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
   return (
     <main className="chat">
       <header className="chat__head">
+        {onBack && (
+          <button className="icon-btn icon-btn--lg" onClick={onBack} title={`Zurück zu #${parentName || 'Kanal'}`} aria-label="Zurück">
+            ←
+          </button>
+        )}
         <ChannelAvatar channel={channel} size={40} />
         <div className="chat__title">
-          <h1>{channel.name}</h1>
-          <HeaderSubtitle names={typingNames} channel={channel} guild={guild} />
+          <h1>{channel.type === 'thread' ? `🧵 ${channel.name}` : channel.name}</h1>
+          {channel.type === 'thread' ? (
+            <span className="chat__sub">Thread in #{parentName || '…'}</span>
+          ) : (
+            <HeaderSubtitle names={typingNames} channel={channel} guild={guild} />
+          )}
         </div>
         <div className="chat__tools">
-          <button className="icon-btn icon-btn--lg" onClick={onOpenSearch} title="Im Chat suchen (Strg+F)" aria-label="Im Chat suchen">
+          {channel.type !== 'thread' && (
+            <button className={`icon-btn icon-btn--lg ${panel === 'threads' ? 'is-on' : ''}`} onClick={() => setPanel((p) => (p === 'threads' ? null : 'threads'))} title="Threads" aria-label="Threads">
+              🧵
+            </button>
+          )}
+          <button className={`icon-btn icon-btn--lg ${panel === 'pins' ? 'is-on' : ''}`} onClick={() => setPanel((p) => (p === 'pins' ? null : 'pins'))} title="Angeheftete Nachrichten" aria-label="Angeheftete Nachrichten">
+            📌
+          </button>
+          <button className="icon-btn icon-btn--lg" onClick={onOpenSearch} title="Suchen (Strg+F)" aria-label="Suchen">
             ⌕
           </button>
         </div>
       </header>
+      <MessageActionsContext.Provider value={actions}>
       <div className="chat__main">
         <div className="chat__col">
           {state.status === 'error' ? (
@@ -169,10 +262,66 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
           ) : (
             <MessageList ref={listRef} channel={channel} state={state} onLoadOlder={loadOlder} onRetry={retry} onDiscard={discard} />
           )}
-          <Composer guild={guild} channel={channel} bot={bot} allChannels={allChannels} onSend={send} />
+          <Composer
+            guild={guild}
+            channel={channel}
+            bot={bot}
+            allChannels={allChannels}
+            onSend={send}
+            replyTo={replyTo}
+            onCancelReply={() => setReplyTo(null)}
+            editing={editing}
+            onCancelEdit={() => setEditing(null)}
+            onSaveEdit={saveEdit}
+          />
         </div>
-        {searchOpen && <SearchPanel messages={state.messages} onJump={jump} onClose={onCloseSearch} />}
+        {searchOpen && <SearchPanel messages={state.messages} guild={guild} channelId={channel.id} onJump={jump} onClose={onCloseSearch} toast={toast} />}
+        {!searchOpen && panel === 'pins' && <PinsPanel channel={channel} onJump={jump} onClose={() => setPanel(null)} toast={toast} />}
+        {!searchOpen && panel === 'threads' && <ThreadsPanel channel={channel} onOpen={(id) => onOpenThread?.(id)} onClose={() => setPanel(null)} toast={toast} />}
       </div>
+      </MessageActionsContext.Provider>
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Nachricht löschen?"
+          onClose={() => setConfirmDelete(null)}
+          actions={[
+            {
+              label: 'Löschen',
+              kind: 'danger',
+              onClick: () => {
+                const m = confirmDelete;
+                setConfirmDelete(null);
+                api
+                  .deleteMessage({ channelId: m.channelId, messageId: m.id })
+                  .then((r) => messageStore.remove(r))
+                  .catch(fail);
+              },
+            },
+            { label: 'Abbrechen', kind: 'ghost', autoFocus: true, onClick: () => setConfirmDelete(null) },
+          ]}
+        >
+          <p>„{(confirmDelete.content || '').slice(0, 120) || 'Nachricht'}“ wird für alle gelöscht. Das lässt sich nicht rückgängig machen.</p>
+        </ConfirmDialog>
+      )}
+      {threadFrom && (
+        <NameDialog
+          title="Thread starten"
+          label="Name des Threads"
+          initial={(threadFrom.content || 'Thread').replace(/\s+/g, ' ').slice(0, 60)}
+          confirmLabel="Thread erstellen"
+          onClose={() => setThreadFrom(null)}
+          onConfirm={async (name) => {
+            const m = threadFrom;
+            setThreadFrom(null);
+            try {
+              const t = await api.createThread({ channelId: m.channelId, name, messageId: m.id });
+              onOpenThread?.(t.id);
+            } catch (e) {
+              fail(e);
+            }
+          }}
+        />
+      )}
     </main>
   );
 }

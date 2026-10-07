@@ -42,10 +42,19 @@ PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau
 | @ **Erwähnungen** | `@` tippen → Personen und Rollen vorschlagen lassen. `#` → Kanäle. Gepingt wird nur, wen du wirklich auswählst |
 | 🛡️ **Schutz vor Massen-Ping** | `@everyone` und `@here` gehen nur nach einer Rückfrage raus |
 | 🔊 **Sprachkanäle** | Beitreten, über den Bot sprechen, die anderen hören, Mikro und Ton schalten, auflegen |
-| 🔍 **Schnell finden** | <kbd>Strg</kbd>+<kbd>K</kbd> springt zu jedem Chat, <kbd>Strg</kbd>+<kbd>F</kbd> sucht im Verlauf und springt zur Nachricht |
+| ↩️ **Antworten** | Auf Nachrichten antworten, mit Zitat; der Verfasser wird nur gepingt, wenn du es willst |
+| 😊 **Reaktionen** | Mit Emojis reagieren (auch eigene Server-Emojis), live aktualisiert |
+| ✏️ **Bearbeiten & Löschen** | Eigene Nachrichten nachträglich ändern oder löschen (mit Rückfrage) |
+| 📎 **Dateien & Bilder** | Per 📎, Strg+V oder Ziehen – bis 25 MiB pro Nachricht |
+| ▤ **Embeds** | Hübsche Info-Karten mit Titel, Text, Farbe und Live-Vorschau |
+| 🧵 **Threads & Foren** | Threads starten und lesen, Forum-Beiträge ansehen und erstellen |
+| 📌 **Pins** | Wichtige Nachrichten anheften, Liste aller angehefteten Nachrichten |
+| 🔍 **Schnell finden** | <kbd>Strg</kbd>+<kbd>K</kbd> springt zu jedem Chat, <kbd>Strg</kbd>+<kbd>F</kbd> sucht im Chat **oder im ganzen Server** |
+| 🔗 **Server beitreten** | Einladungslink einfügen → Vorschau → selbst in Discord beitreten → Bot mit einem Klick nachholen |
+| ⌨️ **Slash-Befehle** | <code>/ping</code> und <code>/pkmessenger</code> funktionieren auf deinen Servern |
 | 🔄 **Auto-Update** | Neue Versionen kommen automatisch, ohne Neuinstallation |
 | 🇩🇪 **Komplett auf Deutsch** | Oberfläche, Datumsangaben und verständliche Fehlermeldungen mit „Was kann ich tun?“ |
-| 🔒 **Privat** | Keine Cloud, keine Werbung, keine Telemetrie. Dein Bot-Token bleibt nur auf deinem PC |
+| 🔒 **Privat & sicher** | Keine Cloud, keine Werbung, keine Telemetrie. Dein Bot-Token wird **verschlüsselt** (Windows-Datenschutz) nur auf deinem PC gespeichert |
 
 <table>
   <tr>
@@ -55,6 +64,23 @@ PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau
   <tr>
     <td><img src="docs/images/schnellsuche.png" alt="Schnellsuche mit Strg+K"><br><sub><b>Strg+K:</b> Zu jedem Chat springen.</sub></td>
     <td><img src="docs/images/suche.png" alt="Suche im Verlauf mit Strg+F"><br><sub><b>Strg+F:</b> Im Verlauf suchen, Treffer anklicken, hinspringen.</sub></td>
+  </tr>
+</table>
+
+---
+
+## 💬 Alles, was ein Messenger braucht
+
+<img src="docs/images/antworten-reaktionen.png" alt="Antworten mit Zitat, Reaktionen, Embed-Karte und Aktionsleiste" width="900">
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/threads.png" alt="Threads-Seitenleiste"><br><sub><b>Threads:</b> starten, lesen, antworten.</sub></td>
+    <td width="50%"><img src="docs/images/serversuche.png" alt="Serverweite Suche"><br><sub><b>Suche im ganzen Server</b> (offizielle Discord-Suche).</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/embed.png" alt="Embed-Baukasten mit Vorschau"><br><sub><b>Embed-Baukasten</b> mit Live-Vorschau.</sub></td>
+    <td><img src="docs/images/server-beitreten.png" alt="Server beitreten mit Vorschau"><br><sub><b>Server beitreten:</b> selbst in Discord beitreten, Bot nachholen.</sub></td>
   </tr>
 </table>
 
@@ -93,7 +119,7 @@ PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau
 Die App zeigt dir diese Schritte auch selbst an:
 
 1. **Bot anlegen:** Öffne das [Discord Developer Portal](https://discord.com/developers/applications) → **New Application** → Namen vergeben → links **Bot** → **Reset Token** → Token **einmal** kopieren.
-2. **Token eintragen:** In PKMessenger auf **„.env-Datei öffnen“** klicken, den Token hinter `DISCORD_TOKEN=` einfügen, speichern.
+2. **Token eintragen:** In PKMessenger den Token ins Feld einfügen und **„Speichern & verbinden“** klicken. Er wird sofort **verschlüsselt** gespeichert (an dein Windows-Konto gebunden) und nie wieder angezeigt. Ändern kannst du ihn später unter ⚙ Einstellungen.
    > 🔐 Den Token **nie** weitergeben, posten oder abfotografieren. Er ist das Passwort deines Bots. Falls er doch irgendwo landet: im Portal sofort **Reset Token**.
 3. **Message Content Intent einschalten:** Im Portal unter **Bot → Privileged Gateway Intents** nur **Message Content Intent** aktivieren. *Server Members* und *Presence* bleiben aus, die braucht PKMessenger nicht.
 4. **Bot einladen:** Die App zeigt dir den fertigen **Einladungslink** an. Er enthält genau die nötigen Rechte: Kanäle ansehen, Nachrichten senden, Verlauf lesen, Reaktionen, Dateien, Links einbetten, Verbinden, Sprechen.
@@ -197,15 +223,18 @@ Mehr Details: [AGENTS.md](AGENTS.md) (Architektur, Entscheidungen, Teststand) ·
 
 ## 🗺️ Geplant
 
-- [ ] Auf Nachrichten antworten (mit Zitat-Vorschau)
-- [ ] Reaktionen mit Emoji-Auswahl
-- [ ] Eigene Nachrichten bearbeiten und löschen
-- [ ] Dateien und Bilder senden (bis 25 MiB)
-- [ ] Embeds anzeigen und erstellen
-- [ ] Threads
-- [ ] Angepinnte Nachrichten
-- [ ] Serverweite Suche
-- [ ] Slash-Befehle
+- [x] Auf Nachrichten antworten (mit Zitat-Vorschau)
+- [x] Reaktionen mit Emoji-Auswahl
+- [x] Eigene Nachrichten bearbeiten und löschen
+- [x] Dateien und Bilder senden (bis 25 MiB)
+- [x] Embeds anzeigen und erstellen
+- [x] Threads und Forum-Beiträge
+- [x] Angeheftete Nachrichten
+- [x] Serverweite Suche
+- [x] Slash-Befehle (<code>/ping</code>, <code>/pkmessenger</code>)
+- [x] Sprachkanäle, Server beitreten, verschlüsselter Token, Einstellungen
+- [ ] Live-Test aller Funktionen auf einem echten Server
+- [ ] Helles Design und eigene Akzentfarben
 
 ---
 

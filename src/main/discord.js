@@ -286,6 +286,11 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         canSend: !other && can(ch, PermissionFlagsBits.SendMessages),
         canReadHistory: !other && can(ch, PermissionFlagsBits.ReadMessageHistory),
         canMentionEveryone: can(ch, PermissionFlagsBits.MentionEveryone),
+        // F7–F13: damit die Oberfläche nur Knöpfe zeigt, die auch funktionieren
+        canPin: !other && can(ch, PermissionFlagsBits.PinMessages ?? PermissionFlagsBits.ManageMessages),
+        canCreateThreads: other === 'forum' ? can(ch, PermissionFlagsBits.SendMessages) : !other && can(ch, PermissionFlagsBits.CreatePublicThreads),
+        canAttach: !other && can(ch, PermissionFlagsBits.AttachFiles),
+        canEmbed: !other && can(ch, PermissionFlagsBits.EmbedLinks),
       });
     }
     return [...groups.values()]
@@ -389,8 +394,9 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       color: Number.isFinite(e?.color) ? `#${e.color.toString(16).padStart(6, '0')}` : null,
       author: e?.author?.name ? { name: s(e.author.name, 256), url: s(e.author.url, 2048), iconUrl: s(e.author.iconURL ?? e.author.icon_url, 2048) } : null,
       fields: (Array.isArray(e?.fields) ? e.fields : []).slice(0, 25).map((f) => ({ name: s(f?.name, 256) ?? '', value: s(f?.value, 1024) ?? '', inline: Boolean(f?.inline) })),
-      image: s(e?.image?.url, 2048),
-      thumbnail: s(e?.thumbnail?.url, 2048),
+      // Discord-Proxy-Adresse bevorzugen (CSP erlaubt nur Discord-CDN; schützt vor Tracking durch fremde Server)
+      image: s(e?.image?.proxyURL ?? e?.image?.proxy_url ?? e?.image?.url, 2048),
+      thumbnail: s(e?.thumbnail?.proxyURL ?? e?.thumbnail?.proxy_url ?? e?.thumbnail?.url, 2048),
       footer: e?.footer?.text ? s(e.footer.text, 2048) : null,
       timestamp: e?.timestamp ? Date.parse(e.timestamp) || null : null,
     };
@@ -530,7 +536,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     })();
     if (!appId) return null;
     const P = PermissionFlagsBits;
-    const permissions = [P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AddReactions, P.AttachFiles, P.EmbedLinks, P.Connect, P.Speak].reduce((a, b) => a | b, 0n);
+    const permissions = [P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AddReactions, P.AttachFiles, P.EmbedLinks, P.Connect, P.Speak, P.PinMessages, P.CreatePublicThreads, P.SendMessagesInThreads].filter((x) => typeof x === "bigint").reduce((a, b) => a | b, 0n);
     const preselect = guildId ? `&guild_id=${guildId}&disable_guild_select=true` : '';
     return `https://discord.com/oauth2/authorize?client_id=${appId}&scope=bot+applications.commands&permissions=${permissions}${preselect}`;
   }
@@ -793,11 +799,19 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         channelId: m.channel_id,
         channelName: (guild.channels.cache.get(m.channel_id) || client.channels.cache.get(m.channel_id))?.name ?? null,
         authorName: m.member?.nick || m.author?.global_name || m.author?.username || 'Unbekannt',
-        content: typeof m.content === 'string' ? m.content.slice(0, 300) : '',
+        content: typeof m.content === 'string' ? readableMentions(guild, m.content).slice(0, 300) : '',
         timestamp: Date.parse(m.timestamp) || null,
         hasAttachments: Array.isArray(m.attachments) && m.attachments.length > 0,
       }));
     return { pending: false, total: Number(data?.total_results) || results.length, results };
+  }
+
+  // Suchtreffer kommen als rohe API-Daten: <@id>, <@&id>, <#id> lesbar machen (Namen aus dem Cache)
+  function readableMentions(guild, text) {
+    return text
+      .replace(/<@!?(\d{17,20})>/g, (_, id) => `@${displayNameOf(client.users?.cache?.get?.(id), guild.members?.cache?.get?.(id))}`)
+      .replace(/<@&(\d{17,20})>/g, (_, id) => `@${guild.roles?.cache?.get?.(id)?.name ?? 'Rolle'}`)
+      .replace(/<#(\d{17,20})>/g, (_, id) => `#${guild.channels?.cache?.get?.(id)?.name ?? 'kanal'}`);
   }
 
   // ---------- F8 Emoji-Auswahl: eigene Server-Emojis ----------
