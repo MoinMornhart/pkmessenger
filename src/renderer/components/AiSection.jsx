@@ -247,26 +247,27 @@ function WebToggle({ checked, onChange }) {
 // Personen aus der Mitgliederliste der Server suchen und hinzufügen
 function PeoplePicker({ label, people, onChange, guilds }) {
   const [query, setQuery] = useState('');
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(null); // null = (noch) nicht gesucht
+  const [open, setOpen] = useState(false); // Feld aktiv → Vorschläge zeigen, auch ohne Eingabe (Issue #1)
   useEffect(() => {
-    if (!query.trim() || !guilds.length) {
-      setItems([]);
+    if (!open || !guilds.length) {
+      setItems(null);
       return undefined;
     }
     let cancelled = false;
     const t = setTimeout(async () => {
+      const q = query.trim().slice(0, 32);
+      // Alle Server gleichzeitig fragen (höchstens 10) – Treffer auch mitten im Namen
+      const lists = await Promise.all(guilds.slice(0, 10).map((g) => api.searchMentionables({ guildId: g.id, query: q }).catch(() => [])));
       const found = new Map();
-      for (const g of guilds.slice(0, 5)) {
-        const res = await api.searchMentionables({ guildId: g.id, query: query.trim().slice(0, 32) }).catch(() => []);
-        for (const u of res) if (u.kind === 'user' && !found.has(u.id)) found.set(u.id, { id: u.id, name: u.display });
-      }
-      if (!cancelled) setItems([...found.values()].filter((u) => !people.some((p) => p.id === u.id)).slice(0, 6));
+      for (const res of lists) for (const u of res) if (u.kind === 'user' && !u.bot && !found.has(u.id)) found.set(u.id, { id: u.id, name: u.display, sub: u.sub });
+      if (!cancelled) setItems([...found.values()].filter((u) => !people.some((p) => p.id === u.id)).slice(0, 8));
     }, 200);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [query, guilds, people]);
+  }, [open, query, guilds, people]);
   return (
     <div className="ai-people">
       <span className="settings__label">{label}</span>
@@ -279,22 +280,34 @@ function PeoplePicker({ label, people, onChange, guilds }) {
             </button>
           </span>
         ))}
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name suchen …" aria-label={`${label}: Name suchen`} />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 200)} // Klick auf einen Vorschlag noch zulassen
+          placeholder="Name suchen …"
+          aria-label={`${label}: Name suchen`}
+        />
       </div>
-      {items.length > 0 && (
+      {open && items && items.length > 0 && (
         <div className="ai-suggest">
           {items.map((u) => (
             <button
               key={u.id}
+              onMouseDown={(e) => e.preventDefault()} // Fokus behalten → Liste bleibt offen
               onClick={() => {
-                onChange([...people, u]);
+                onChange([...people, { id: u.id, name: u.name }]);
                 setQuery('');
               }}
             >
               ＋ {u.name}
+              {u.sub && u.sub !== u.name && <span className="muted small"> @{u.sub}</span>}
             </button>
           ))}
         </div>
+      )}
+      {open && items && items.length === 0 && (
+        <p className="muted small">{query.trim() ? `Niemand mit „${query.trim()}“ gefunden. Tipp: Anfang des Namens tippen (z. B. „Mo“).` : 'Noch keine bekannten Personen – einfach einen Namen tippen.'}</p>
       )}
     </div>
   );

@@ -571,12 +571,17 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     if (q.length === 0) {
       members = [...guild.members.cache.values()].slice(0, 8);
     } else {
+      // Bekannte Personen, deren Name den Text IRGENDWO enthält („o“ findet „MoinMornhart“) …
+      const known = [...guild.members.cache.values()].filter((m) => m.displayName.toLowerCase().includes(q) || m.user.username.toLowerCase().includes(q));
+      let searched = [];
       try {
-        // "Search Guild Members" braucht laut Doku KEIN privilegiertes GuildMembers-Intent.
-        members = [...(await guild.members.search({ query, limit: 8 })).values()];
+        // … plus Discords Mitgliedersuche (findet nur Namen, die SO ANFANGEN). Braucht laut Doku kein GuildMembers-Intent.
+        searched = [...(await guild.members.search({ query, limit: 8 })).values()];
       } catch {
-        members = [...guild.members.cache.values()].filter((m) => m.displayName.toLowerCase().includes(q) || m.user.username.toLowerCase().includes(q)).slice(0, 8);
+        searched = [];
       }
+      const seen = new Set();
+      members = [...searched, ...known].filter((m) => !seen.has(m.id) && seen.add(m.id)).slice(0, 8);
     }
     const users = members.map((m) => ({
       kind: 'user',

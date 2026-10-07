@@ -107,6 +107,8 @@ const updater = createUpdater({
   emit: broadcast,
   // Installiert per PKMessenger-Setup.exe? Dann liegt Squirrels Update.exe eine Ebene über der App.
   squirrelInstalled: demo ? true : fs.existsSync(path.join(path.dirname(process.execPath), '..', 'Update.exe')),
+  // Demo: GitHub-Abfrage simuliert (kein Netz) – „neueste Version“ = eigene Version
+  ...(demo ? { fetchImpl: () => new Promise((r) => setTimeout(() => r({ ok: true, json: async () => ({ tag_name: `v${app.getVersion()}` }) }), 800)) } : {}),
 });
 
 // Eigener Benachrichtigungston: geprüfte WAV-Datei im App-Ordner (keine Geheimnisse, kein Netz)

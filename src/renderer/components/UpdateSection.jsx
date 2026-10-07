@@ -25,7 +25,7 @@ export default function UpdateSection({ appInfo, toast }) {
     if (!waiting || !DONE.has(u.state) || u.lastChecked < waiting) return;
     clearTimeout(timer.current);
     setWaiting(false);
-    if (u.state === 'current') toast({ kind: 'info', title: 'Kein Update nötig ✓', text: `Du hast die neueste Version (v${appInfo?.version}).`, duration: 4000 });
+    if (u.state === 'current') toast({ kind: 'info', title: 'Kein Update nötig ✓', text: `Du hast die neueste Version (v${appInfo?.version}).${u.latest ? ' Direkt bei GitHub geprüft.' : ''}`, duration: 4000 });
     else if (u.state === 'downloading') toast({ kind: 'info', title: 'Neue Version gefunden 🎉', text: 'Sie wird im Hintergrund geladen. Danach erscheint „Jetzt neu starten“.' });
     else if (u.state === 'ready') toast({ kind: 'info', title: 'Update bereit', text: 'Klicke auf „Jetzt neu starten“, um es zu installieren.' });
     else toast({ kind: 'error', title: u.error?.message || 'Update-Prüfung fehlgeschlagen', text: u.error?.hint });

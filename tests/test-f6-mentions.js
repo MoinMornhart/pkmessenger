@@ -106,3 +106,12 @@ test('Mention-Suche fällt auf den Cache zurück, wenn der Endpoint scheitert', 
   const res = await service.searchMentionables({ guildId: GUILD_ID, query: 'ann' });
   assert.deepEqual(res.filter((r) => r.kind === 'user').map((r) => r.display), ['Anna']);
 });
+
+test('Personensuche findet auch Namen, die den Text nur ENTHALTEN („o“ → MoinMornhart, Issue #1)', async () => {
+  const { service, world } = await readyService();
+  world.addMember(U, 'MoinMornhart');
+  world.addMember('555555555555555556', 'Otto');
+  const res = await service.searchMentionables({ guildId: GUILD_ID, query: 'o' });
+  const users = res.filter((r) => r.kind === 'user').map((r) => r.display);
+  assert.deepEqual(users, ['Otto', 'MoinMornhart']); // zuerst „fängt so an“, dann „enthält“ – ohne Doppelte
+});
