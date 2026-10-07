@@ -52,6 +52,20 @@ jobs:
       create_tag: ${{ steps.check.outputs.create_tag }}
 
     steps:
+      # „Run workflow“ mit einem Tag, den es (noch) nicht gibt, scheiterte sonst mit einer unverständlichen Git-Meldung
+      - name: Angegebenen Tag prüfen (nur manuell)
+        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          if ! gh api "repos/$REPO/git/ref/tags/$INPUT_TAG" >/dev/null 2>&1; then
+            echo "::error::Den Tag $INPUT_TAG gibt es nicht. Für ein neues Update einfach die Version in package.json erhöhen und nach main bringen – der Tag entsteht dann automatisch."
+            exit 1
+          fi
+
       - name: Repository auschecken
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -93,14 +107,17 @@ jobs:
             echo "✔ Ziel-Commit: $TARGET_SHA"
 
             # Prüfen, ob der Tag bereits existiert.
-            # Ein vorhandener Tag darf nur akzeptiert werden, wenn er exakt
-            # auf denselben Commit zeigt.
+            # Ein vorhandener Tag wird nie verschoben. Zeigt er auf einen älteren Commit, ist diese
+            # Version schon veröffentlicht (z. B. package.json nur wegen Abhängigkeiten geändert) → überspringen.
             if EXISTING_SHA="$(gh api "repos/$REPO/commits/$TAG" --jq .sha 2>/dev/null)"; then
               if [ "$EXISTING_SHA" != "$TARGET_SHA" ]; then
-                echo "::error::Tag $TAG existiert bereits auf $EXISTING_SHA."
-                echo "::error::Erwartet wurde der geprüfte Commit $TARGET_SHA."
-                echo "::error::Der Tag wird aus Sicherheitsgründen nicht verschoben."
-                exit 1
+                echo "ℹ Version $VERSION ist schon veröffentlicht (Tag $TAG auf $EXISTING_SHA) – nichts zu tun."
+                echo "ℹ Für ein neues Update die Version in package.json erhöhen."
+                {
+                  echo "skip=true"
+                  echo "tag=$TAG"
+                } >> "$GITHUB_OUTPUT"
+                exit 0
               fi
 
               echo "ℹ Tag $TAG existiert bereits korrekt."
