@@ -2971,3 +2971,27 @@ img.chat-avatar {
     transform: translateX(4px) rotate(-12deg) scale(0.92);
   }
 }
+
+
+/* ---------- Systemnachrichten (Beitritt, Boost, Pin …) ---------- */
+.msg--system {
+  justify-content: center;
+}
+.sysmsg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(80%, 640px);
+  padding: 5px 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: center;
+}
+.sysmsg__time {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
