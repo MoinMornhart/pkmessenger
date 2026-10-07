@@ -231,10 +231,17 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     // Mitmachen: Chat anklicken → Tour geht von selbst weiter
     await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
     await wait(1400);
-    const t4 = await card(); // „Rechtsklick auf einen Chat“
-    await next();
+    const t4 = await card(); // „Rechtsklick auf einen Chat“ (Mitmachen)
+    // Echter Rechtsklick → Menü geht auf und muss im Licht liegen (Issue #35)
+    await js(win, `(() => { const r=document.querySelector('.chatlist__items .chatrow'); const b=r.getBoundingClientRect(); r.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:b.left+80,clientY:b.top+30})); })()`);
+    await wait(1300);
+    const t4b = await card();
+    await shoot(win, dir, '56b-tour-rechtsklick-menue');
+    const menuLit = await js(win, `(() => { const m=document.querySelector('.ctx-menu')?.getBoundingClientRect(); const r=document.querySelector('.tour__ring')?.getBoundingClientRect(); return Boolean(m && r && m.left>=r.left-1 && m.right<=r.right+1 && m.top>=r.top-1 && m.bottom<=r.bottom+1); })()`);
+    console.log(`[tour-menue] nach Rechtsklick: ${t4b} · Menü im Licht: ${menuLit}`);
+    await next(); // „Das kurze Menü“ → „Oben in der Liste“
     await wait(300);
-    await next(); // „Oben in der Liste“ → „Schreiben“
+    await next(); // → „Schreiben“
     await wait(400);
     await js(win, typeInto('.composer textarea', '/'));
     await wait(300);
