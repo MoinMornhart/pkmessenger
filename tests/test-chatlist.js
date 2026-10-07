@@ -24,7 +24,8 @@ test('Vorschau: letzte Nachricht je sichtbarem Kanal mit Verlaufs-Recht', async 
   assert.equal(previews[ch.id].isOwn, false);
   assert.equal(world.channels.blindHistory.messages.fetchCalls.length, 0);
   assert.equal(world.channels.geheim.messages.fetchCalls.length, 0);
-  assert.deepEqual(ch.messages.fetchCalls, [{ limit: 1 }], 'genau 1 Nachricht pro Kanal');
+  // Liegt die letzte Nachricht schon im Speicher, wird sie ohne Anfrage benutzt; sonst genau 1 Nachricht pro Kanal
+  assert.ok(ch.messages.fetchCalls.length === 0 || JSON.stringify(ch.messages.fetchCalls) === JSON.stringify([{ limit: 1 }]));
 });
 
 test('Vorschau: Fehler in einem Kanal bricht die Liste nicht ab', async () => {

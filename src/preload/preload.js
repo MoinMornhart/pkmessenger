@@ -17,6 +17,8 @@ const EVENT_TYPES = new Set([
   'voice:state',
   'voice:speaking',
   'voice:members',
+  'threads:changed',
+  'interaction',
 ]);
 
 const call = (channel) => (payload) => ipcRenderer.invoke(channel, payload);
@@ -44,6 +46,17 @@ contextBridge.exposeInMainWorld('api', {
   tokenSave: call('pk:token-save'),
   tokenClear: call('pk:token-clear'),
   invitePreview: call('pk:invite-preview'),
+  editMessage: call('pk:edit-message'),
+  deleteMessage: call('pk:delete-message'),
+  react: call('pk:react'),
+  listPins: call('pk:list-pins'),
+  setPinned: call('pk:set-pinned'),
+  listThreads: call('pk:list-threads'),
+  createThread: call('pk:create-thread'),
+  getThread: call('pk:get-thread'),
+  searchMessages: call('pk:search-messages'),
+  listEmojis: call('pk:list-emojis'),
+  commandsState: call('pk:commands-state'),
   refresh: call('pk:refresh'),
   channelAccess: call('pk:channel-access'),
   // Sprachkanäle

@@ -19,7 +19,7 @@ const FATAL_CLOSE_CODES = new Set([4004, 4010, 4011, 4012, 4013, 4014]);
  * @param {() => object} [opts.createClient]  Fabrik für den Client (Tests)
  */
 function createDiscordService({ discord, envPath, emit, createClient, loginTimeoutMs = LOGIN_TIMEOUT_MS, statusExtra = {}, getToken = () => loadToken(envPath) }) {
-  const { GatewayIntentBits, PermissionFlagsBits, ChannelType, Events, RESTEvents } = discord;
+  const { GatewayIntentBits, PermissionFlagsBits, ChannelType, Events, RESTEvents, Partials, MessageFlags, Routes } = discord;
   const TEXT_TYPES = new Set([ChannelType.GuildText, ChannelType.GuildAnnouncement]);
   // Sprachkanäle (Stage-Kanäle bewusst nicht – dort gelten Sprecher-Regeln).
   const VOICE_TYPES = new Set([ChannelType.GuildVoice]);
@@ -42,7 +42,10 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
           GatewayIntentBits.MessageContent,
           GatewayIntentBits.GuildMessageTyping,
           GatewayIntentBits.GuildVoiceStates, // nicht privilegiert; nötig für Sprachkanäle (wer ist drin, Beitreten)
+          GatewayIntentBits.GuildMessageReactions, // F8: Reaktionen live (nicht privilegiert)
         ],
+        // F8: Reaktionen auch an älteren, nicht im Speicher liegenden Nachrichten erkennen
+        partials: Partials ? [Partials.Message, Partials.Reaction] : [],
         // Sicherheitsnetz: standardmäßig pingt der Bot NIEMANDEN, nur explizit gelistete IDs.
         allowedMentions: { parse: [], repliedUser: false },
       }));
@@ -84,10 +87,14 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   }
 
   // Liefert nur Kanäle, die der Bot wirklich SEHEN darf.
+  const isThread = (ch) => Boolean(ch) && THREAD_TYPES.has(ch.type);
+  // In Threads gilt "Nachrichten in Threads senden" statt "Nachrichten senden" (F12)
+  const canSendIn = (ch) => can(ch, isThread(ch) ? PermissionFlagsBits.SendMessagesInThreads : PermissionFlagsBits.SendMessages);
+
   function requireTextChannel(channelId) {
     const channel = requireReady().channels.cache.get(channelId);
-    if (!channel || !TEXT_TYPES.has(channel.type) || !can(channel, PermissionFlagsBits.ViewChannel))
-      throw appError('NOT_FOUND', 'Kanal nicht gefunden oder für den Bot nicht sichtbar.');
+    const textLike = channel && (TEXT_TYPES.has(channel.type) || isThread(channel));
+    if (!textLike || !can(channel, PermissionFlagsBits.ViewChannel)) throw appError('NOT_FOUND', 'Kanal nicht gefunden oder für den Bot nicht sichtbar.');
     return channel;
   }
 
@@ -156,6 +163,29 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     c.on(Events.ChannelUpdate, (_o, ch) => channelsChanged(ch));
     c.on(Events.ChannelDelete, channelsChanged);
     c.on(Events.GuildRoleUpdate, (role) => emit('channels:changed', { guildId: role.guild.id }));
+    // F8: Reaktionen live – Nachricht (ggf. nachgeladen) neu an die Oberfläche geben
+    const onReaction = async (reaction) => {
+      try {
+        if (reaction?.partial) await reaction.fetch();
+        let m = reaction?.message;
+        if (m?.partial) m = await m.fetch();
+        if (m?.guildId) emit('message:update', serializeMessage(m));
+      } catch {
+        /* Nachricht evtl. gelöscht oder nicht mehr sichtbar */
+      }
+    };
+    c.on(Events.MessageReactionAdd, onReaction);
+    c.on(Events.MessageReactionRemove, onReaction);
+    c.on(Events.MessageReactionRemoveAll, (m) => m?.guildId && !m.partial && emit('message:update', serializeMessage(m)));
+    // F12: Threads geändert → Thread-Liste des Kanals neu laden
+    const threadsChanged = (t) => {
+      if (t?.parentId) emit('threads:changed', { channelId: t.parentId, threadId: t.id });
+    };
+    c.on(Events.ThreadCreate, threadsChanged);
+    c.on(Events.ThreadDelete, threadsChanged);
+    c.on(Events.ThreadUpdate, (_o, t) => threadsChanged(t));
+    // F15: Slash-Befehle – Antwort innerhalb von 3 Sekunden (Discord-Vorgabe)
+    c.on(Events.InteractionCreate, (i) => handleInteraction(i, c));
     // Rechte des Bots können sich ändern (neue Rolle, Rolle gelöscht) → Kanalliste neu berechnen (Issue #1).
     c.on(Events.GuildMemberUpdate, (_old, member) => {
       if (member?.id && member.id === c.user?.id) emit('channels:changed', { guildId: member.guild?.id ?? null });
@@ -200,6 +230,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
           c.once(Events.ClientReady, () => done(resolve));
           c.login(tokenResult.token).catch((err) => done(reject, err));
         });
+        registerCommands(c); // F15, läuft im Hintergrund
         return setStatus({ state: 'ready', bot: botInfo() });
       } catch (err) {
         const error = describeError(err);
@@ -316,8 +347,65 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         channels: valuesOf(msg?.mentions?.channels).map((ch) => ({ id: ch.id, name: ch.name ?? 'kanal' })),
         everyone: Boolean(msg?.mentions?.everyone),
       },
-      reference: msg?.reference?.messageId ? { messageId: msg.reference.messageId, channelId: msg.reference.channelId ?? null } : null,
+      reference: msg?.reference?.messageId ? { messageId: msg.reference.messageId, channelId: msg.reference.channelId ?? null, ...replyPreview(msg) } : null,
+      reactions: valuesOf(msg?.reactions?.cache).map(serializeReaction).filter(Boolean),
+      embeds: (Array.isArray(msg?.embeds) ? msg.embeds : []).slice(0, 10).map(serializeEmbed),
+      pinned: Boolean(msg?.pinned),
+      thread: msg?.hasThread && msg.thread ? { id: msg.thread.id, name: msg.thread.name ?? 'Thread', messageCount: msg.thread.messageCount ?? null } : null,
+      // Bearbeiten nur eigene (Discord-Regel); Löschen eigene oder mit "Nachrichten verwalten"
+      canEdit: Boolean(author?.id) && author.id === client?.user?.id,
+      canDelete: (Boolean(author?.id) && author.id === client?.user?.id) || (msg?.channel ? can(msg.channel, PermissionFlagsBits.ManageMessages) : false),
     };
+  }
+
+  // F7: Vorschau der Nachricht, auf die geantwortet wurde (nur wenn sie im Speicher liegt – kein Extra-Request)
+  function replyPreview(msg) {
+    const ref = msg?.channel?.messages?.cache?.get?.(msg.reference.messageId);
+    if (!ref) return { authorName: null, text: null };
+    const t = (typeof ref.content === 'string' ? ref.content : '').replace(/\s+/g, ' ').trim();
+    return { authorName: displayNameOf(ref.author, ref.member), text: t ? t.slice(0, 100) : ref.attachments?.size ? '📎 Anhang' : '…' };
+  }
+
+  // F8: Reaktion → { key, name, id, url, count, me }. key = Unicode-Emoji oder "name:id" (eigene Server-Emojis)
+  function serializeReaction(r) {
+    const e = r?.emoji;
+    if (!e?.name && !e?.id) return null;
+    let url = null;
+    try {
+      url = e.id && typeof e.imageURL === 'function' ? e.imageURL({ size: 48 }) : null;
+    } catch {
+      url = null;
+    }
+    return { key: e.id ? `${e.name ?? 'emoji'}:${e.id}` : e.name, name: e.name ?? '', id: e.id ?? null, animated: Boolean(e.animated), url, count: Number(r.count) || 0, me: Boolean(r.me) };
+  }
+
+  // F11: Embed anzeigen (nur Anzeige-Felder, alles null-sicher und gekürzt)
+  function serializeEmbed(e) {
+    const s = (v, n) => (typeof v === 'string' ? v.slice(0, n) : null);
+    return {
+      title: s(e?.title, 256),
+      description: s(e?.description, 4096),
+      url: s(e?.url, 2048),
+      color: Number.isFinite(e?.color) ? `#${e.color.toString(16).padStart(6, '0')}` : null,
+      author: e?.author?.name ? { name: s(e.author.name, 256), url: s(e.author.url, 2048), iconUrl: s(e.author.iconURL ?? e.author.icon_url, 2048) } : null,
+      fields: (Array.isArray(e?.fields) ? e.fields : []).slice(0, 25).map((f) => ({ name: s(f?.name, 256) ?? '', value: s(f?.value, 1024) ?? '', inline: Boolean(f?.inline) })),
+      image: s(e?.image?.url, 2048),
+      thumbnail: s(e?.thumbnail?.url, 2048),
+      footer: e?.footer?.text ? s(e.footer.text, 2048) : null,
+      timestamp: e?.timestamp ? Date.parse(e.timestamp) || null : null,
+    };
+  }
+
+  // F11: Embed aus dem Baukasten der Oberfläche → Discord-API-Format
+  function toApiEmbed(e) {
+    const out = {};
+    if (e.title) out.title = e.title;
+    if (e.description) out.description = e.description;
+    if (e.url) out.url = e.url;
+    if (e.color) out.color = parseInt(e.color.slice(1), 16);
+    if (e.footer) out.footer = { text: e.footer };
+    if (e.image) out.image = { url: e.image };
+    return out;
   }
 
   async function getMessages({ channelId, before, limit }) {
@@ -365,23 +453,36 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return out;
   }
 
-  async function sendMessage({ channelId, content, mentions, nonce }) {
+  async function sendMessage({ channelId, content, mentions, nonce, replyTo = null, pingReply = false, files = [], embeds = [] }) {
     const channel = requireTextChannel(channelId);
-    if (!can(channel, PermissionFlagsBits.SendMessages))
+    if (!canSendIn(channel))
       throw appError('MISSING_PERMISSION', 'Der Bot darf in diesem Kanal nicht schreiben.', 'Gib der Bot-Rolle hier "Nachrichten senden".');
     if (mentions.everyone && !can(channel, PermissionFlagsBits.MentionEveryone))
       throw appError('MISSING_PERMISSION', 'Der Bot darf hier nicht @everyone/@here pingen.', 'Bot-Rolle braucht "@everyone, @here und alle Rollen erwähnen" – oder ohne Ping senden.');
-    const sent = await channel.send({
-      content,
+    const payload = {
+      ...(content ? { content } : {}),
       ...(nonce ? { nonce, enforceNonce: true } : {}),
-      allowedMentions: buildAllowedMentions(mentions),
-    });
+      // Antworten (F7): Antwort-Ping nur, wenn ausdrücklich gewünscht
+      allowedMentions: { ...buildAllowedMentions(mentions), repliedUser: Boolean(pingReply) },
+    };
+    if (replyTo) payload.reply = { messageReference: replyTo, failIfNotExists: false };
+    if (files.length) {
+      if (!can(channel, PermissionFlagsBits.AttachFiles))
+        throw appError('MISSING_PERMISSION', 'Der Bot darf hier keine Dateien senden.', 'Gib der Bot-Rolle hier "Dateien anhängen".');
+      payload.files = files.map((f) => ({ attachment: Buffer.from(f.data), name: f.name }));
+    }
+    if (embeds.length) {
+      if (!can(channel, PermissionFlagsBits.EmbedLinks))
+        throw appError('MISSING_PERMISSION', 'Der Bot darf hier keine Embeds senden.', 'Gib der Bot-Rolle hier "Links einbetten".');
+      payload.embeds = embeds.map(toApiEmbed);
+    }
+    const sent = await channel.send(payload);
     return serializeMessage(sent);
   }
 
   async function sendTyping({ channelId }) {
     const channel = requireTextChannel(channelId);
-    if (!can(channel, PermissionFlagsBits.SendMessages)) return false;
+    if (!canSendIn(channel)) return false;
     const now = Date.now();
     if (now - (lastTyping.get(channelId) || 0) < TYPING_THROTTLE_MS) return false; // nicht spammen
     lastTyping.set(channelId, now);
@@ -460,6 +561,45 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     };
   }
 
+  // ---------- F15 Slash-Befehle ----------
+  const COMMANDS = [
+    { name: 'ping', description: 'Prüft, ob der Bot (PKMessenger) erreichbar ist' },
+    { name: 'pkmessenger', description: 'Was ist dieser Bot? Infos zu PKMessenger' },
+  ];
+  let commandsState = { registered: false, error: null };
+
+  /** Globale Befehle setzen (Bulk-Overwrite = idempotent, keine Doppelungen). */
+  async function registerCommands(c) {
+    try {
+      if (!c?.application?.commands?.set) return;
+      await c.application.commands.set(COMMANDS);
+      commandsState = { registered: true, error: null };
+    } catch (err) {
+      commandsState = { registered: false, error: describeError(err).message };
+      emit('log', { level: 'warn', message: `Slash-Befehle konnten nicht registriert werden: ${commandsState.error}` });
+    }
+  }
+
+  async function handleInteraction(i, c) {
+    try {
+      if (!i?.isChatInputCommand?.()) return;
+      const ephemeral = MessageFlags?.Ephemeral ? { flags: MessageFlags.Ephemeral } : {};
+      if (i.commandName === 'ping') {
+        const ms = Number.isFinite(c?.ws?.ping) && c.ws.ping >= 0 ? `${Math.round(c.ws.ping)} ms` : 'unbekannt';
+        await i.reply({ content: `🏓 Pong! Verbindung zu Discord: ${ms}`, allowedMentions: { parse: [] }, ...ephemeral });
+      } else if (i.commandName === 'pkmessenger') {
+        await i.reply({
+          content: 'Dieser Bot wird über **PKMessenger** gesteuert – ein Bot-Control-Center. Nachrichten von ihm schreibt eine echte Person über die App, gekennzeichnet als Bot.',
+          allowedMentions: { parse: [] },
+          ...ephemeral,
+        });
+      }
+      emit('interaction', { command: i.commandName, user: i.user?.username ?? null, guildId: i.guildId ?? null });
+    } catch {
+      /* Antwort zu spät oder Interaktion abgelaufen – nichts weiter zu tun */
+    }
+  }
+
   // ---------- Aktualisieren & Kanalzugriff (Issue #1) ----------
 
   /**
@@ -507,6 +647,178 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       .sort(byPos)
       .map(describe);
     return { total: relevant.length, hidden, readOnly, unsupported, threads };
+  }
+
+  // ---------- F9 Bearbeiten/Löschen, F8 Reaktionen, F13 Pins ----------
+
+  async function requireMessage(channelId, messageId) {
+    const channel = requireTextChannel(channelId);
+    const cached = channel.messages?.cache?.get?.(messageId);
+    const msg = cached || (await channel.messages.fetch(messageId).catch(() => null));
+    if (!msg) throw appError('NOT_FOUND', 'Nachricht nicht gefunden (evtl. gelöscht).');
+    return { channel, msg };
+  }
+
+  async function editMessage({ channelId, messageId, content, mentions }) {
+    const { msg } = await requireMessage(channelId, messageId);
+    if (msg.author?.id !== client.user.id) throw appError('MISSING_PERMISSION', 'Nur eigene Nachrichten des Bots können bearbeitet werden.', 'Das ist eine Discord-Regel.');
+    const edited = await msg.edit({ content, allowedMentions: buildAllowedMentions(mentions) });
+    return serializeMessage(edited);
+  }
+
+  async function deleteMessage({ channelId, messageId }) {
+    const { channel, msg } = await requireMessage(channelId, messageId);
+    const own = msg.author?.id === client.user.id;
+    if (!own && !can(channel, PermissionFlagsBits.ManageMessages))
+      throw appError('MISSING_PERMISSION', 'Der Bot darf fremde Nachrichten hier nicht löschen.', 'Dafür braucht die Bot-Rolle "Nachrichten verwalten".');
+    await msg.delete();
+    return { id: messageId, channelId };
+  }
+
+  const reactionKey = (r) => (r?.emoji?.id ? `${r.emoji.name}:${r.emoji.id}` : r?.emoji?.name);
+
+  async function react({ channelId, messageId, emoji, add }) {
+    const { channel, msg } = await requireMessage(channelId, messageId);
+    if (add) {
+      const existing = valuesOf(msg.reactions?.cache).find((r) => reactionKey(r) === emoji);
+      if (!existing && !can(channel, PermissionFlagsBits.AddReactions))
+        throw appError('MISSING_PERMISSION', 'Der Bot darf hier keine neuen Reaktionen hinzufügen.', 'Gib der Bot-Rolle "Reaktionen hinzufügen".');
+      await msg.react(emoji);
+    } else {
+      const r = valuesOf(msg.reactions?.cache).find((x) => reactionKey(x) === emoji);
+      if (r) await r.users.remove(client.user.id);
+    }
+    return serializeMessage(msg);
+  }
+
+  async function listPins({ channelId }) {
+    const channel = requireTextChannel(channelId);
+    if (!can(channel, PermissionFlagsBits.ReadMessageHistory)) throw appError('MISSING_PERMISSION', 'Der Bot darf den Verlauf hier nicht lesen.', 'Gib der Bot-Rolle "Nachrichtenverlauf lesen".');
+    const res = await channel.messages.fetchPins();
+    return { items: (res?.items || []).map((it) => ({ pinnedAt: it.pinnedTimestamp ?? null, message: serializeMessage(it.message) })), hasMore: Boolean(res?.hasMore) };
+  }
+
+  async function setPinned({ channelId, messageId, pin }) {
+    const { channel, msg } = await requireMessage(channelId, messageId);
+    const flag = PermissionFlagsBits.PinMessages ?? PermissionFlagsBits.ManageMessages;
+    if (!can(channel, flag)) throw appError('MISSING_PERMISSION', 'Der Bot darf hier nichts anheften.', 'Gib der Bot-Rolle "Nachrichten anheften".');
+    if (pin) await msg.pin();
+    else await msg.unpin();
+    return serializeMessage(msg);
+  }
+
+  // ---------- F12 Threads & Forum-Beiträge ----------
+
+  function serializeThread(t) {
+    return {
+      id: t.id,
+      name: t.name ?? 'Thread',
+      parentId: t.parentId ?? null,
+      guildId: t.guildId ?? t.guild?.id ?? null,
+      archived: Boolean(t.archived),
+      locked: Boolean(t.locked),
+      messageCount: Number.isFinite(t.messageCount) ? t.messageCount : null,
+      lastMessageId: t.lastMessageId ?? null,
+      createdTimestamp: t.createdTimestamp ?? null,
+      canSend: canSendIn(t),
+      canReadHistory: can(t, PermissionFlagsBits.ReadMessageHistory),
+    };
+  }
+
+  /** Aktive (+ zuletzt archivierte) Threads eines Text-/Forum-Kanals. */
+  async function listThreads({ channelId }) {
+    const parent = requireReady().channels.cache.get(channelId);
+    if (!parent || !can(parent, PermissionFlagsBits.ViewChannel) || !parent.threads) throw appError('NOT_FOUND', 'Kanal nicht gefunden oder ohne Threads.');
+    const active = await parent.threads.fetchActive().catch(() => null);
+    const archived = await parent.threads.fetchArchived({ limit: 25 }).catch(() => null);
+    const all = [...valuesOf(active?.threads), ...valuesOf(archived?.threads)];
+    const seen = new Set();
+    return all
+      .filter((t) => t && !seen.has(t.id) && seen.add(t.id) && can(t, PermissionFlagsBits.ViewChannel))
+      .map(serializeThread)
+      .sort((a, b) => Number(a.archived) - Number(b.archived) || compareSnowflakes(b.lastMessageId || b.id, a.lastMessageId || a.id));
+  }
+
+  /** Thread erstellen: aus einer Nachricht, frei im Textkanal, oder als Forum-Beitrag (mit erster Nachricht). */
+  async function createThread({ channelId, name, messageId, content }) {
+    const parent = requireReady().channels.cache.get(channelId);
+    if (!parent || !can(parent, PermissionFlagsBits.ViewChannel)) throw appError('NOT_FOUND', 'Kanal nicht gefunden.');
+    const isForum = parent.type === ChannelType.GuildForum || parent.type === ChannelType.GuildMedia;
+    const needed = isForum ? PermissionFlagsBits.SendMessages : PermissionFlagsBits.CreatePublicThreads;
+    if (!can(parent, needed)) throw appError('MISSING_PERMISSION', 'Der Bot darf hier keine Threads erstellen.', isForum ? 'Gib der Bot-Rolle im Forum "Beiträge erstellen".' : 'Gib der Bot-Rolle "Öffentliche Threads erstellen".');
+    let thread;
+    if (isForum) {
+      if (!content) throw appError('VALIDATION', 'Ein Forum-Beitrag braucht eine erste Nachricht.');
+      thread = await parent.threads.create({ name, message: { content, allowedMentions: { parse: [] } } });
+    } else if (messageId) {
+      const { msg } = await requireMessage(channelId, messageId);
+      thread = await msg.startThread({ name });
+    } else {
+      thread = await parent.threads.create({ name });
+    }
+    return serializeThread(thread);
+  }
+
+  function getThread({ threadId }) {
+    const t = requireReady().channels.cache.get(threadId);
+    if (!t || !isThread(t) || !can(t, PermissionFlagsBits.ViewChannel)) throw appError('NOT_FOUND', 'Thread nicht gefunden.');
+    return serializeThread(t);
+  }
+
+  // ---------- F14 Serverweite Suche ----------
+
+  /** Offizieller Endpoint GET /guilds/{id}/messages/search (max. 25 Treffer, braucht Message Content Intent). */
+  async function searchMessages({ guildId, content, channelId, authorId, pinned, offset = 0 }) {
+    const guild = requireGuild(guildId);
+    const query = new URLSearchParams();
+    if (content) query.set('content', content);
+    if (channelId) query.append('channel_id', channelId);
+    if (authorId) query.append('author_id', authorId);
+    if (pinned !== undefined) query.set('pinned', String(pinned));
+    query.set('limit', '25');
+    if (offset) query.set('offset', String(offset));
+    const route = Routes?.guildMessagesSearch ? Routes.guildMessagesSearch(guild.id) : `/guilds/${guild.id}/messages/search`;
+    const data = await client.rest.get(route, { query });
+    // Discord indiziert neue Server erst: Antwort ohne Ergebnisse + retry_after
+    if (data && data.messages === undefined && data.retry_after !== undefined) return { pending: true, retryAfterMs: Math.ceil(Number(data.retry_after) * 1000) || 2000, total: 0, results: [] };
+    const results = (Array.isArray(data?.messages) ? data.messages : [])
+      .map((group) => (Array.isArray(group) ? group[0] : group))
+      .filter(Boolean)
+      .filter((m) => {
+        const ch = guild.channels.cache.get(m.channel_id) || client.channels.cache.get(m.channel_id);
+        return ch && can(ch, PermissionFlagsBits.ViewChannel);
+      })
+      .map((m) => ({
+        id: m.id,
+        channelId: m.channel_id,
+        channelName: (guild.channels.cache.get(m.channel_id) || client.channels.cache.get(m.channel_id))?.name ?? null,
+        authorName: m.member?.nick || m.author?.global_name || m.author?.username || 'Unbekannt',
+        content: typeof m.content === 'string' ? m.content.slice(0, 300) : '',
+        timestamp: Date.parse(m.timestamp) || null,
+        hasAttachments: Array.isArray(m.attachments) && m.attachments.length > 0,
+      }));
+    return { pending: false, total: Number(data?.total_results) || results.length, results };
+  }
+
+  // ---------- F8 Emoji-Auswahl: eigene Server-Emojis ----------
+  function listEmojis({ guildId }) {
+    const guild = requireGuild(guildId);
+    return valuesOf(guild.emojis?.cache)
+      .filter((e) => e?.id && e.name && e.available !== false)
+      .slice(0, 100)
+      .map((e) => {
+        let url = null;
+        try {
+          url = typeof e.imageURL === 'function' ? e.imageURL({ size: 48 }) : null;
+        } catch {
+          url = null;
+        }
+        return { key: `${e.name}:${e.id}`, name: e.name, url, animated: Boolean(e.animated) };
+      });
+  }
+
+  function getCommandsState() {
+    return { ...commandsState, commands: COMMANDS.map((c) => `/${c.name}`) };
   }
 
   // ---------- Sprachkanäle ----------
@@ -565,6 +877,17 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     refresh,
     getChannelAccess,
     previewInvite,
+    editMessage,
+    deleteMessage,
+    react,
+    listPins,
+    setPinned,
+    listThreads,
+    createThread,
+    getThread,
+    searchMessages,
+    listEmojis,
+    getCommandsState,
   };
 }
 

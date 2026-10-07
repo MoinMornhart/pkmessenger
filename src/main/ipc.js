@@ -31,7 +31,19 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
       await service.connect(); // → Setup-Ansicht
       return info;
     },
-    'pk:refresh': (p) => service.refresh(validators.optionalGuildRef(p)),
+    // F7–F15
+    'pk:edit-message': (p) => service.editMessage(validators.editMessage(p)),
+    'pk:delete-message': (p) => service.deleteMessage(validators.messageRef(p)),
+    'pk:react': (p) => service.react(validators.react(p)),
+    'pk:list-pins': (p) => service.listPins(validators.channelRef(p)),
+    'pk:set-pinned': (p) => service.setPinned(validators.pin(p)),
+    'pk:list-threads': (p) => service.listThreads(validators.channelRef(p)),
+    'pk:create-thread': (p) => service.createThread(validators.threadCreate(p)),
+    'pk:get-thread': (p) => service.getThread(validators.threadRef(p)),
+    'pk:search-messages': (p) => service.searchMessages(validators.search(p)),
+    'pk:list-emojis': (p) => service.listEmojis(validators.guildRef(p)),
+    'pk:commands-state': () => service.getCommandsState(),
+    'pk:refresh':(p) => service.refresh(validators.optionalGuildRef(p)),
     'pk:channel-access': (p) => service.getChannelAccess(validators.guildRef(p)),
     'pk:list-voice-members': (p) => service.listVoiceMembers(validators.guildRef(p)),
     'pk:voice-state': () => (voice ? voice.getState() : { state: 'idle' }),

@@ -26,7 +26,10 @@ function makeUser(id, username, extra = {}) {
 }
 
 function makeMessage({ id, channel, author, content = '', createdTimestamp = Date.now(), nonce = null, mentions = {} }) {
-  return {
+  // Reaktionen wie bei discord.js: cache (Map) + users.remove()
+  const reactionCache = new Map();
+  const keyOf = (e) => (e.includes(':') ? e : e);
+  const msg = {
     id,
     channelId: channel.id,
     guildId: channel.guild.id,
@@ -49,7 +52,43 @@ function makeMessage({ id, channel, author, content = '', createdTimestamp = Dat
       channels: new Map((mentions.channels || []).map((c) => [c.id, c])),
       everyone: Boolean(mentions.everyone),
     },
+    pinned: false,
+    hasThread: false,
+    thread: null,
+    deleted: false,
+    actions: [],
+    reactions: {
+      cache: reactionCache,
+      resolve: (k) => reactionCache.get(keyOf(k)) || null,
+    },
+    async react(emoji) {
+      msg.actions.push(['react', emoji]);
+      const [name, id] = emoji.includes(':') ? emoji.split(':') : [emoji, null];
+      const r = reactionCache.get(emoji) || { emoji: { name, id }, count: 0, me: false, users: { remove: async (uid) => { msg.actions.push(['unreact', emoji, uid]); r.count -= 1; r.me = false; if (r.count <= 0) reactionCache.delete(emoji); } } };
+      if (!r.me) { r.count += 1; r.me = true; }
+      reactionCache.set(emoji, r);
+    },
+    async edit(opts) {
+      msg.actions.push(['edit', opts]);
+      msg.content = opts.content;
+      msg.editedTimestamp = Date.now();
+      return msg;
+    },
+    async delete() {
+      msg.actions.push(['delete']);
+      msg.deleted = true;
+      channel.store = channel.store.filter((m) => m.id !== msg.id);
+    },
+    async pin() { msg.actions.push(['pin']); msg.pinned = true; },
+    async unpin() { msg.actions.push(['unpin']); msg.pinned = false; },
+    async startThread({ name }) {
+      msg.actions.push(['startThread', name]);
+      msg.hasThread = true;
+      msg.thread = { id: '555000000000000001', name, messageCount: 0, parentId: channel.id, guildId: channel.guild.id, permissionsFor: channel.permissionsFor, type: 11, guild: channel.guild };
+      return msg.thread;
+    },
   };
+  return msg;
 }
 
 function makeChannel(guild, { id, name, type = ChannelType.GuildText, parentId = null, position = 0, perms = [] }) {
@@ -70,7 +109,14 @@ function makeChannel(guild, { id, name, type = ChannelType.GuildText, parentId =
     permissionsFor: () => ({ has: (flag) => permSet.has(flag) }),
     messages: {
       fetchCalls: [],
+      get cache() {
+        return new Map(channel.store.map((m) => [m.id, m]));
+      },
+      async fetchPins() {
+        return { items: channel.store.filter((m) => m.pinned).map((m) => ({ pinnedTimestamp: 1700000000000, message: m })), hasMore: false };
+      },
       async fetch(opts) {
+        if (typeof opts === 'string') return channel.store.find((m) => m.id === opts) || Promise.reject(Object.assign(new Error('Unknown Message'), { code: 10008 }));
         channel.messages.fetchCalls.push(opts);
         let list = [...channel.store].sort((a, b) => (BigInt(b.id) > BigInt(a.id) ? 1 : -1)); // neueste zuerst, wie die API
         if (opts.before) list = list.filter((m) => BigInt(m.id) < BigInt(opts.before));
@@ -81,11 +127,29 @@ function makeChannel(guild, { id, name, type = ChannelType.GuildText, parentId =
     async send(options) {
       channel.sent.push(options);
       // Wie bei Discord: zeitbasierte, monoton steigende Snowflake-ID (siehe error.md #3).
-      const msg = makeMessage({ id: discord.SnowflakeUtil.generate().toString(), channel, author: guild.client.user, content: options.content, nonce: options.nonce ?? null });
+      const msg = makeMessage({ id: discord.SnowflakeUtil.generate().toString(), channel, author: guild.client.user, content: options.content ?? '', nonce: options.nonce ?? null });
+      channel.store.push(msg);
       return msg;
     },
     async sendTyping() {
       channel.typingCalls += 1;
+    },
+    // Threads (F12)
+    threads: {
+      created: [],
+      list: [],
+      async fetchActive() {
+        return { threads: new Map(channel.threads.list.filter((t) => !t.archived).map((t) => [t.id, t])) };
+      },
+      async fetchArchived() {
+        return { threads: new Map(channel.threads.list.filter((t) => t.archived).map((t) => [t.id, t])) };
+      },
+      async create(opts) {
+        channel.threads.created.push(opts);
+        const t = { id: discord.SnowflakeUtil.generate().toString(), name: opts.name, parentId: channel.id, guildId: guild.id, guild, type: 11, archived: false, messageCount: 0, permissionsFor: (me) => channel.permissionsFor(me) }; // wie discord.js: Rechte vom Eltern-Kanal
+        channel.threads.list.push(t);
+        return t;
+      },
     },
   };
   return channel;
