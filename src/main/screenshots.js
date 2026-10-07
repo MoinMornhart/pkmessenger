@@ -267,7 +267,14 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await wait(300);
   await js(win, `(() => { ${SET} setVal(document.querySelector('#ai-job-name'),'Morgengruß'); setVal(document.querySelector('#ai-job-prompt'),'Schreib einen kurzen, fröhlichen Guten-Morgen-Gruß mit dem Plan für heute.'); const t=document.querySelector('#ai-job-target'); const o=[...t.options].find(o=>o.textContent.includes('#allgemein')); if(o) setVal(t,o.value); })()`);
   await wait(300);
-  await win.webContents.executeJavaScript(`document.querySelector('.ai-job-form')?.scrollIntoView({block:'center'})`);
+  // Issue #12: Vorschau vor dem Speichern – KI schreibt, aber NICHTS wird gepostet
+  const sentBefore = await js(win, `document.querySelectorAll('.msg--out').length`);
+  await clickText('.ai-job-form .btn', 'Vorschau');
+  await wait(800);
+  const prev = await js(win, `JSON.stringify({ vorschau: document.querySelector('.ai-preview__text')?.textContent.slice(0,50) || null, status: document.querySelector('.ai-status')?.textContent.replace(/\\s+/g,' ').slice(0,140) || null })`);
+  const sentAfter = await js(win, `document.querySelectorAll('.msg--out').length`);
+  console.log(`[ki-vorschau] ${prev} · gepostet: ${sentAfter - sentBefore}`);
+  await win.webContents.executeJavaScript(`document.querySelector('.ai-preview')?.scrollIntoView({block:'center'})`);
   await wait(300);
   await shoot(win, dir, '24-ki-auftrag');
   await clickText('.ai-job-form .btn', 'Auftrag speichern');

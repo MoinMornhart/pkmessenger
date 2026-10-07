@@ -157,8 +157,11 @@ function makeChannel(guild, { id, name, type = ChannelType.GuildText, parentId =
       },
       async create(opts) {
         channel.threads.created.push(opts);
-        const t = { id: discord.SnowflakeUtil.generate().toString(), name: opts.name, parentId: channel.id, guildId: guild.id, guild, type: 11, archived: false, messageCount: 0, permissionsFor: (me) => channel.permissionsFor(me) }; // wie discord.js: Rechte vom Eltern-Kanal
+        // Wie discord.js: vollwertiger Kanal (senden/lesen), Rechte vom Eltern-Kanal, landet im Kanal-Speicher
+        const t = makeChannel(guild, { id: discord.SnowflakeUtil.generate().toString(), name: opts.name, type: 11, parentId: channel.id });
+        Object.assign(t, { archived: false, messageCount: 0, permissionsFor: (me) => channel.permissionsFor(me) });
         channel.threads.list.push(t);
+        guild.channels?.cache?.set?.(t.id, t);
         return t;
       },
     },

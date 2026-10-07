@@ -3094,3 +3094,54 @@ img.chat-avatar {
   min-width: 0; /* allgemeine Regel .settings select hat min-width 220px → ragte aus dem Dialog */
   width: 100%;
 }
+
+/* ---------- KI: Status, Limits, Profile, Optionen, Vorschau (Issue #12) ---------- */
+.ai-status {
+  display: grid;
+  gap: 3px;
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  font-size: 13px;
+  color: var(--text-2);
+}
+.ai-status .btn {
+  justify-self: start;
+  margin-top: 4px;
+}
+.ai-limits label,
+.ai-opts label {
+  display: grid;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.settings .ai-limits input {
+  min-width: 0;
+  width: 110px;
+  flex: none;
+}
+.ai-opts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+.settings .ai-opts select,
+.settings .ai-profiles select {
+  min-width: 0;
+  width: 100%;
+}
+.ai-preview {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.ai-preview__text {
+  margin-top: 4px;
+  white-space: pre-wrap;
+  font-size: 13.5px;
+}

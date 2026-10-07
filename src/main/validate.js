@@ -189,7 +189,7 @@ const validators = {
     return key.trim();
   },
   aiJob(p) {
-    const { id, name, channelId, channelName, prompt, schedule, context, enabled } = obj(p);
+    const { id, name, channelId, channelName, prompt, schedule, context, enabled, maxLength, language, persona, contextSize, postAs, notify } = obj(p);
     if (id !== undefined && !(typeof id === 'string' && /^[0-9a-f-]{36}$/.test(id))) throw new ValidationError('Ungültige Auftrags-ID.');
     if (typeof name !== 'string' || name.trim().length < 1 || name.length > 60) throw new ValidationError('Der Name muss 1–60 Zeichen haben.');
     if (typeof prompt !== 'string' || prompt.trim().length < 3 || prompt.length > 2000) throw new ValidationError('Der Auftrag muss 3–2000 Zeichen haben.');
@@ -198,7 +198,33 @@ const validators = {
     const s = obj(schedule);
     const clean = s.kind === 'interval' ? { kind: 'interval', minutes: s.minutes } : { kind: 'daily', time: s.time, days: Array.isArray(s.days) ? [...s.days] : s.days };
     if (!isValidSchedule(clean)) throw new ValidationError('Ungültiger Zeitplan (mind. alle 15 Minuten, Uhrzeit HH:MM, mind. ein Wochentag).');
-    return { ...(id ? { id } : {}), name: name.trim(), channelId: snowflake(channelId, 'channelId'), channelName: channelName?.trim() || '', prompt: prompt.trim(), schedule: clean, context, enabled };
+    // Neu (Issue #12): Länge, Sprache, Persona, Kontextumfang, Thread oder Nachricht, Hinweis
+    const len = maxLength === undefined ? 1800 : maxLength;
+    if (!Number.isInteger(len) || len < 100 || len > 2000) throw new ValidationError('Die Antwortlänge muss 100–2000 Zeichen sein.');
+    const lang = language === undefined ? 'auto' : language;
+    if (!['auto', 'de', 'en'].includes(lang)) throw new ValidationError('Unbekannte Sprache.');
+    if (persona !== undefined && (typeof persona !== 'string' || persona.length > 300)) throw new ValidationError('Der Tonfall darf höchstens 300 Zeichen haben.');
+    const ctx = contextSize === undefined ? (context ? 20 : 0) : contextSize;
+    if (![0, 10, 20, 50].includes(ctx)) throw new ValidationError('Ungültiger Kontextumfang.');
+    const mode = postAs === undefined ? 'message' : postAs;
+    if (!['message', 'thread'].includes(mode)) throw new ValidationError('Ungültige Art (Nachricht oder Thread).');
+    if (notify !== undefined && typeof notify !== 'boolean') throw new ValidationError('Ungültiges Feld "notify".');
+    return {
+      ...(id ? { id } : {}),
+      name: name.trim(),
+      channelId: snowflake(channelId, 'channelId'),
+      channelName: channelName?.trim() || '',
+      prompt: prompt.trim(),
+      schedule: clean,
+      context: ctx > 0,
+      contextSize: ctx,
+      enabled,
+      maxLength: len,
+      language: lang,
+      persona: (persona || '').trim(),
+      postAs: mode,
+      notify: notify !== false,
+    };
   },
   aiResponder(p) {
     const { enabled, channelIds, dms, allowUsers, blockUsers, instructions, context, notify } = obj(p);
@@ -226,6 +252,18 @@ const validators = {
       context,
       notify,
     };
+  },
+  aiLimits(p) {
+    const { perHour, perDay } = obj(p);
+    if (!Number.isInteger(perHour) || perHour < 1 || perHour > 500) throw new ValidationError('Stundenlimit: 1–500 Anfragen.');
+    if (!Number.isInteger(perDay) || perDay < 1 || perDay > 5000) throw new ValidationError('Tageslimit: 1–5000 Anfragen.');
+    if (perDay < perHour) throw new ValidationError('Das Tageslimit darf nicht kleiner als das Stundenlimit sein.');
+    return { perHour, perDay };
+  },
+  aiProfileName(p) {
+    const { name } = obj(p);
+    if (typeof name !== 'string' || name.trim().length < 1 || name.length > 40) throw new ValidationError('Der Profilname muss 1–40 Zeichen haben.');
+    return { name: name.trim() };
   },
   aiJobRef(p) {
     const { id } = obj(p);

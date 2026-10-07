@@ -120,8 +120,9 @@ test('Auftrag ausführen: KI fragen → als Bot posten, niemand wird gepingt', a
   const run = await ai.runJob({ id: job.id });
   assert.equal(run.ok, true);
   const sent = world.channels.allgemein.sent.at(-1);
-  assert.equal(sent.content, '**Guten Morgen!** @everyone');
-  assert.deepEqual(sent.allowedMentions.parse, []); // Text darf @everyone enthalten, pingt aber niemanden
+  // Issue #12: @everyone aus KI-Text wird unschädlich gemacht (unsichtbares Trennzeichen) UND pingt ohnehin niemanden
+  assert.equal(sent.content, '**Guten Morgen!** @​everyone');
+  assert.deepEqual(sent.allowedMentions.parse, []);
   assert.equal(sent.allowedMentions.users?.length ?? 0, 0);
   assert.match(f.calls[0].body.messages[1].content, /Sag Guten Morgen/);
   assert.ok(!/Letzte Nachrichten/.test(f.calls[0].body.messages[1].content)); // ohne Erlaubnis kein Chatverlauf
