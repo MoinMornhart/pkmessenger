@@ -25,7 +25,7 @@ function makeUser(id, username, extra = {}) {
   return { id, username, globalName: null, bot: false, displayAvatarURL: avatar, ...extra };
 }
 
-function makeMessage({ id, channel, author, content = '', createdTimestamp = Date.now(), nonce = null, mentions = {} }) {
+function makeMessage({ id, channel, author, content = '', createdTimestamp = Date.now(), nonce = null, mentions = {}, type = 0, embeds }) {
   // Reaktionen wie bei discord.js: cache (Map) + users.remove()
   const reactionCache = new Map();
   const keyOf = (e) => (e.includes(':') ? e : e);
@@ -38,13 +38,15 @@ function makeMessage({ id, channel, author, content = '', createdTimestamp = Dat
     member: null,
     author,
     content,
+    type,
+    system: ![0, 19, 20, 23].includes(type), // wie discord.js Message#system
     createdTimestamp,
     editedTimestamp: null,
     system: false,
     nonce,
     partial: false,
     attachments: new Map(),
-    embeds: [],
+    embeds: embeds || [],
     reference: null,
     mentions: {
       users: new Map((mentions.users || []).map((u) => [u.id, u])),
