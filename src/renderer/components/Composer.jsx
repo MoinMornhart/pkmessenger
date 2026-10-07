@@ -190,8 +190,25 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
     [allChannels, guild.id, guild.isDM, editing],
   );
 
+  const lastSuggest = useRef(null);
+  useEffect(() => {
+    if (suggest?.trigger === '@') lastSuggest.current = suggest;
+  }, [suggest]);
   const onChange = (e) => {
-    const value = e.target.value;
+    let value = e.target.value;
+    // „@anna “ getippt statt aus der Liste gewählt → bei genau passendem Namen trotzdem echte Erwähnung (Issue #35)
+    const caretNow = e.target.selectionStart;
+    const typed = /(^|\s)@([^\s@]{2,32}) $/.exec(value.slice(0, caretNow));
+    if (typed && lastSuggest.current) {
+      const hit = lastSuggest.current.items.filter((it) => (it.kind === 'user' || it.kind === 'role') && it.display.toLowerCase() === typed[2].toLowerCase());
+      if (hit.length === 1) {
+        const display = `@${hit[0].display}`;
+        const start = caretNow - typed[2].length - 2;
+        value = `${value.slice(0, start)}${display} ${value.slice(caretNow)}`;
+        setInserted((list) => [...list.filter((x) => x.display !== display), { display, kind: hit[0].kind, id: hit[0].id }]);
+        lastSuggest.current = null;
+      }
+    }
     setText(value);
     updateSuggestions(value, e.target.selectionStart);
     const now = Date.now();
@@ -525,7 +542,8 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
           <div className="format-bar" role="toolbar" aria-label="Text formatieren">
             {FORMAT_BUTTONS.map((b) => (
               <button key={b.kind} className={`format-bar__btn format-bar__btn--${b.kind}`} title={b.title} aria-label={b.title} onMouseDown={(e) => e.preventDefault()} onClick={() => format(b.kind)}>
-                {b.label}
+                <span className="format-bar__icon">{b.label}</span>
+                <span className="format-bar__name">{b.name}</span>
               </button>
             ))}
           </div>

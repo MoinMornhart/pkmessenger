@@ -1,7 +1,7 @@
 import { memo, useContext, useState } from 'react';
 import { MessageActionsContext } from '../state';
 import { formatShortTime, formatFull, formatDayPill } from '../../shared/format';
-import MessageContent from './MessageContent.jsx';
+import MessageContent, { OwnMessageContext } from './MessageContent.jsx';
 import { ReplyQuote, Reactions, Embeds, ThreadChip, MessageActionBar, PollCard } from './MessageExtras.jsx';
 import { hueFor } from './ChatList.jsx';
 import { systemInfo } from '../../shared/system-messages';
@@ -115,7 +115,9 @@ function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
             {m.author.bot && <span className="bot-tag">BOT</span>}
           </div>
         )}
-        <MessageContent content={m.content} mentions={m.mentions} />
+        <OwnMessageContext.Provider value={Boolean(out)}>
+          <MessageContent content={m.content} mentions={m.mentions} />
+        </OwnMessageContext.Provider>
         <Attachments items={m.attachments} />
         <PollCard message={m} />
         <Embeds embeds={m.embeds} />

@@ -3180,19 +3180,19 @@ img.chat-avatar {
 .format-bar__btn:focus-visible {
   background: var(--panel-2);
 }
-.format-bar__btn--bold {
+.format-bar__btn--bold .format-bar__icon {
   font-weight: 800;
 }
-.format-bar__btn--italic {
+.format-bar__btn--italic .format-bar__icon {
   font-style: italic;
 }
-.format-bar__btn--underline {
+.format-bar__btn--underline .format-bar__icon {
   text-decoration: underline;
 }
-.format-bar__btn--strike {
+.format-bar__btn--strike .format-bar__icon {
   text-decoration: line-through;
 }
-.format-bar__btn--code {
+.format-bar__btn--code .format-bar__icon {
   font-family: Consolas, monospace;
   font-size: 12.5px;
 }
@@ -4016,4 +4016,31 @@ kbd {
   50% {
     opacity: 0.3;
   }
+}
+
+/* ---------- Formatier-Menü mit Text, Spoiler-Rückfrage (Issue #35) ---------- */
+.format-bar__btn {
+  display: inline-grid;
+  justify-items: center;
+  gap: 1px;
+  height: auto;
+  min-width: 46px;
+  padding: 4px 6px;
+}
+.format-bar__name {
+  font-size: 10px;
+  font-weight: 500;
+  font-style: normal;
+  text-decoration: none;
+  color: var(--text-2);
+}
+.spoiler-ask {
+  display: block;
+}
+.spoiler-ask h3,
+.spoiler-ask p {
+  display: block;
+}
+.format-bar__icon {
+  line-height: 1.1;
 }

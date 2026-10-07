@@ -43,3 +43,12 @@ test('Erwähnungen bleiben erhalten (Text drumherum unverändert)', () => {
   const [s, e] = sel(t, 'schau mal');
   assert.equal(applyFormat(t, s, e, 'bold').text, 'Hey @Anna **schau mal**');
 });
+
+test('Spoiler-Inhalt erscheint in Vorschauen nie im Klartext (Issue #35)', () => {
+  const { maskSpoilers, FORMAT_BUTTONS } = require('../src/shared/format-text');
+  assert.equal(maskSpoilers('Das Ende: ||Er war es|| lol'), 'Das Ende: ▒▒▒▒ lol');
+  assert.equal(maskSpoilers('||a|| und ||b||'), '▒▒▒▒ und ▒▒▒▒');
+  assert.equal(maskSpoilers('kein | Spoiler'), 'kein | Spoiler');
+  // Formatier-Menü: jeder Knopf hat einen sichtbaren Namen
+  assert.ok(FORMAT_BUTTONS.every((b) => b.name && b.name.length <= 12));
+});

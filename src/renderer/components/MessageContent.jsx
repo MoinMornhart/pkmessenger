@@ -1,6 +1,8 @@
-import { memo, useContext, useState } from 'react';
+import { memo, useContext, useState, createContext } from 'react';
 import { tokenizeMentions } from '../../shared/mentions';
 import { NavContext } from '../state';
+import { createPortal } from 'react-dom';
+import { prefs } from '../prefs';
 
 // Sicheres Mini-Markdown: erzeugt nur React-Elemente, NIEMALS innerHTML.
 const CODE_BLOCK = /```(?:[a-zA-Z0-9_+-]*\n)?([\s\S]*?)```/g;
@@ -9,14 +11,62 @@ const INLINE =
   /(\\[\\*_~`|>])|(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(~~[^~\n]+~~)|(\*[^*\s][^*\n]*\*)|(\b_[^_\n]+_\b)|(https?:\/\/[^\s<>"']+[^\s<>"'.,:;!?)\]])|(\|\|[^|\n]+\|\|)/g;
 
 // Spoiler: verdeckt, Klick deckt auf (wie in Discord)
+// Fremde Spoiler: erst fragen („Wirklich aufdecken?“ mit „Nicht mehr fragen“, Issue #35); eigene sofort
 function Spoiler({ children }) {
+  const own = useContext(OwnMessageContext);
   const [open, setOpen] = useState(false);
+  const [ask, setAsk] = useState(false);
+  const [skip, setSkip] = useState(false);
+  const reveal = () => (own || !prefs.get().spoilerAsk ? setOpen(true) : setAsk(true));
   return (
-    <span className={`spoiler ${open ? 'is-open' : ''}`} role="button" tabIndex={0} title={open ? '' : 'Spoiler – zum Aufdecken klicken'} onClick={() => setOpen(true)} onKeyDown={(e) => e.key === 'Enter' && setOpen(true)}>
-      {children}
-    </span>
+    <>
+      <span
+        className={`spoiler ${open ? 'is-open' : ''}`}
+        role="button"
+        tabIndex={0}
+        aria-label={open ? undefined : 'Spoiler – zum Aufdecken klicken'}
+        title={open ? '' : 'Spoiler – zum Aufdecken klicken'}
+        onClick={() => !open && reveal()}
+        onKeyDown={(e) => e.key === 'Enter' && !open && reveal()}
+      >
+        {children}
+      </span>
+      {ask && (
+        createPortal(
+        <div className="modal-backdrop" onMouseDown={() => setAsk(false)}>
+          <div className="modal confirm spoiler-ask" role="dialog" aria-label="Spoiler aufdecken?" onMouseDown={(e) => e.stopPropagation()}>
+            <h3>Spoiler aufdecken?</h3>
+            <p>Hier hat jemand etwas absichtlich verdeckt, z. B. das Ende eines Films oder eine Lösung.</p>
+            <label className="composer__ping">
+              <input type="checkbox" checked={skip} onChange={(e) => setSkip(e.target.checked)} /> Nicht mehr fragen
+            </label>
+            <div className="confirm__actions">
+              <button className="btn btn--ghost" onClick={() => setAsk(false)}>
+                Lieber nicht
+              </button>
+              <button
+                className="btn btn--primary"
+                autoFocus
+                onClick={() => {
+                  if (skip) prefs.set({ spoilerAsk: false });
+                  setAsk(false);
+                  setOpen(true);
+                }}
+              >
+                👁 Aufdecken
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+        )
+      )}
+    </>
   );
 }
+
+/** Eigene Nachricht? Dann Spoiler ohne Rückfrage aufdecken. */
+export const OwnMessageContext = createContext(false);
 
 function Link({ href }) {
   const nav = useContext(NavContext);
