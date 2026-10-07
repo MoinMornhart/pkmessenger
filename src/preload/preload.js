@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('api', {
   errorReport: call('pk:error-report'),
   openLogFolder: call('pk:open-log-folder'),
   setupCheck: call('pk:setup-check'),
+  setPresence: call('pk:set-presence'),
   lockHello: call('pk:lock-hello'),
   lockSetHello: call('pk:lock-set-hello'),
   helloStatus: call('pk:hello-status'),

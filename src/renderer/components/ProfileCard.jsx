@@ -9,6 +9,8 @@ export function openProfile(userId, guildId) {
   window.dispatchEvent(new CustomEvent('pk:open-profile', { detail: { userId, guildId: guildId || null } }));
 }
 
+export const STATUS_TEXT = { online: 'Online', idle: 'Abwesend', dnd: 'Bitte nicht stören', offline: 'Offline' };
+
 const fmtDate = (ts) => (ts ? new Date(ts).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' }) : '–');
 
 export default function ProfileCard({ userId, guildId, onClose, onOpenDM, toast }) {
@@ -49,6 +51,12 @@ export default function ProfileCard({ userId, guildId, onClose, onOpenDM, toast 
                   {p.name} {p.bot && <span className="bot-tag">BOT</span>}
                 </div>
                 <div className="muted small">@{p.username}</div>
+                {p.status && (
+                  <div className={`presence presence--${p.status}`}>
+                    <span className="presence__dot" /> {STATUS_TEXT[p.status] || p.status}
+                    {p.activity ? ` · ${p.activity}` : ''}
+                  </div>
+                )}
               </div>
             </div>
             <dl className="profile-card__facts">

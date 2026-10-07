@@ -390,6 +390,7 @@ function createTestService(opts = {}) {
     createClient: () => world.client,
     loginTimeoutMs: opts.loginTimeoutMs ?? 300,
     ...(opts.dmStore ? { dmStore: opts.dmStore } : {}),
+    ...(opts.presence ? { presence: opts.presence } : {}),
   });
   return { service, world, events, envPath };
 }

@@ -89,6 +89,8 @@ const service = createDiscordService({
     list: () => (Array.isArray(store.get().dmChannels) ? store.get().dmChannels : []),
     add: (entry) => store.set('dmChannels', [entry, ...(store.get().dmChannels || []).filter((e) => e.channelId !== entry.channelId)].slice(0, 100)),
   },
+  // Online-Status (freiwillig, privilegiertes Intent): Schalter in settings.json
+  presence: { get: () => store.get().presence === true, set: (on) => store.set('presence', Boolean(on)) },
   ...(demo ? { createClient: demo.createClient, statusExtra: { demo: true } } : {}),
 });
 const store = createStore(path.join(app.getPath('userData'), demo || SHOTS_ARG ? 'settings-dev-demo.json' : 'settings.json'));

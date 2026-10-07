@@ -301,6 +301,40 @@ function ProfileSection({ toast, guildId }) {
 }
 
 // Bildschirmschutz: andere Programme (Screenshots, Aufnahmen, Bildschirm teilen) sehen nur ein schwarzes Fenster
+// Online-Status anzeigen (Issue #1) – braucht „Presence Intent“ im Entwicklerportal
+function PresenceToggle() {
+  const [on, setOn] = useState(null);
+  const [err, setErr] = useState(null);
+  useEffect(() => {
+    api
+      .getSettings()
+      .then((s) => setOn(s.presence === true))
+      .catch(() => setOn(false));
+  }, []);
+  const toggle = async (next) => {
+    setErr(null);
+    try {
+      await api.setPresence({ on: next });
+      setOn(next);
+    } catch (e) {
+      setErr(e);
+    }
+  };
+  return (
+    <div className="settings__field" data-setting="presence">
+      <label className="composer__ping">
+        <input type="checkbox" checked={on === true} disabled={on === null} onChange={(e) => toggle(e.target.checked)} /> 🟢 Online-Status von Personen anzeigen
+      </label>
+      <p className="muted small">Zeigt im Profil und bei Namensvorschlägen, wer online, abwesend oder beschäftigt ist. Dafür braucht der Bot die freiwillige Erlaubnis „Presence Intent“ im Discord-Entwicklerportal. Die App prüft das vorher. Gespeichert wird nichts.</p>
+      {err && (
+        <p className="warn small">
+          ⚠ {err.message} {err.hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // Eigene vertraute Seiten (Issue #38: „Trusted Links“)
 function TrustedDomains() {
   const [p, setP] = useState(prefs.get());
@@ -369,6 +403,7 @@ function MediaPrivacy() {
       </label>
       <p className="muted small">🛡 Link-Schutz ist immer an: IP-Grabber, Betrugs-Links („gratis Nitro“) und nachgemachte Adressen werden erkannt, gesperrt und nicht kopierbar gemacht. Geprüft wird nur auf diesem PC, ohne fremde Dienste.</p>
       <TrustedDomains />
+      <PresenceToggle />
     </>
   );
 }
@@ -465,7 +500,7 @@ const SECTIONS = [
   { id: 'aussehen', icon: '🎨', title: 'Aussehen', desc: 'Design, Farbe, Animationen, Chat-Hintergrund.', keywords: ['farbe', 'theme', 'hell', 'dunkel', 'hintergrund', 'kompakt', 'animation'] },
   { id: 'schreiben', icon: '✍️', title: 'Schreiben', desc: 'Wie Namensvorschläge beim Schreiben funktionieren.', keywords: ['erwähnen', 'mention', 'namen', 'vorschläge', '@'] },
   { id: 'toene', icon: '🔔', title: 'Benachrichtigungen', desc: 'Töne, eigener Ton, Nicht stören.', keywords: ['ton', 'sound', 'lautstärke', 'nicht stören', 'benachrichtigung'] },
-  { id: 'datenschutz', icon: '🔒', title: 'Datenschutz', desc: 'Bildschirmschutz, Bilder/GIFs/Videos laden, Warnung vor Links.', keywords: ['bilder', 'gif', 'video', 'medien', 'link', 'screenshot', 'ip', 'spoiler', 'grabber', 'vertrauen', 'trusted', 'betrug'] },
+  { id: 'datenschutz', icon: '🔒', title: 'Datenschutz', desc: 'Bildschirmschutz, Bilder/GIFs/Videos laden, Warnung vor Links.', keywords: ['bilder', 'gif', 'video', 'medien', 'link', 'screenshot', 'ip', 'spoiler', 'grabber', 'vertrauen', 'trusted', 'betrug', 'online', 'status', 'presence'] },
   { id: 'sicherheit', icon: '🛡', title: 'Sicherheit & Start', desc: 'App-Passwort, Windows Hello, mit Windows starten, im Hintergrund weiterlaufen.', keywords: ['passwort', 'sperre', 'hello', 'fingerabdruck', 'autostart', 'hintergrund', 'tray'] },
   { id: 'profil', icon: '🪪', title: 'Bot-Profil', desc: 'Name, Bild und Beschreibung deines Bots.', keywords: ['name', 'avatar', 'bild', 'über mich', 'spitzname'] },
   { id: 'token', icon: '🔑', title: 'Bot-Token', desc: 'Den geheimen Schlüssel deines Bots ersetzen oder entfernen.', keywords: ['token', 'schlüssel', 'anmelden'] },
