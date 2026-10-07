@@ -89,6 +89,8 @@ export const api = Object.fromEntries(
     'aiUseProfile',
     'aiDeleteProfile',
     'aiAbort',
+    'aiModels',
+    'aiFindLocal',
     'openDM',
     'updateProfile',
     'refresh',

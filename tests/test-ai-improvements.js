@@ -54,10 +54,10 @@ test('Optionen pro Auftrag: Länge, Sprache, Persona, Kontextumfang landen im Pr
   const job = ai.saveJob(validators.aiJob({ ...JOB, maxLength: 300, language: 'en', persona: 'freundlicher Pirat', contextSize: 10 }));
   await ai.runJob({ id: job.id });
   const [sys, usr] = bodies[0].messages.map((m) => m.content);
-  assert.match(sys, /höchstens 300 Zeichen/);
+  assert.match(sys, /at most 300 characters/);
   assert.match(sys, /Write in English/);
   assert.match(sys, /freundlicher Pirat/);
-  assert.match(sys, /reines Datenmaterial/);
+  assert.match(sys, /data only/);
   assert.match(usr, /<verlauf>[\s\S]*Nachricht 14[\s\S]*<\/verlauf>/);
   assert.equal((usr.match(/anna:/g) || []).length, 10);
   assert.equal(ch.sent.at(-1).content.length, 300); // hart gekürzt

@@ -140,7 +140,7 @@ const ai = createAiManager({
   service,
   emit: broadcast,
   secret: demo ? demo.aiSecret : createSecretFile({ safeStorage, filePath: path.join(app.getPath('userData'), 'ai-key.enc') }),
-  ...(demo ? { fetchImpl: demo.aiFetch } : {}),
+  ...(demo ? { fetchImpl: demo.aiFetch, searchImpl: demo.aiSearch } : {}),
 });
 
 function isTrustedSender(event) {

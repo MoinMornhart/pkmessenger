@@ -416,7 +416,14 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     const gName = new Map((guilds || []).map((g) => [g.id, g.name]));
     return flatChannels
       .filter((c) => c.canSend && (c.type === 'text' || c.type === 'announcement' || c.type === 'dm'))
-      .map((c) => ({ id: c.id, dm: c.type === 'dm', label: c.type === 'dm' ? `💬 ${c.name} (privat)` : `#${c.name} · ${gName.get(c.guildId) || ''}` }));
+      .map((c) => ({
+        id: c.id,
+        dm: c.type === 'dm',
+        name: c.name,
+        guildId: c.type === 'dm' ? '@dm' : c.guildId,
+        guildName: c.type === 'dm' ? 'Privatchats' : gName.get(c.guildId) || 'Server',
+        label: c.type === 'dm' ? `💬 ${c.name} (privat)` : `#${c.name} · ${gName.get(c.guildId) || ''}`,
+      }));
   }, [flatChannels, guilds]);
 
   const guild = guildId === DM_ID ? DM_GUILD : guilds?.find((g) => g.id === guildId) || null;
