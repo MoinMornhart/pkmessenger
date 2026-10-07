@@ -21,7 +21,7 @@ const FATAL_CLOSE_CODES = new Set([4004, 4010, 4011, 4012, 4013, 4014]);
  * @param {(type: string, payload: any) => void} opts.emit  Events an den Renderer
  * @param {() => object} [opts.createClient]  Fabrik für den Client (Tests)
  */
-function createDiscordService({ discord, envPath, emit, createClient, loginTimeoutMs = LOGIN_TIMEOUT_MS, statusExtra = {}, getToken = () => loadToken(envPath), dmStore = { list: () => [], add: () => {} } }) {
+function createDiscordService({ discord, envPath, emit, createClient, loginTimeoutMs = LOGIN_TIMEOUT_MS, statusExtra = {}, getToken = () => loadToken(envPath), dmStore = { list: () => [], add: () => {} }, presence = { get: () => false, set: () => {} } }) {
   const { GatewayIntentBits, PermissionFlagsBits, ChannelType, Events, RESTEvents, Partials, MessageFlags, Routes } = discord;
   const TEXT_TYPES = new Set([ChannelType.GuildText, ChannelType.GuildAnnouncement]);
   // Sprachkanäle (Stage-Kanäle bewusst nicht – dort gelten Sprecher-Regeln).
@@ -38,8 +38,10 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     createClient ||
     (() =>
       new discord.Client({
-        // Nur was wir brauchen (Datensparsamkeit). KEIN GuildMembers, KEIN GuildPresences.
+        // Nur was wir brauchen (Datensparsamkeit). KEIN GuildMembers. GuildPresences NUR, wenn in den Einstellungen
+        // eingeschaltet (Online-Status, privilegiert, Issue #1) – sonst nicht.
         intents: [
+          ...(presence.get() ? [GatewayIntentBits.GuildPresences] : []),
           GatewayIntentBits.Guilds,
           GatewayIntentBits.GuildMessages,
           GatewayIntentBits.MessageContent,
@@ -246,6 +248,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     });
   }
 
+  let retryWithoutPresence = false;
   async function connect() {
     if (connecting) return connecting;
     connecting = (async () => {
@@ -277,6 +280,12 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       } catch (err) {
         const error = describeError(err);
         await destroyClient();
+        // Online-Status an, aber im Portal nicht erlaubt → Discord lehnt ab (4014): Schalter aus und ohne neu verbinden
+        if (error.code === 'DISALLOWED_INTENTS' && presence.get()) {
+          presence.set(false);
+          retryWithoutPresence = true;
+          emit('log', { level: 'warn', message: 'Presence intent rejected by Discord (4014) – online status turned off, reconnecting without it.' });
+        }
         return setStatus({ state: error.code === 'TOKEN_INVALID' ? 'setup' : 'error', reason: error.code, error });
       }
     })();
@@ -284,8 +293,36 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       return await connecting;
     } finally {
       connecting = null;
+      if (retryWithoutPresence) {
+        retryWithoutPresence = false;
+        setTimeout(() => connect().catch(() => {}), 0);
+      }
     }
   }
+
+  /** Online-Status ein/aus (Issue #1). Vorher über die offizielle API prüfen, ob „Presence Intent“ im Portal an ist. */
+  async function setPresence({ on }) {
+    if (on) {
+      const c = requireReady();
+      let flags = null;
+      try {
+        flags = (await c.application.fetch())?.flags;
+      } catch {
+        flags = null;
+      }
+      const allowed = Boolean(flags?.has?.('GatewayPresence') || flags?.has?.('GatewayPresenceLimited'));
+      if (!allowed)
+        throw Object.assign(appError('MISSING_PERMISSION', 'Im Discord-Entwicklerportal ist „Presence Intent“ noch aus.', 'Portal → dein Bot → „Bot“ → „Privileged Gateway Intents“ → „Presence Intent“ einschalten und speichern. Dann hier nochmal.'), {
+          url: `https://discord.com/developers/applications/${c.application.id}/bot`,
+        });
+    }
+    presence.set(Boolean(on));
+    connect().catch(() => {}); // neu verbinden, damit Discord das Intent übernimmt
+    return { on: Boolean(on) };
+  }
+
+  /** online | idle | dnd | offline | null (unbekannt/aus) */
+  const statusOf = (member) => (presence.get() ? member?.presence?.status || 'offline' : null);
 
   async function disconnect() {
     await destroyClient();
@@ -607,6 +644,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       sub: m.user.username,
       avatarUrl: m.displayAvatarURL({ size: 32, extension: 'png' }),
       bot: Boolean(m.user.bot),
+      status: statusOf(m),
     }));
     const roles = fuzzyFilter(
       [...guild.roles.cache.values()].filter((r) => r.id !== guild.id).sort((a, b) => b.position - a.position),
@@ -662,6 +700,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         avatarUrl: (e.member || e.user).displayAvatarURL?.({ size: 32, extension: 'png' }) || null,
         bot: Boolean(e.user.bot),
         guilds: e.guilds.slice(0, 3),
+        status: e.member ? statusOf(e.member) : null,
       }));
   }
 
@@ -696,6 +735,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       bannerColor: user.hexAccentColor || null,
       bot: Boolean(user.bot),
       isSelf: user.id === c.user.id,
+      status: member ? statusOf(member) : null,
+      activity: presence.get() ? String(member?.presence?.activities?.find?.((a) => a?.name && a.type !== 4)?.name || '').slice(0, 100) || null : null,
       createdAt: user.createdTimestamp || timestampOf(user.id) || null, // Discord-ID enthält das Erstellungsdatum
       joinedAt: member?.joinedTimestamp || null,
       guildName: guild?.name || null,
@@ -1353,6 +1394,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     searchMentionables,
     searchPeople,
     setupCheck,
+    setPresence,
     getUserProfile,
     getInviteUrl,
     serializeMessage,

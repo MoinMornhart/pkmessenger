@@ -426,6 +426,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
               {it.kind === 'channel' && <span className="ch-icon">#</span>}
               {it.kind === 'command' && <span className="ch-icon">/</span>}
               {(it.kind === 'everyone' || it.kind === 'here') && <span className="ch-icon">📣</span>}
+              {it.status && <span className={`presence presence--${it.status}`} title={it.status}><span className="presence__dot" /></span>}
               <span className="suggest__name">{it.kind === 'everyone' || it.kind === 'here' ? `@${it.display}` : it.display}</span>
               {it.sub && <span className="muted small">{it.sub}</span>}
               {it.bot && <span className="bot-tag">BOT</span>}

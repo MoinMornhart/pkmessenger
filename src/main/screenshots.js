@@ -331,6 +331,21 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
     await wait(300);
     console.log(`[hilfe] Check: ${check} · Ups: ${oops}`);
+    // Online-Status (Issue #1): im Demo ist „Presence Intent“ aus → verständliche Ablehnung statt Verbindungsabbruch
+    await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+    await wait(500);
+    await js(win, `document.querySelector('.settings__nav [data-nav="datenschutz"]')?.click()`);
+    await wait(300);
+    await js(win, `document.querySelector('[data-setting="presence"] input')?.click()`);
+    await wait(800);
+    await js(win, `document.querySelector('[data-setting="presence"]')?.scrollIntoView({block:'center'})`);
+    await wait(200);
+    await shoot(win, dir, '67-online-status-pruefung');
+    const pres = await js(win, `JSON.stringify({ an: document.querySelector('[data-setting="presence"] input')?.checked, hinweis: document.querySelector('[data-setting="presence"] .warn')?.textContent.slice(0,70) || null, verbunden: document.querySelector('.me__status, .chatlist__me')?.textContent.includes('Verbunden') ?? null })`);
+    await js(win, `document.querySelector('.settings__nav [data-nav="alle"]')?.click()`);
+    await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+    await wait(300);
+    console.log(`[online-status] ${pres}`);
   }
   // Smileys (Issue #1: „mehr Smileys“): 😀 im Eingabefeld, suchen, einfügen; ➕ bei Reaktionen
   await js(win, `document.querySelector('.tool-btn[aria-label="Smileys"]')?.click()`);
