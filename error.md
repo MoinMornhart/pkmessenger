@@ -216,3 +216,19 @@ Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zwei
 4. **Lösung:** Block aus `77776dc` wiederhergestellt. **Neu: `tests/test-css-classes.js`** prüft, dass jede feste CSS-Klasse der Komponenten in `styles.css` vorkommt. Gegenprobe: Ohne die Wiederherstellung meldet der Test genau die 6 fehlenden Klassen.
 5. **Testergebnis:** 170/170 Tests grün, kompletter Demo-Lauf ohne Fehler.
 6. **Prävention:** Der neue Test läuft bei `npm test` und damit auch im Release-Workflow. Verlorene Styles verhindern so ein Release.
+
+---
+
+## #18 – „Ich drücke nach Updates suchen, aber die App sagt nichts“ (JoniMoni)
+
+1. **Datum & Uhrzeit:** 07.10.2026, 13:30–13:45
+2. **Was passiert ist:** Nach dem Release v0.4.0 meldete JoniMoni, dass sich kein Update lädt und der Knopf keine Reaktion zeigt.
+3. **Ursache (geprüft):**
+   - Das Release war korrekt (alle 4 Dateien, RELEASES zeigt auf 0.4.0). **update.electronjs.org lieferte aber bis ca. 5 Minuten nach der Veröffentlichung noch 0.3.0 aus** (Cache). JoniMonis Versuche lagen genau in diesem Zeitraum.
+   - Die Oberfläche gab **keine Rückmeldung**: rohe Zustandswörter („checking“, „error“), Fehlermeldungen wurden nie angezeigt, der Knopf meldete kein Ergebnis.
+   - Nach der Installation wurde beim ersten Start gar nicht geprüft (`--squirrel-firstrun`), danach nur alle 6 Std.
+   - Die ZIP-Version (entpackt statt installiert) kann sich ohne Squirrel nicht aktualisieren, die App sagte das aber nicht.
+   - JoniMonis Vermutung „`e` statt `err` im Fehlerhandler“ stimmte nicht (geprüft: `err` korrekt).
+4. **Lösung:** `UpdateSection.jsx` mit deutschem Status, „geprüft um …“, Fehlertext und Hinweis, Knopf „Suche …“ plus Ergebnis-Hinweis (oder „keine Antwort“ nach 45 s), „Jetzt neu starten und installieren“. Updater: alle 15 Min. (Wunsch JoniMoni), erster Start prüft nach 60 s, ZIP-Version wird erkannt (fehlende `Update.exe`) und erklärt, keine Doppelprüfung während der Suche. Die Demo hat einen simulierten Updater (Screenshot 31).
+5. **Testergebnis:** Updater-Tests 9/9 (3 neu), Demo: `{"waehrend":"Suche …","status":"… Du hast die neueste Version ✓ · geprüft um 13:42","hinweis":"Kein Update nötig ✓ …"}`.
+6. **Prävention:** Nach einem Release mit `curl https://update.electronjs.org/<repo>/win32-x64/<alte Version>/RELEASES` prüfen, ob der Dienst die neue Version liefert, bevor man „Update ist da“ meldet.

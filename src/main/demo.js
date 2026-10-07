@@ -235,7 +235,16 @@ function createDemo() {
       client.emit(Events.MessageCreate, m);
     },
   };
-  return { world, envPath, createClient: () => client, voiceLib, stats, aiSecret, aiFetch, simulate };
+  // Simulierter Updater (nur Demo): „Suchen“ → kurz „Suche …“ → „neueste Version“
+  const { EventEmitter } = require('node:events');
+  const autoUpdater = new EventEmitter();
+  autoUpdater.setFeedURL = () => {};
+  autoUpdater.quitAndInstall = () => {};
+  autoUpdater.checkForUpdates = () => {
+    autoUpdater.emit('checking-for-update');
+    setTimeout(() => autoUpdater.emit('update-not-available'), 1200);
+  };
+  return { world, envPath, createClient: () => client, voiceLib, stats, aiSecret, aiFetch, simulate, autoUpdater };
 }
 
 module.exports = { createDemo };

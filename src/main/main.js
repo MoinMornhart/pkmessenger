@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs');
 const path = require('node:path');
 const { app, BrowserWindow, ipcMain, shell, session, Menu, autoUpdater, safeStorage } = require('electron');
 
@@ -96,11 +97,14 @@ const voice = createVoiceManager({
   },
 });
 const updater = createUpdater({
-  autoUpdater,
-  isPackaged: app.isPackaged,
+  // Demo: simulierter Updater, damit Anzeige und Rückmeldung testbar sind (echte App: Squirrel)
+  autoUpdater: demo ? demo.autoUpdater : autoUpdater,
+  isPackaged: demo ? true : app.isPackaged,
   version: app.getVersion(),
   repo: parseRepo(require('../../package.json').repository),
   emit: broadcast,
+  // Installiert per PKMessenger-Setup.exe? Dann liegt Squirrels Update.exe eine Ebene über der App.
+  squirrelInstalled: demo ? true : fs.existsSync(path.join(path.dirname(process.execPath), '..', 'Update.exe')),
 });
 
 // KI-Agenten (Beta): API-Schlüssel verschlüsselt in ai-key.enc; im Demo simulierter Anbieter

@@ -19,6 +19,7 @@ function make(over = {}) {
   const au = fakeAutoUpdater();
   const events = [];
   const scheduled = [];
+  const delayed = [];
   const u = createUpdater({
     autoUpdater: au,
     isPackaged: true,
@@ -29,9 +30,11 @@ function make(over = {}) {
     arch: 'x64',
     argv: [],
     schedule: (fn, ms) => scheduled.push(ms),
+    later: (fn, ms) => delayed.push({ fn, ms }),
+    now: () => 1234,
     ...over,
   });
-  return { u, au, events, scheduled };
+  return { u, au, events, scheduled, delayed };
 }
 
 test('Repo-Angabe wird aus allen üblichen Formaten gelesen', () => {
@@ -58,17 +61,45 @@ test('In der Entwicklung / ohne Repo: abgeschaltet mit deutscher Begründung, ke
   assert.deepEqual(noRepo.au.calls, []);
 });
 
-test('Start: Feed setzen, sofort prüfen, alle 6 Stunden erneut', () => {
+test('Start: Feed setzen, sofort prüfen, alle 15 Minuten erneut (Wunsch JoniMoni)', () => {
   const { u, au, scheduled } = make();
   u.start();
   assert.deepEqual(au.calls, [['setFeedURL', 'https://update.electronjs.org/pmorn/pkmessenger/win32-x64/0.1.0'], ['check']]);
-  assert.deepEqual(scheduled, [6 * 60 * 60 * 1000]);
+  assert.deepEqual(scheduled, [15 * 60 * 1000]);
 });
 
-test('Erster Start nach Installation (--squirrel-firstrun): keine Sofort-Prüfung', () => {
-  const { u, au } = make({ argv: ['PKMessenger.exe', '--squirrel-firstrun'] });
+test('Erster Start nach Installation (--squirrel-firstrun): Prüfung nach 60 s statt gar nicht', () => {
+  const { u, au, delayed } = make({ argv: ['PKMessenger.exe', '--squirrel-firstrun'] });
   u.start();
   assert.deepEqual(au.calls.map((c) => c[0]), ['setFeedURL']);
+  assert.equal(delayed.length, 1);
+  assert.equal(delayed[0].ms, 60 * 1000);
+  delayed[0].fn();
+  assert.deepEqual(au.calls.map((c) => c[0]), ['setFeedURL', 'check']);
+});
+
+test('ZIP-Version (ohne Squirrel-Installer): Auto-Update aus, mit verständlichem Grund', () => {
+  const { u, au } = make({ squirrelInstalled: false });
+  u.start();
+  assert.equal(u.getState().state, 'disabled');
+  assert.match(u.getState().reason, /ZIP.*PKMessenger-Setup\.exe/);
+  assert.deepEqual(au.calls, []);
+});
+
+test('Rückmeldung: Zeitpunkt der letzten Prüfung, keine Doppelprüfung während „Suche“', () => {
+  const { u, au } = make();
+  u.start();
+  au.emit('checking-for-update');
+  assert.equal(u.check().state, 'checking');
+  assert.equal(au.calls.filter((c) => c[0] === 'check').length, 1);
+  au.emit('update-not-available');
+  assert.equal(u.getState().state, 'current');
+  assert.equal(u.getState().lastChecked, 1234);
+  au.emit('error', new Error('net::ERR_INTERNET_DISCONNECTED'));
+  assert.equal(u.getState().state, 'error');
+  assert.match(u.getState().error.detail, /INTERNET_DISCONNECTED/);
+  assert.equal(u.check().state, 'error'); // nach Fehler darf erneut geprüft werden
+  assert.equal(au.calls.filter((c) => c[0] === 'check').length, 2);
 });
 
 test('Ablauf: prüfen → laden → bereit → Neustart; ohne Update kein Neustart', () => {

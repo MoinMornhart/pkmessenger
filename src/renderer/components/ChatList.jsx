@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useState } from 'react';
-import { formatListTime } from '../../shared/format';
+import { formatListTime, formatShortTime } from '../../shared/format';
 import { api } from '../api';
 import { prefs } from '../prefs';
 
@@ -21,6 +21,7 @@ function VersionLine({ appInfo }) {
       <span>PKMessenger {appInfo?.version ? `v${appInfo.version}` : ''}</span>
       <span>·</span>
       <span>{UPDATE_TEXT[u.state] || u.state}</span>
+      {u.state === 'current' && u.lastChecked ? <span className="muted">({formatShortTime(u.lastChecked)})</span> : null}
       {u.enabled && (u.state === 'current' || u.state === 'error' || u.state === 'idle') && (
         <button className="link-btn" onClick={() => api.checkForUpdates().catch(() => {})}>
           Jetzt prüfen
