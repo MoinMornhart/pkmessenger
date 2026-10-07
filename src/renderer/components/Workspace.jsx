@@ -202,6 +202,11 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     };
   }, [openChatId]);
 
+  // Online-Status live (Issue #1): userId → Status, aus Ereignissen
+  const [presence, setPresence] = useState({});
+  useEffect(() => onEvent((type, p) => type === 'presence' && p?.userId && setPresence((m) => ({ ...m, [p.userId]: p.status }))), []);
+  const typingIn = useMemo(() => Object.fromEntries(Object.entries(typing).map(([cid, who]) => [cid, Object.values(who).map((v) => v.name)])), [typing]);
+
   // „🤖 KI schreibt gerade an …“ (Issue #1)
   const [aiBusy, setAiBusy] = useState({}); // channelId → userName
   useEffect(
@@ -508,6 +513,8 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         )}
         <ServerRail guilds={guilds} activeId={guildId} unreadGuilds={unreadGuilds} onSelect={selectGuild} onInvite={invite} onJoin={() => setJoinOpen(true)} />
         <ChatList
+          typingIn={typingIn}
+          presence={presence}
           guild={guild}
           chats={chats}
           chatGroups={chatGroups}
@@ -683,6 +690,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
             channel={channel}
             bot={status.bot}
             typingNames={typingNames}
+            presenceStatus={channel?.type === 'dm' ? presence[channel.userId] ?? channel.status ?? null : null}
             onRead={markRead}
             toast={toast}
             searchOpen={searchOpen}

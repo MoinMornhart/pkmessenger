@@ -4171,3 +4171,27 @@ kbd {
 .presence--dnd .presence__dot {
   background: #ef4444;
 }
+
+/* ---------- Status am Avatar, „schreibt …“ in der Chatliste (Issue #1) ---------- */
+.chat-avatar__wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.chat-avatar__presence {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+}
+.chat-avatar__presence .presence__dot {
+  width: 13px;
+  height: 13px;
+  border: 2.5px solid var(--panel);
+}
+.chatrow__preview.is-typing {
+  color: var(--accent);
+  font-style: italic;
+}
+.chatrow__preview .typing__dots {
+  margin-right: 6px;
+}

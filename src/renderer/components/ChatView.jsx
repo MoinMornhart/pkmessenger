@@ -11,6 +11,8 @@ import MessageList from './MessageList.jsx';
 import Composer from './Composer.jsx';
 import SearchPanel from './SearchPanel.jsx';
 import { ChannelAvatar } from './ChatList.jsx';
+import { typingText } from '../../shared/typing';
+import { STATUS_TEXT } from './ProfileCard.jsx';
 
 function Skeleton() {
   return (
@@ -29,9 +31,9 @@ function Skeleton() {
 }
 
 // Untertitel im Chat-Kopf: "Anna schreibt …" (wie im Messenger) oder das Kanalthema.
-function HeaderSubtitle({ names, channel, guild }) {
+function HeaderSubtitle({ names, channel, guild, status }) {
   if (names.length) {
-    const text = names.length === 1 ? `${names[0]} schreibt …` : names.length === 2 ? `${names[0]} und ${names[1]} schreiben …` : 'Mehrere schreiben …';
+    const text = typingText(names);
     return (
       <span className="chat__sub chat__sub--typing" aria-live="polite">
         <span className="typing__dots">
@@ -43,6 +45,12 @@ function HeaderSubtitle({ names, channel, guild }) {
       </span>
     );
   }
+  if (guild.isDM && status)
+    return (
+      <span className={`chat__sub presence presence--${status}`}>
+        <span className="presence__dot" /> {STATUS_TEXT[status] || status}
+      </span>
+    );
   return (
     <span className="chat__sub" title={channel.topic || ''}>
       {channel.topic || (guild.isDM ? `Privatchat mit ${channel.name}${channel.isBot ? ' (Bot)' : ''}` : `${guild.name} · ${channel.canSend ? 'Bot darf schreiben' : 'Bot darf nur lesen'}`)}
@@ -50,7 +58,7 @@ function HeaderSubtitle({ names, channel, guild }) {
   );
 }
 
-export default function ChatView({ guild, channel, bot, typingNames, onRead, toast, searchOpen, onCloseSearch, onOpenSearch, allChannels, onOpenThread, onBack, parentName }) {
+export default function ChatView({ guild, channel, bot, typingNames, onRead, toast, searchOpen, onCloseSearch, onOpenSearch, allChannels, onOpenThread, onBack, parentName, presenceStatus = null }) {
   const state = useChannelMessages(channel?.id);
   const listRef = useRef(null);
   const [replyTo, setReplyTo] = useState(null); // F7
@@ -252,7 +260,7 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
           {channel.type === 'thread' ? (
             <span className="chat__sub">Thread in #{parentName || '…'}</span>
           ) : (
-            <HeaderSubtitle names={typingNames} channel={channel} guild={guild} />
+            <HeaderSubtitle names={typingNames} channel={channel} guild={guild} status={presenceStatus} />
           )}
         </div>
         <div className="chat__tools">

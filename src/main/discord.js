@@ -9,6 +9,7 @@ const { isSystemType, systemInfo } = require('../shared/system-messages');
 const { TYPING_THROTTLE_MS } = require('../shared/limits');
 const { fuzzyFilter } = require('../shared/fuzzy');
 const { maskSpoilers } = require('../shared/format-text');
+const { bestStatus } = require('../shared/typing');
 
 const LOGIN_TIMEOUT_MS = 45000;
 // Gateway-Close-Codes, bei denen ein Reconnect sinnlos ist (falscher Token, Intent nicht freigeschaltet, ...).
@@ -177,6 +178,11 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       if (!inScope(msg) || !msg.id) return;
       emit('message:delete', { id: msg.id, channelId: msg.channelId });
     });
+    // Online-Status live (nur wenn eingeschaltet; ohne Presence-Intent kommen keine Ereignisse)
+    c.on(Events.PresenceUpdate, (_old, now) => {
+      if (!presence.get() || !now?.userId) return;
+      emit('presence', { userId: now.userId, status: presenceOf(now.userId) });
+    });
     c.on(Events.TypingStart, (typing) => {
       if (!(typing?.guild || isDM(typing?.channel)) || !typing.channel?.id || !typing.user?.id || typing.user.id === c.user?.id) return;
       emit('typing', {
@@ -323,6 +329,12 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
 
   /** online | idle | dnd | offline | null (unbekannt/aus) */
   const statusOf = (member) => (presence.get() ? member?.presence?.status || 'offline' : null);
+  /** Status einer Person über alle Server des Bots (Privatchats haben selbst keinen Status, Issue #1). */
+  const presenceOf = (userId) => {
+    if (!presence.get() || !client || !userId) return null;
+    const list = [...client.guilds.cache.values()].map((g) => g.presences?.cache?.get?.(userId)?.status || (g.members.cache.has(userId) ? 'offline' : null));
+    return bestStatus(list) || 'offline';
+  };
 
   async function disconnect() {
     await destroyClient();
@@ -735,7 +747,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       bannerColor: user.hexAccentColor || null,
       bot: Boolean(user.bot),
       isSelf: user.id === c.user.id,
-      status: member ? statusOf(member) : null,
+      status: member ? statusOf(member) : presenceOf(user.id),
       activity: presence.get() ? String(member?.presence?.activities?.find?.((a) => a?.name && a.type !== 4)?.name || '').slice(0, 100) || null : null,
       createdAt: user.createdTimestamp || timestampOf(user.id) || null, // Discord-ID enthält das Erstellungsdatum
       joinedAt: member?.joinedTimestamp || null,
@@ -1247,6 +1259,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       guildId: null,
       type: 'dm',
       userId: user?.id ?? ch.recipientId ?? null,
+      status: presenceOf(user?.id ?? ch.recipientId),
       name: displayNameOf(user, null),
       avatarUrl: avatarOf(user),
       isBot: Boolean(user?.bot),

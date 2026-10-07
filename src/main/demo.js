@@ -269,6 +269,10 @@ function createDemo() {
   const aiSearch = async (query) => ({ source: 'DuckDuckGo', results: [{ title: `Wetter: ${query}`, url: 'https://wetter.example/berlin', snippet: 'Sonnig, bis 21 °C, kaum Wind.' }] });
   // Für den Screenshot-Lauf: Anna erwähnt den Bot in #allgemein (wie eine echte Nachricht über das Gateway)
   const simulate = {
+    // Mehrere tippen gleichzeitig (Tippanzeige wie Discord)
+    typingAll() {
+      for (const who of people) client.emit(Events.TypingStart, { guild, channel: channels.allgemein, user: who, member: { displayName: who.globalName } });
+    },
     mention(text) {
       const ch = channels.allgemein;
       const m = makeMessage({ id: SnowflakeUtil.generate().toString(), channel: ch, author: anna, content: `<@${client.user.id}> ${text}`, createdTimestamp: Date.now(), mentions: { users: [client.user] } });
