@@ -603,8 +603,21 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await wait(400);
   await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
   await wait(400);
+  // #allgemein ist offen und das Fenster aktiv → KI schweigt (Issue #1: „wenn ich im Chat bin, soll KI nichts machen“)
+  simulate?.mention('Bist du da?');
+  await wait(800);
+  const quiet = await js(win, `[...document.querySelectorAll('.msg--out')].some(m=>m.textContent.includes('in der Lounge'))`);
+  // Anderer Chat offen → KI antwortet; währenddessen „🤖 KI schreibt gerade an …“
+  await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.textContent.includes('ankuendigungen'))?.click()`);
+  await wait(16000); // Wartezeit pro Kanal (15 s) abwarten
   simulate?.mention('Wann ist das Treffen heute?');
-  await wait(1500);
+  await wait(600);
+  await shoot(win, dir, '60-ki-schreibt-gerade');
+  const busyPill = await js(win, `document.querySelector('.ai-busy')?.textContent.trim() || null`);
+  await wait(2200);
+  await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
+  await wait(900);
+  console.log(`[ki-still] Chat offen → geantwortet: ${quiet} · Anzeige: ${busyPill}`);
   await shoot(win, dir, '30-ki-antwort-im-chat');
   const reply = await js(win, `JSON.stringify({ hinweis: [...document.querySelectorAll('.toast')].map(t=>t.textContent).find(t=>t.includes('geantwortet'))?.slice(0,60) || null, antwortAlsReply: [...document.querySelectorAll('.msg--out')].some(m=>m.querySelector('.reply-quote') && m.textContent.includes('19 Uhr** in der Lounge') || m.textContent.includes('in der Lounge 🎉')) })`);
   console.log(`[ki-antwort] ${reply}`);

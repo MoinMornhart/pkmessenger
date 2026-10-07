@@ -397,6 +397,10 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
           {r.context && <p className="muted small">⚠ Diese Nachrichten gehen dann an deinen KI-Anbieter.</p>}
           <WebToggle checked={r.web} onChange={(web) => set({ web })} />
           <label className="composer__ping">
+            <input type="checkbox" checked={r.quietWhenOpen !== false} onChange={(e) => set({ quietWhenOpen: e.target.checked })} /> Nicht antworten, wenn ich den Chat gerade selbst offen habe
+          </label>
+          <p className="muted small">💡 Als Erwähnung zählt: @Bot, die Bot-Rolle oder eine Antwort auf eine Nachricht des Bots.</p>
+          <label className="composer__ping">
             <input type="checkbox" checked={r.notify} onChange={(e) => set({ notify: e.target.checked })} /> Hinweis in der App, wenn der Bot geantwortet hat
           </label>
           <p className="muted small">🛑 Schutz: antwortet nie anderen Bots, höchstens alle 15 Sek. pro Kanal und 30× pro Stunde, pingt niemanden.</p>
@@ -410,6 +414,17 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
           <button className="btn btn--ghost btn--small" onClick={() => setR(cfg.responder)}>
             Verwerfen
           </button>
+        </div>
+      )}
+      {cfg.skips?.length > 0 && (
+        <div className="ai-recent">
+          <span className="settings__label">Nicht geantwortet (warum?)</span>
+          {cfg.skips.map((e, i) => (
+            <div key={i} className="small muted">
+              ⏭ {formatListTime(e.at, Date.now())} · {e.userName}
+              {targets.find((t) => t.id === e.channelId) ? ` in ${targets.find((t) => t.id === e.channelId).label}` : ' (Privatchat)'}: {e.text}
+            </div>
+          ))}
         </div>
       )}
       {cfg.recent?.length > 0 && (
@@ -691,7 +706,20 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
             >
               {busy === 'test' ? 'Teste …' : '🔌 Verbindung testen'}
             </button>
+            <label className="composer__ping" data-setting="ai-autoconnect">
+              <input type="checkbox" checked={cfg.options.autoConnect} onChange={wrap('opt', async () => setCfg(await api.aiSetOptions({ autoConnect: !cfg.options.autoConnect })))} /> Beim Start automatisch verbinden
+            </label>
           </div>
+          {cfg.conn && (
+            <p className={`small ${cfg.conn.ok ? 'ok' : 'warn'}`} role="status">
+              {cfg.conn.ok ? `🟢 Verbunden mit ${cfg.conn.model || cfg.model}` : `🔴 Nicht verbunden: ${cfg.conn.message}`} · {formatListTime(cfg.conn.at, Date.now())}
+              {!cfg.conn.ok && cfg.options.autoConnect ? ' · neuer Versuch in 5 Minuten' : ''}
+            </p>
+          )}
+          <label className="composer__ping" data-setting="ai-thinking">
+            <input type="checkbox" checked={cfg.options.thinking} onChange={wrap('opt', async () => setCfg(await api.aiSetOptions({ thinking: !cfg.options.thinking })))} /> 🧠 Denkendes Modell (Thinking)
+          </label>
+          <p className="muted small">Für Modelle, die erst „nachdenken“ (z. B. Qwen3, DeepSeek-R1, …-thinking). Sie bekommen mehr Zeit und Platz, ihre Gedanken landen nie im Chat.</p>
 
           <ResponderSection key={JSON.stringify(cfg.responder)} cfg={cfg} targets={targets} guilds={guilds} toast={toast} />
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '../api';
+import { api, onEvent } from '../api';
 import { bus, messageStore, NavContext } from '../state';
 import { compareSnowflakes, timestampOf } from '../../shared/snowflake';
 import { toPlainText } from '../../shared/mentions';
@@ -184,6 +184,37 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   useEffect(() => {
     if (guildId || channelId) api.setLastLocation({ guildId: guildId === DM_ID ? null : guildId, channelId }).catch(() => {});
   }, [guildId, channelId]);
+
+  // KI soll nicht antworten, während du den Chat selbst offen hast (Issue #1) → Main wissen lassen, was offen ist
+  const openChatId = activeThread?.id || channelId || null;
+  useEffect(() => {
+    const report = () => api.setActiveChat({ channelId: openChatId, focused: document.hasFocus() && !document.hidden }).catch(() => {});
+    report();
+    window.addEventListener('focus', report);
+    window.addEventListener('blur', report);
+    document.addEventListener('visibilitychange', report);
+    return () => {
+      window.removeEventListener('focus', report);
+      window.removeEventListener('blur', report);
+      document.removeEventListener('visibilitychange', report);
+    };
+  }, [openChatId]);
+
+  // „🤖 KI schreibt gerade an …“ (Issue #1)
+  const [aiBusy, setAiBusy] = useState({}); // channelId → userName
+  useEffect(
+    () =>
+      onEvent((type, p) => {
+        if (type !== 'ai:busy' || !p?.channelId) return;
+        setAiBusy((m) => {
+          const next = { ...m };
+          if (p.on) next[p.channelId] = p.userName || '';
+          else delete next[p.channelId];
+          return next;
+        });
+      }),
+    [],
+  );
 
   // ---------- Live-Events ----------
   useEffect(() => {
@@ -529,6 +560,15 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
         <Tour />
+        {Object.keys(aiBusy).length > 0 && (
+          <div className="ai-busy" role="status">
+            {Object.entries(aiBusy).map(([cid, name]) => (
+              <button key={cid} className="ai-busy__item" onClick={() => setChannelId(cid)} title="Zum Chat springen">
+                <span className="ai-busy__dot" /> 🤖 KI schreibt gerade{name ? ` an ${name}` : ''} in {channelById.get(cid) ? `#${channelById.get(cid).name}` : 'einem Privatchat'} …
+              </button>
+            ))}
+          </div>
+        )}
         {profileOf && (
           <ProfileCard
             userId={profileOf.userId}

@@ -142,7 +142,7 @@ test('Lokale KI finden: fragt nur localhost und meldet laufende Programme mit Mo
 
 test('Validierung: web-Schalter und Modell-Abfrage', () => {
   assert.equal(validators.aiResponder({ enabled: true, channelIds: [], dms: false, allowUsers: [], blockUsers: [], instructions: '', context: false, notify: true }).web, false);
-  assert.throws(() => validators.aiResponder({ enabled: true, channelIds: [], dms: false, allowUsers: [], blockUsers: [], instructions: '', context: false, notify: true, web: 'ja' }), /web/);
+  assert.throws(() => validators.aiResponder({ enabled: true, channelIds: [], dms: false, allowUsers: [], blockUsers: [], instructions: '', context: false, notify: true, web: 'ja' }), /Schalter/);
   assert.deepEqual(validators.aiModels({ provider: 'openai', baseUrl: 'http://localhost:11434/v1' }), { provider: 'openai', baseUrl: 'http://localhost:11434/v1' });
   assert.throws(() => validators.aiModels({ provider: 'x', baseUrl: 'http://localhost:11434/v1' }), /Anbieter/);
 });

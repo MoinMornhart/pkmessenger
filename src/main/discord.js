@@ -397,6 +397,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         everyone: Boolean(msg?.mentions?.everyone),
       },
       reference: msg?.reference?.messageId ? { messageId: msg.reference.messageId, channelId: msg.reference.channelId ?? null, ...replyPreview(msg) } : null,
+      toBot: isToBot(msg),
       reactions: valuesOf(msg?.reactions?.cache).map(serializeReaction).filter(Boolean),
       embeds: (Array.isArray(msg?.embeds) ? msg.embeds : []).slice(0, 10).map(serializeEmbed),
       pinned: Boolean(msg?.pinned),
@@ -423,6 +424,18 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   }
 
   // F7: Vorschau der Nachricht, auf die geantwortet wurde (nur wenn sie im Speicher liegt – kein Extra-Request)
+  /** Ging die Nachricht an den Bot? @Bot, @Bot-Rolle (verwaltete Rolle des Bots) oder Antwort auf eine Bot-Nachricht. */
+  function isToBot(msg) {
+    const botId = client?.user?.id;
+    if (!botId || !msg) return false;
+    if (valuesOf(msg.mentions?.users).some((u) => u.id === botId)) return true;
+    const botRole = msg.guild?.members?.me?.roles?.botRole?.id;
+    if (botRole && valuesOf(msg.mentions?.roles).some((r) => r.id === botRole)) return true;
+    if (msg.mentions?.repliedUser?.id === botId) return true;
+    const ref = msg.reference?.messageId ? msg.channel?.messages?.cache?.get?.(msg.reference.messageId) : null;
+    return ref?.author?.id === botId;
+  }
+
   function replyPreview(msg) {
     const ref = msg?.channel?.messages?.cache?.get?.(msg.reference.messageId);
     if (!ref) return { authorName: null, text: null };
