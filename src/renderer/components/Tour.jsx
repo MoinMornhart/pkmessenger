@@ -55,10 +55,13 @@ export function buildSteps() {
   }
   steps.push(
     { target: '.chatlist__items', title: 'Deine Chats', text: 'Neue Nachrichten stehen oben, ein Punkt zeigt Ungelesenes.', task: 'Klick jetzt auf einen Chat.', click: '.chatlist__items .chatrow' },
-    { target: '.chatlist__items .chatrow', title: 'Rechtsklick auf einen Chat', text: 'Als gelesen markieren, 🖼 eigenen Hintergrund für diesen Chat oder Server, Link kopieren, umbenennen und verschieben (wenn der Bot darf).' },
+    { target: '.chatlist__items .chatrow', title: 'Rechtsklick auf einen Chat', text: 'Mit der rechten Maustaste öffnet sich ein kurzes Menü mit mehr Möglichkeiten.', task: 'Mach jetzt einen Rechtsklick auf einen Chat.', done: () => has('.ctx-menu') },
+    { target: '.ctx-menu', title: 'Das kurze Menü', text: '✓ Als gelesen markieren · 🖼 Hintergrund für diesen Chat oder den ganzen Server · 🔗 Link kopieren · ✏️ Umbenennen und ⬆️⬇️ Verschieben (wenn der Bot darf). Ein Klick daneben schließt es.' },
     { target: '.chatlist__head [aria-label="Aktualisieren"]|.chatlist__head [aria-label="Sortierung wechseln"]|.chatlist__head [aria-label="Nicht stören"]|.chatlist__head [aria-label="Einstellungen"]', title: 'Oben in der Liste', text: '⟳ neu laden · ☰ sortieren (neueste oder nach Kategorien) · 🔔 Nicht stören (keine Töne) · ⚙ Einstellungen. Töne und eigene Benachrichtigungstöne stellst du in den Einstellungen ein.' },
     { target: '.composer textarea', title: 'Schreiben', text: 'Alles geht als dein Bot raus (mit BOT-Abzeichen). „@“ schlägt Namen vor, „#“ Kanäle, „/“ Befehle wie /münze, /spoiler oder /umfrage. Text markieren → Menü zum Formatieren.', task: 'Tippe ein „/“ ins Feld.', done: () => ($('.composer textarea')?.value || '').startsWith('/') },
     { target: '.composer .tool-btn', all: true, title: 'Die Knöpfe unten', text: '📎 Dateien anhängen (bis 25 MB) · ▤ Embed bauen (Kasten mit Titel, Farbe, Bild) · 😀 Smileys · 📊 Umfrage erstellen.' },
+    { target: '.msglist .msg--in', title: 'Rechtsklick auf eine Nachricht', text: 'Auch Nachrichten haben ein kurzes Menü.', task: 'Mach einen Rechtsklick auf eine Nachricht.', done: () => has('.ctx-menu') },
+    { target: '.ctx-menu', title: 'Alles zu einer Nachricht', text: '↩ Antworten · 👍❤️ schnell reagieren · 📋 Text kopieren · 🔗 Link kopieren · 🧵 Thread starten · 📌 anheften · ✏️ bearbeiten / 🗑 löschen (eigene) · 👤 Person verwalten.' },
     { target: '.msglist .msg', title: 'Nachrichten', text: 'Klick auf Bild oder Namen zeigt das Profil. Maus drüber: antworten, reagieren, Thread. Rechtsklick: alle Aktionen, auch kopieren, anheften und Person verwalten. Gefährliche Links werden automatisch gesperrt.' },
     { target: '.chat__head [aria-label="Threads"]|.chat__head [aria-label="Angeheftete Nachrichten"]|.chat__head [aria-label="Suchen"]', title: 'Threads, Pins, Suche', text: '🧵 Threads (Neben-Unterhaltungen) ansehen und starten · 📌 angeheftete Nachrichten · 🔎 im Chat suchen (Strg+F). Strg+K springt zu jedem Chat, auch mit Tippfehlern.' },
   );
@@ -75,6 +78,7 @@ export function buildSteps() {
 }
 
 const PAD = 8;
+const POPUPS = '.ctx-menu, .suggest, .emoji-panel, .format-bar';
 
 export default function Tour() {
   const [step, setStep] = useState(-1); // -1 = aus
@@ -111,11 +115,15 @@ export default function Tour() {
   useEffect(() => {
     if (step < 0) return undefined;
     setDone(false);
+    // Offenes Rechtsklick-Menü vom vorigen Schritt schließen, wenn es hier nicht mehr gebraucht wird
+    if (!String(STEPS[step]?.target || '').includes('.ctx-menu') && document.querySelector('.ctx-menu')) window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     const s = STEPS[step];
     const tick = () => {
       // Mehrere Ziele („a|b|c“ oder all: true) → gemeinsamen Rahmen um alle legen
       const els = !s.target ? [] : s.all ? [...document.querySelectorAll(s.target)] : s.target.split('|').map((x) => $(x.trim())).filter(Boolean);
-      const rs = els.map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0);
+      // Was gerade aufgeht (Rechtsklick-Menü, Vorschläge, Smileys, Formatieren …), gehört mit ins Licht (Issue #35)
+      const popups = [...document.querySelectorAll(POPUPS)].filter((el) => !el.closest('.tour'));
+      const rs = [...els, ...(els.length ? popups : [])].map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0);
       if (!rs.length) setRect(null);
       else {
         const x1 = Math.min(...rs.map((r) => r.left));
@@ -146,7 +154,7 @@ export default function Tour() {
 
   useEffect(() => {
     if (step < 0) return undefined;
-    const onKey = (e) => e.key === 'Escape' && finish('skipped');
+    const onKey = (e) => e.key === 'Escape' && !document.querySelector(POPUPS) && finish('skipped');
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [step, finish]);
@@ -163,6 +171,7 @@ export default function Tour() {
     const above = rect.y - 14 - 220;
     const right = rect.x + rect.w + 14;
     if (rect.w < vw * 0.45 && right + 360 < vw) card = { left: right, top: Math.min(Math.max(12, rect.y), vh - 240) };
+    else if (rect.x - 374 > 12) card = { left: rect.x - 374, top: Math.min(Math.max(12, rect.y), vh - 240) }; // links daneben (z. B. Eingabefeld + Vorschläge)
     else if (below + 220 < vh) card = { left: Math.min(Math.max(12, rect.x), vw - 372), top: below };
     else if (above > 12) card = { left: Math.min(Math.max(12, rect.x), vw - 372), top: above };
   }
