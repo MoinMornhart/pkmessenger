@@ -225,7 +225,7 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
                 <span className="chatrow__preview">
                   {p ? (
                     <>
-                      {p.isOwn ? <span className="tick" aria-label="gesendet">✓</span> : <span className="chatrow__author">{p.authorName}: </span>}
+                      {p.system ? null : p.isOwn ? <span className="tick" aria-label="gesendet">✓</span> : <span className="chatrow__author">{p.authorName}: </span>}
                       {p.text || '…'}
                     </>
                   ) : (

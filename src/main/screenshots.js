@@ -42,6 +42,8 @@ async function runScreenshots(win, dir, { demo, stats }) {
   await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
   await wait(1200);
   await shoot(win, dir, '02-chat');
+  const sys = await js(win, `JSON.stringify([...document.querySelectorAll('.sysmsg')].map(e=>e.textContent.slice(0,60)))`);
+  console.log(`[system] Systemnachrichten: ${sys}`);
   await js(win, typeInto('.composer textarea', 'Hey @an'));
   await wait(900);
   await shoot(win, dir, '03-mention-autocomplete');

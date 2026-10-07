@@ -183,3 +183,14 @@ Nebenbei: iCloud hat erneut eine Datei umbenannt (`SettingsDialog.jsx` → `Sett
 6. **Prävention:** Fehlermeldungen immer auch nach `describeError` prüfen (so, wie sie die Oberfläche sieht).
 
 Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zweiten Lauf versehentlich **aus**, weil `settings-dev-demo.json` den Zustand vom letzten Lauf behielt („Illegal invocation“ beim Ausfüllen eines nicht mehr vorhandenen Feldes). Der Lauf setzt jetzt KI-Beta, Privatchats und Bildschirmschutz beim Start zurück.
+
+---
+
+## #15 – Systemnachrichten und Umfragen erschienen leer
+
+1. **Datum & Uhrzeit:** 07.10.2026
+2. **Was passiert ist:** JoniMoni: „Stelle sicher, dass Systemnachrichten erkannt werden“. Beitritte, Boosts, Pins usw. erschienen als leere Sprechblase. Beim Prüfen fiel außerdem auf, dass in der Chatliste bei einer Umfrage als letzter Nachricht nur „✓ …“ stand.
+3. **Ursache (geprüft):** Discord schickt für Systemnachrichten meist **keinen Text**, nur einen Nachrichtentyp (`type`, z. B. 7 = Beitritt). Die App hat den Typ nicht übertragen und alles als normale Nachricht gezeichnet. Für Umfragen und Embeds ohne Text gab es keinen Vorschautext.
+4. **Lösung:** `src/shared/system-messages.js` übersetzt alle Typen aus der Discord-Doku ins Deutsche (mit Fallback für künftige Typen). Systemnachrichten erscheinen mittig als Hinweis, trennen die Gruppierung und haben eine Vorschau. Umfragen zeigen in der Vorschau „📊 Frage“, Embeds „▤ Titel“.
+5. **Testergebnis:** `tests/test-system-messages.js` (6 Tests), insgesamt 162/162 grün. Demo: Beitritt und Boost sichtbar.
+6. **Prävention:** Neue Nachrichtenarten (Umfrage, Embed, System) immer auch in der Chat-Vorschau prüfen.
