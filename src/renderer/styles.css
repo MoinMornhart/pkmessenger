@@ -4367,3 +4367,49 @@ kbd {
   gap: 3px;
   font-size: 13.5px;
 }
+
+/* ---------- Fernzugang im WLAN (Issue #46/#50) ---------- */
+.remote {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+.remote__pw {
+  display: grid;
+  gap: 6px;
+  max-width: 420px;
+}
+.remote__pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line));
+  border-radius: 12px;
+  background: var(--panel-2);
+}
+.remote__pair img {
+  background: #fff;
+  border-radius: 8px;
+  image-rendering: pixelated;
+}
+.remote__pair > div {
+  flex: 1 1 240px;
+}
+.remote__url {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11.5px;
+  word-break: break-all;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--panel);
+}
+.remote__log {
+  max-height: 180px;
+  overflow: auto;
+  display: grid;
+  gap: 2px;
+}

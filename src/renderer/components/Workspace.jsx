@@ -22,6 +22,7 @@ import { getLists, loadLists, onListsChanged } from '../linkLists';
 import ProfileCard from './ProfileCard.jsx';
 import Tour from './Tour.jsx';
 import WhatsNew from './WhatsNew.jsx';
+import { RemoteApprovals } from './RemoteSection.jsx';
 import SetupWizard from './SetupWizard.jsx';
 import { prefs } from '../prefs';
 import JoinServerDialog from './JoinServerDialog.jsx';
@@ -204,6 +205,16 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
       document.removeEventListener('visibilitychange', report);
     };
   }, [openChatId]);
+
+  // Fernzugang: jede Aktivität eines anderen Geräts sichtbar machen (Issue #50: „Host muss sehen, dass Aktivität ist“)
+  useEffect(
+    () =>
+      onEvent((type, p) => {
+        if (type !== 'remote:activity' || !p || p.quiet || !p.device) return;
+        toast({ kind: /Falsch|abgelehnt/.test(p.action) ? 'warn' : 'info', title: `📱 ${p.device}: ${p.action}`, text: p.detail ? `„${p.detail}“` : p.ip ? `von ${p.ip}` : '', duration: 5000 });
+      }),
+    [toast],
+  );
 
   // Online-Status live (Issue #1): userId → Status, aus Ereignissen
   const [presence, setPresence] = useState({});
@@ -601,6 +612,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
         <Tour />
         <WhatsNew version={appInfo?.version} />
+        <RemoteApprovals />
         {wizardOpen && (
           <div className="modal-backdrop" onMouseDown={() => setWizardOpen(false)}>
             <div className="modal wizard-modal" role="dialog" aria-label="Einrichtungs-Assistent" onMouseDown={(e) => e.stopPropagation()}>

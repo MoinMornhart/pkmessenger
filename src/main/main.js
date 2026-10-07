@@ -19,6 +19,10 @@ const { createMemory } = require('./ai-memory');
 const { createHello } = require('./hello');
 const { createLogger, buildReport } = require('./logger');
 const { createBlocklist } = require('./blocklist');
+const { createRemote } = require('./remote');
+const { validators: remoteValidators } = require('./validate');
+const os = require('node:os');
+const qrcode = require('qrcode-generator');
 const { createAppLock } = require('./app-lock');
 const { createTokenStore } = require('./secrets');
 
@@ -152,6 +156,35 @@ const openLogFolder = () => {
 
 // Öffentliche Sperrlisten für den Link-Schutz: täglich von GitHub, lokal geprüft (Demo: kleine Liste, kein Netz)
 const blocklist = createBlocklist({ dir: demo ? null : app.getPath('userData'), emit: broadcast, ...(demo ? { fetchImpl: demo.blocklistFetch } : {}) });
+
+// Fernzugang im WLAN (Issue #46/#50, Eigentümer-Freigabe 07.10.2026): ab Werk aus, nur private Netze
+const lanAddresses = () =>
+  Object.values(os.networkInterfaces())
+    .flat()
+    .filter((i) => i && i.family === 'IPv4' && !i.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(i.address))
+    .map((i) => i.address)
+    .sort((a, b) => Number(!a.startsWith('192.168.')) - Number(!b.startsWith('192.168.'))); // echtes WLAN vor virtuellen Adaptern (WSL/Hyper-V)
+const remote = createRemote({
+  service,
+  validators: remoteValidators,
+  store,
+  vault: demo ? (() => { let r = null; return { get: () => r, set: (v) => (r = v), clear: () => (r = null) }; })() : createSecretFile({ safeStorage, filePath: path.join(app.getPath('userData'), 'remote-devices.enc') }),
+  emit: broadcast,
+  logger,
+  webDir: path.join(__dirname, '..', 'remote-web'),
+  naclPath: require.resolve('tweetnacl/nacl-fast.min.js'),
+  // Demo/Screenshot-Lauf: nur auf diesem PC lauschen (keine Firewall-Abfrage)
+  lanAddresses: demo ? () => ['127.0.0.1'] : lanAddresses,
+  bindHost: demo ? '127.0.0.1' : '0.0.0.0',
+});
+/** Einmal-Code + QR-Code (als Bild) für die Oberfläche */
+remote.createPairingWithQr = () => {
+  const p = remote.createPairing();
+  const qr = qrcode(0, 'M');
+  qr.addData(p.url);
+  qr.make();
+  return { ...p, qr: qr.createDataURL(6, 2) };
+};
 
 // Windows Hello zum Entsperren (Issue #29) – Windows-eigene Prüfung, siehe hello.js
 const hello = demo ? { availability: async () => 'Available', verify: async () => true } : createHello();
@@ -310,13 +343,15 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
   const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote }, isTrustedSender);
   // Automatische Sperre: PC eine Weile unbenutzt → App sperren
   setInterval(() => appLock.idleTick(powerMonitor.getSystemIdleTime()), 30000).unref?.();
   createWindow();
   updateTray();
   service.connect(); // async – blockiert das Fenster nicht
   updater.start();
+  // Fernzugang: nur wenn der Besitzer ihn eingeschaltet hat
+  if (store.get().remote?.enabled && !SHOTS_ARG) remote.start().catch(() => {});
   // Sperrlisten: kurz nach dem Start, dann alle 6 Stunden prüfen (geladen wird nur, wenn älter als 24 h)
   setTimeout(() => blocklist.update().catch(() => {}), 8000).unref?.();
   setInterval(() => blocklist.update().catch(() => {}), 6 * 60 * 60 * 1000).unref?.();
@@ -337,6 +372,7 @@ app.on('before-quit', (e) => {
   } catch {
     /* ignorieren */
   }
+  remote.stop().catch(() => {});
   try {
     voice.leave(); // sauber auflegen
   } catch {

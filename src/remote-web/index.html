@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="referrer" content="no-referrer" />
+    <title>PKMessenger – Fernzugang</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --panel: #161a23;
+        --panel2: #1e2330;
+        --line: #2a3142;
+        --text: #e8ecf3;
+        --muted: #9aa3b5;
+        --accent: #2dd4bf;
+        --warn: #f87171;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--line);
+        z-index: 2;
+      }
+      header h1 {
+        font-size: 16px;
+        margin: 0;
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      main {
+        padding: 14px;
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+        margin-bottom: 12px;
+      }
+      label {
+        display: block;
+        margin: 10px 0 4px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      input,
+      textarea {
+        width: 100%;
+        padding: 11px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--panel2);
+        color: var(--text);
+        font: inherit;
+      }
+      button {
+        font: inherit;
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 16px;
+        background: var(--panel2);
+        color: var(--text);
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--accent);
+        color: #062b27;
+        font-weight: 700;
+      }
+      button.back {
+        padding: 6px 12px;
+      }
+      .list button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border-radius: 12px;
+        margin-bottom: 6px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+      .msg {
+        margin: 6px 0;
+        padding: 8px 12px;
+        border-radius: 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        max-width: 88%;
+        word-wrap: break-word;
+      }
+      .msg.own {
+        margin-left: auto;
+        background: #134e48;
+      }
+      .msg b {
+        display: block;
+        font-size: 12.5px;
+        color: var(--accent);
+      }
+      .msg small {
+        display: block;
+        text-align: right;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .composer {
+        position: sticky;
+        bottom: 0;
+        display: flex;
+        gap: 8px;
+        padding: 10px 0 14px;
+        background: var(--bg);
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .warn {
+        color: var(--warn);
+      }
+      .bot {
+        padding: 1px 6px;
+        border-radius: 5px;
+        background: #5865f2;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .hidden {
+        display: none !important;
+      }
+      #messages {
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <button id="back" class="back hidden" aria-label="Zurück">←</button>
+      <h1 id="title">PKMessenger · Fernzugang</h1>
+      <button id="logout" class="back hidden">Abmelden</button>
+    </header>
+    <main>
+      <section id="pair" class="card hidden">
+        <h2>Gerät koppeln</h2>
+        <p class="muted">Gib dem Gerät einen Namen und das Fernzugangs-Passwort ein. Danach musst du die Kopplung am PC bestätigen.</p>
+        <label for="pair-name">Name dieses Geräts</label>
+        <input id="pair-name" maxlength="40" placeholder="z. B. Handy von Anna" />
+        <label for="pair-pw">Fernzugangs-Passwort</label>
+        <input id="pair-pw" type="password" autocomplete="current-password" />
+        <p><button id="pair-go" class="primary">Koppeln</button></p>
+        <p id="pair-msg" class="muted"></p>
+      </section>
+      <section id="login" class="card hidden">
+        <h2>Anmelden</h2>
+        <p class="muted">Aus Sicherheitsgründen fragt PKMessenger bei jeder Sitzung nach dem Passwort.</p>
+        <label for="login-pw">Fernzugangs-Passwort</label>
+        <input id="login-pw" type="password" autocomplete="current-password" />
+        <p><button id="login-go" class="primary">Anmelden</button></p>
+        <p id="login-msg" class="muted"></p>
+      </section>
+      <section id="nodevice" class="card hidden">
+        <h2>Nicht gekoppelt</h2>
+        <p class="muted">Öffne am PC: Einstellungen → Sicherheit &amp; Start → Fernzugang → „Gerät hinzufügen“ und scanne den QR-Code.</p>
+      </section>
+      <section id="home" class="hidden">
+        <p class="muted" id="sendas"></p>
+        <div id="list" class="list"></div>
+      </section>
+      <section id="chat" class="hidden">
+        <div id="messages"></div>
+        <div class="composer">
+          <input id="text" maxlength="2000" placeholder="Nachricht schreiben …" aria-label="Nachricht" />
+          <button id="send" class="primary" aria-label="Senden">➤</button>
+        </div>
+        <p id="chat-msg" class="muted"></p>
+      </section>
+    </main>
+    <script src="/nacl.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

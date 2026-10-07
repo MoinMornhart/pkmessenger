@@ -341,6 +341,87 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
     await wait(300);
     console.log(`[hilfe] Check: ${check} · Ups: ${oops}`);
+    // Fernzugang im WLAN (#46/#50): Passwort, einschalten, QR, „Handy“ koppelt sich, Bestätigung am PC, Nachricht senden
+    {
+      const nacl = require('tweetnacl');
+      const seal = (obj, key) => {
+        const n = nacl.randomBytes(24);
+        return { n: Buffer.from(n).toString('base64'), c: Buffer.from(nacl.secretbox(Buffer.from(JSON.stringify(obj)), n, key)).toString('base64') };
+      };
+      const unseal = (m, key) => {
+        const p = m?.n ? nacl.secretbox.open(new Uint8Array(Buffer.from(m.c, 'base64')), new Uint8Array(Buffer.from(m.n, 'base64')), key) : null;
+        return p ? JSON.parse(Buffer.from(p).toString()) : m;
+      };
+      const post = async (u, body) => (await fetch(u, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json();
+      const setIn = (sel, v) => js(win, `(() => { const el=document.querySelector(${JSON.stringify(sel)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(v)}); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+      await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+      await wait(500);
+      await js(win, `document.querySelector('.settings__nav [data-nav="sicherheit"]')?.click()`);
+      await wait(400);
+      await setIn('input[aria-label="Neues Fernzugangs-Passwort"]', 'demo-passwort-123');
+      await setIn('input[aria-label="Fernzugangs-Passwort wiederholen"]', 'demo-passwort-123');
+      await js(win, `[...document.querySelectorAll('.remote .btn')].find(b=>b.textContent.includes('Passwort festlegen'))?.click()`);
+      await wait(600);
+      await js(win, `[...document.querySelectorAll('.remote label.composer__ping')].find(l=>l.textContent.includes('einschalten'))?.querySelector('input')?.click()`);
+      await wait(800);
+      await js(win, `[...document.querySelectorAll('.remote .btn')].find(b=>b.textContent.includes('Gerät hinzufügen'))?.click()`);
+      await wait(800);
+      await js(win, `document.querySelector('.remote__pair')?.scrollIntoView({block:'center'})`);
+      await wait(300);
+      await shoot(win, dir, '73-fernzugang-qr');
+      const url = await js(win, `document.querySelector('.remote__url')?.textContent || ''`);
+      let result = { url: Boolean(url) };
+      if (url) {
+        const h = new URLSearchParams(new URL(url).hash.slice(1));
+        const key = new Uint8Array(Buffer.from(h.get('k'), 'base64url'));
+        const base = url.split('#')[0];
+        // Web-Oberfläche erreichbar?
+        result.web = (await fetch(base)).status;
+        const pairing = post(`${base}api/pair`, { p: h.get('p'), ...seal({ password: 'demo-passwort-123', name: 'Annas Handy', t: Date.now() }, key) });
+        await wait(900);
+        await shoot(win, dir, '74-fernzugang-bestaetigen');
+        result.frage = await js(win, `document.querySelector('[aria-label="Fernzugang bestätigen"] h3')?.textContent || null`);
+        await js(win, `[...document.querySelectorAll('[aria-label="Fernzugang bestätigen"] .btn')].find(b=>b.textContent.includes('Zulassen'))?.click()`);
+        const dev = unseal(await pairing, key);
+        result.gekoppelt = Boolean(dev.deviceId);
+        if (dev.deviceId) {
+          const dk = new Uint8Array(Buffer.from(dev.deviceKey, 'base64'));
+          const call = async (op, args, session) => unseal(await post(`${base}api`, { d: dev.deviceId, ...seal({ op, args, session, t: Date.now() }, dk) }), dk);
+          const login = await call('login', { password: 'demo-passwort-123' });
+          const guilds = await call('guilds', null, login.session);
+          const groups = await call('channels', { guildId: guilds.data[0].id }, login.session);
+          const ch = groups.data.flatMap((g) => g.channels).find((c) => c.name === 'allgemein');
+          const sent = await call('send', { channelId: ch.id, content: 'Hallo vom Handy 📱' }, login.session);
+          result.gesendet = sent.data?.content || sent.error;
+          await wait(800);
+          await shoot(win, dir, '75-fernzugang-aktivitaet');
+          result.protokoll = await js(win, `[...document.querySelectorAll('.remote__log div')].slice(0,3).map(d=>d.textContent.replace(/^[^·]+· /,'')).join(' | ')`);
+        }
+      }
+      // Handy-Oberfläche im echten Browserfenster (Handygröße) – lädt sie fehlerfrei?
+      try {
+        const { BrowserWindow } = require('electron');
+        const phone = new BrowserWindow({ width: 400, height: 760, show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+        const errs = [];
+        phone.webContents.on('console-message', (e) => e.level === 'error' && errs.push(e.message));
+        const fresh = await js(win, `document.querySelector('.remote__url')?.textContent || ''`);
+        await phone.loadURL(fresh || url);
+        await wait(800);
+        const img = await phone.webContents.capturePage();
+        require('fs').writeFileSync(require('path').join(dir, '76-fernzugang-handy.png'), img.toPNG());
+        result.handySeite = await phone.webContents.executeJavaScript(`document.querySelector('#pair:not(.hidden) h2, #nodevice:not(.hidden) h2')?.textContent || null`);
+        result.handyFehler = errs.length;
+        phone.destroy();
+      } catch (e) {
+        result.handyFehler = String(e.message);
+      }
+      console.log(`[fernzugang] ${JSON.stringify(result)}`);
+      await js(win, `[...document.querySelectorAll('.remote label.composer__ping')].find(l=>l.textContent.includes('einschalten'))?.querySelector('input')?.click()`);
+      await wait(400);
+      await js(win, `document.querySelector('.settings__nav [data-nav="alle"]')?.click()`);
+      await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+      await wait(300);
+    }
     // „Das ist neu“ nach einem Update (#44)
     await js(win, `window.dispatchEvent(new CustomEvent('pk:whats-new', { detail: { since: '0.0.1' } }))`);
     await wait(1200);

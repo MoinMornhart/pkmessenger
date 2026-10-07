@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, onEvent } from '../api';
+import RemoteSection from './RemoteSection.jsx';
 
 // Einstellungen → Sicherheit & Start: App-Passwort, automatische Sperre, mit Windows starten (Issue #1)
 const HELLO_TEXT = {
@@ -141,6 +142,7 @@ export default function SecuritySection({ toast }) {
           <p className="muted small">Gespeichert wird nur ein verschlüsselter Fingerabdruck (Hash), nie das Passwort selbst.</p>
         </div>
       )}
+      <RemoteSection toast={toast} />
     </>
   );
 }

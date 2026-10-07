@@ -537,6 +537,28 @@ const validators = {
     if (typeof summary !== 'string' || summary.length > 4000) throw new ValidationError('Die Zusammenfassung darf höchstens 4000 Zeichen haben.');
     return { userId: snowflake(userId, 'userId'), summary };
   },
+  remotePassword(p) {
+    const { password, current } = obj(p);
+    if (typeof password !== 'string' || password.length < 8 || password.length > 200) throw new ValidationError('Das Fernzugangs-Passwort braucht 8–200 Zeichen.');
+    if (current !== undefined && (typeof current !== 'string' || current.length > 200)) throw new ValidationError('Ungültiges bisheriges Passwort.');
+    return { password, current };
+  },
+  remoteOptions(p) {
+    const { requireApproval } = obj(p);
+    if (typeof requireApproval !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
+    return { requireApproval };
+  },
+  remoteDecide(p) {
+    const { id, allow } = obj(p);
+    if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{4,40}$/.test(id) || typeof allow !== 'boolean') throw new ValidationError('Ungültige Entscheidung.');
+    return { id, allow };
+  },
+  remoteId(p) {
+    const { id, pairId } = obj(p);
+    const v = id ?? pairId;
+    if (typeof v !== 'string' || !/^[A-Za-z0-9_-]{4,40}$/.test(v)) throw new ValidationError('Ungültige ID.');
+    return { id: v, pairId: v };
+  },
   logError(p) {
     const { where, message } = obj(p);
     return { where: typeof where === 'string' ? where.slice(0, 200) : 'renderer', message: typeof message === 'string' ? message.slice(0, 2000) : 'unknown' };
