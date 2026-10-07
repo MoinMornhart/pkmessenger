@@ -101,6 +101,7 @@
 4. **Ursache (geprüft):** In `.git/refs/heads/` lag statt `main` eine Datei **`main 2`**, so benennt iCloud Drive Dateien bei Sync-Konflikten. Ohne `refs/heads/main` hält Git den Branch für leer. Der Inhalt von `main 2` war korrekt (`5c16022…`), alle Objekte vorhanden, `origin/main` identisch.
 5. **Lösung:** `main 2` gesichert (Scratchpad), dann `git update-ref refs/heads/main 5c160229…` und `main 2` entfernt. Keine Daten verloren, nichts überschrieben.
 6. **Testergebnis:** `git status -sb` → `## main...origin/main`; `git log` zeigt 5c16022/2680646/5ea6faa; `git fsck --no-dangling` ohne Fehler.
+8. **Wiederholt am 07.10.2026, ca. 01:41:** Diesmal war `.git/refs/remotes/origin/main` zu `main 2` umbenannt. Wörtlich: `fatal: bad object refs/remotes/origin/main 2` und `error: https://github.com/Morni-Team/pkmessenger.git did not send all necessary objects`. Gleiche Reparatur (`git update-ref refs/remotes/origin/main 9ab2d34…`, Duplikat gesichert und entfernt). Danach `git fetch` ok, `fsck` ohne Fehler. **Das bestätigt, dass das Problem bei iCloud liegt und wiederkehrt.**
 7. **Prävention:** Das Projekt liegt im iCloud-Ordner, und iCloud verträgt sich schlecht mit `.git` und `node_modules`. **Empfehlung an den Nutzer:** das Projekt in einen Ordner außerhalb von iCloud verschieben (z. B. `C:\Projekte\PKMessenger`), da GitHub ohnehin die Sicherung ist. Bis dahin vor jedem Lauf prüfen: `find .git -name "* 2*"`.
 
 ---
