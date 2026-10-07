@@ -3221,3 +3221,52 @@ img.chat-avatar {
   border-left: 3px solid color-mix(in srgb, var(--text-2) 60%, transparent);
   color: var(--text-2);
 }
+
+/* ---------- Anruf: pro Teilnehmer stumm/lauter (nur für mich) ---------- */
+.tile__ctrl {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  margin-top: 6px;
+}
+.tile__mute {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.tile__mute.is-on {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  border-color: var(--danger);
+  color: var(--text);
+}
+.tile__ctrl input[type='range'] {
+  width: 110px;
+  accent-color: var(--accent);
+}
+
+/* ---------- Audio-Test und Hilfe ---------- */
+.mic-test {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+}
+.level--wide {
+  width: 200px;
+}
+.voice-help {
+  margin-top: 10px;
+  color: var(--text-2);
+}
+.voice-help summary {
+  cursor: pointer;
+  font-size: 13.5px;
+}
+.voice-help ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}

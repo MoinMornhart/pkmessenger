@@ -280,6 +280,7 @@ Mehr Details: [AGENTS.md](AGENTS.md) (Architektur, Entscheidungen, Teststand) ·
 - [x] Bildschirmschutz: Screenshots und Aufnahmen anderer Programme verbieten (Einstellungen → Datenschutz)
 - [x] Privatnachrichten mit dem Bot (💬 in der Leiste links)
 - [x] 🧪 Beta: KI-Agenten – eine KI postet zu festen Zeiten (beliebiger Anbieter, eigener API-Schlüssel)
+- [x] 🎧 Sprachkanal: Teilnehmer nur für mich stumm/leiser/lauter (gegen Doppelt-Hören), „Alles stumm“, Geräuschsperre (Noise-Gate), Echo-/Rauschunterdrückung schaltbar, Audio-Test + Hilfe
 - [x] ⌨️ Schnellbefehle mit „/“: /shrug, /tableflip, /unflip, /lenny, /me, /spoiler, /fett, /code, /zitat, /würfel, /münze, /umfrage, /embed, /hilfe
 - [x] Spoiler (||…||) und Zitate (> …) werden in der App richtig angezeigt
 - [x] ✍️ Text markieren → Leiste mit Fett, Kursiv, Unterstrichen, Durchgestrichen, Code, Spoiler, Zitat (auch Strg+B / I / U)

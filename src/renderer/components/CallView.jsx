@@ -1,7 +1,46 @@
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { ChannelAvatar, hueFor } from './ChatList.jsx';
+import { prefs } from '../prefs';
 
-function Tile({ person, speaking, isBot }) {
+// Pro Teilnehmer nur für mich: stumm schalten oder Lautstärke ändern (Issue #1: „man hört sich doppelt“)
+function PersonControls({ person }) {
+  const [fx, setFx] = useState(prefs.get().voiceFx);
+  useEffect(() => prefs.subscribe((p) => setFx(p.voiceFx)), []);
+  const muted = Boolean(fx.userMuted[person.id]);
+  const vol = fx.userVolume[person.id] ?? 1;
+  const set = (patch) => prefs.set({ voiceFx: { ...fx, ...patch } });
+  return (
+    <div className="tile__ctrl">
+      <button
+        className={`tile__mute ${muted ? 'is-on' : ''}`}
+        aria-pressed={muted}
+        title={muted ? 'Wieder hören' : 'Nur für mich stumm schalten'}
+        onClick={() => {
+          const userMuted = { ...fx.userMuted };
+          if (muted) delete userMuted[person.id];
+          else userMuted[person.id] = true;
+          set({ userMuted });
+        }}
+      >
+        {muted ? '🔇 für mich stumm' : '🔈 hören'}
+      </button>
+      {!muted && (
+        <input
+          type="range"
+          min="0"
+          max="2"
+          step="0.1"
+          value={vol}
+          aria-label={`Lautstärke von ${person.name}`}
+          title={`Lautstärke ${Math.round(vol * 100)} %`}
+          onChange={(e) => set({ userVolume: { ...fx.userVolume, [person.id]: Number(e.target.value) } })}
+        />
+      )}
+    </div>
+  );
+}
+
+function Tile({ person, speaking, isBot, controls }) {
   const hue = hueFor(person.id);
   return (
     <div className={`tile ${speaking ? 'is-speaking' : ''}`}>
@@ -15,6 +54,7 @@ function Tile({ person, speaking, isBot }) {
       <div className="tile__state">
         {person.deafened ? '🔈 Ton aus' : person.muted ? '🔇 stumm' : speaking ? 'spricht …' : ' '}
       </div>
+      {controls && <PersonControls person={person} />}
     </div>
   );
 }
@@ -50,7 +90,7 @@ function CallView({ channel, members, speaking, voice, bot, micLevel, onJoin, on
         <div className="call__grid">
           {here && bot && <Tile person={{ id: bot.id, name: bot.displayName, avatarUrl: bot.avatarUrl, muted: !voice.talking, deafened: !voice.listening }} speaking={voice.talking && micLevel > 0.08} isBot />}
           {(here ? others : members).map((m) => (
-            <Tile key={m.id} person={m} speaking={speaking.has(m.id)} />
+            <Tile key={m.id} person={m} speaking={speaking.has(m.id)} controls={here && voice.listening && !m.bot} />
           ))}
         </div>
         <p className="call__note">
@@ -88,9 +128,9 @@ function CallView({ channel, members, speaking, voice, bot, micLevel, onJoin, on
                 </span>
               )}
             </button>
-            <button className={`call-btn ${voice.listening ? 'is-on' : ''}`} onClick={onToggleListen} disabled={voice.state !== 'connected'} aria-pressed={voice.listening}>
+            <button className={`call-btn ${voice.listening ? 'is-on' : ''}`} onClick={onToggleListen} disabled={voice.state !== 'connected'} aria-pressed={voice.listening} title={voice.listening ? 'Alles stumm: niemanden mehr hören' : 'Wieder alle hören'}>
               <span aria-hidden="true">{voice.listening ? '🔊' : '🔈'}</span>
-              {voice.listening ? 'Ton an' : 'Ton aus'}
+              {voice.listening ? 'Ton an' : 'Alles stumm'}
             </button>
             <button className="call-btn call-btn--hangup" onClick={onLeave} title="Auflegen">
               <span aria-hidden="true">📞</span> Auflegen

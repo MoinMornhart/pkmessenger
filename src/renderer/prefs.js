@@ -1,8 +1,9 @@
 // Einstellungen dieses PCs (Audio, Chatliste, Aussehen, Töne). Keine Geheimnisse.
 import { sanitizeSound } from '../shared/notify-sounds';
+import { sanitizeVoiceFx } from '../shared/voice-settings';
 // localStorage kann fehlen/werfen → immer mit Standardwerten weiterarbeiten.
 const KEY = 'pk.prefs.v1';
-const DEFAULTS = Object.freeze({ micDeviceId: '', outputDeviceId: '', volume: 1, chatSort: 'recent', collapsed: {}, theme: 'nacht', accent: '', motion: 'voll', density: 'normal', sound: sanitizeSound(null) });
+const DEFAULTS = Object.freeze({ micDeviceId: '', outputDeviceId: '', volume: 1, chatSort: 'recent', collapsed: {}, theme: 'nacht', accent: '', motion: 'voll', density: 'normal', sound: sanitizeSound(null), voiceFx: sanitizeVoiceFx(null) });
 const THEME_IDS = ['nacht', 'ozean', 'lila', 'amoled', 'hell'];
 const pick = (v, allowed, fallback) => (allowed.includes(v) ? v : fallback);
 const listeners = new Set();
@@ -21,6 +22,7 @@ function read() {
       motion: pick(raw?.motion, ['voll', 'dezent', 'aus'], 'voll'),
       density: pick(raw?.density, ['normal', 'kompakt'], 'normal'),
       sound: sanitizeSound(raw?.sound),
+      voiceFx: sanitizeVoiceFx(raw?.voiceFx),
       collapsed: raw?.collapsed && typeof raw.collapsed === 'object' && !Array.isArray(raw.collapsed) ? Object.fromEntries(Object.entries(raw.collapsed).filter(([k, v]) => /^\d{17,20}$/.test(k) && v === true)) : {},
     };
   } catch {

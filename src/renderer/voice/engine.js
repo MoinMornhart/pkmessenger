@@ -5,6 +5,7 @@
 import { voicePacket, onVoiceAudio } from '../api';
 import { prefs } from '../prefs';
 import { SAMPLE_RATE, FRAME_SAMPLES, CHANNELS, createFrameAssembler, rms, nextPlayTime } from '../../shared/audio-frames';
+import { micConstraints, gateStep, userGain } from '../../shared/voice-settings';
 
 const OPUS_CONFIG = { codec: 'opus', sampleRate: SAMPLE_RATE, numberOfChannels: CHANNELS, bitrate: 64000, opus: { frameDuration: 20000 } };
 
@@ -18,7 +19,7 @@ export function micErrorText(err) {
 }
 
 // Zähler für Diagnose/automatische Tests (nur Zahlen, keine Audiodaten).
-const stats = (window.__pkVoiceStats = { encoded: 0, decoded: 0, played: 0 });
+const stats = (window.__pkVoiceStats = { encoded: 0, decoded: 0, played: 0, gated: 0, skippedMuted: 0 });
 
 export function createVoiceEngine({ onLevel = () => {} } = {}) {
   let ctx = null;
@@ -31,6 +32,8 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
   function applyOutput(p) {
     if (!ctx) return;
     if (master) master.gain.value = p.volume;
+    // Lautstärke je Teilnehmer (0 = für mich stumm)
+    for (const [userId, d] of decoders) if (d.gain) d.gain.gain.value = userGain(p.voiceFx, userId);
     // Lautsprecher-Auswahl (Chromium: AudioContext.setSinkId); '' = Windows-Standard
     if (typeof ctx.setSinkId === 'function') ctx.setSinkId(p.outputDeviceId || '').catch(() => {});
   }
@@ -46,12 +49,13 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
     return ctx;
   }
 
-  let lastMic = prefs.get().micDeviceId;
+  const micKey = (p) => JSON.stringify([p.micDeviceId, p.voiceFx.echo, p.voiceFx.noise, p.voiceFx.agc]);
+  let lastMic = micKey(prefs.get());
   const offPrefs = prefs.subscribe((p) => {
     applyOutput(p);
-    // Anderes Mikrofon gewählt, während das Mikro an ist → nahtlos umschalten
-    if (p.micDeviceId !== lastMic) {
-      lastMic = p.micDeviceId;
+    // Anderes Mikrofon oder Echo/Rauschen/Automatik geändert, während das Mikro an ist → nahtlos neu starten
+    if (micKey(p) !== lastMic) {
+      lastMic = micKey(p);
       if (mic) {
         stopMic();
         startMic().catch(() => {});
@@ -63,11 +67,8 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
   async function startMic() {
     if (mic) return;
     const c = ensureContext();
-    const micId = prefs.get().micDeviceId;
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, ...(micId ? { deviceId: { ideal: micId } } : {}) },
-      video: false,
-    });
+    const p = prefs.get();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints(p.voiceFx, p.micDeviceId), video: false });
     try {
       await c.audioWorklet.addModule('voice-worklet.js');
     } catch {
@@ -78,6 +79,7 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
     const assembler = createFrameAssembler();
     let ts = 0;
     let levelTick = 0;
+    let gateOpenUntil = 0; // Noise-Gate (Issue #1: „Rauschen entfernen“)
     const encoder = new AudioEncoder({
       output: (chunk) => {
         const bytes = new Uint8Array(chunk.byteLength);
@@ -93,6 +95,12 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
       if (++levelTick % 8 === 0) onLevel(Math.min(1, rms(block) * 4));
       for (const frame of assembler.push(block)) {
         if (encoder.state !== 'configured') return;
+        const g = gateStep(rms(frame), prefs.get().voiceFx.gate, performance.now(), gateOpenUntil);
+        gateOpenUntil = g.openUntil;
+        if (!g.open) {
+          frame.fill(0); // Rauschen → Stille senden
+          stats.gated++;
+        }
         const data = new AudioData({ format: 'f32-planar', sampleRate: SAMPLE_RATE, numberOfFrames: FRAME_SAMPLES, numberOfChannels: CHANNELS, timestamp: ts, data: frame });
         ts += 20000;
         encoder.encode(data);
@@ -123,7 +131,13 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
   function decoderFor(userId) {
     let d = decoders.get(userId);
     if (d && d.decoder.state !== 'closed') return d;
-    d = { until: 0, ts: 0, decoder: null };
+    d = { until: 0, ts: 0, decoder: null, gain: null };
+    if (ctx) {
+      // Eigener Regler je Teilnehmer (für mich stumm / leiser / lauter)
+      d.gain = ctx.createGain();
+      d.gain.gain.value = userGain(prefs.get().voiceFx, userId);
+      d.gain.connect(master);
+    }
     d.decoder = new AudioDecoder({
       output: (audio) => {
         try {
@@ -139,7 +153,7 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
           }
           const src = ctx.createBufferSource();
           src.buffer = buffer;
-          src.connect(master);
+          src.connect(d.gain || master);
           const at = nextPlayTime(ctx.currentTime, d.until);
           src.start(at);
           stats.played++;
@@ -162,6 +176,10 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
       if (!offAudio)
         offAudio = onVoiceAudio((userId, data) => {
           if (!playback) return;
+          if (prefs.get().voiceFx.userMuted[userId]) {
+            stats.skippedMuted++; // für mich stumm → gar nicht erst dekodieren (spart Rechenleistung)
+            return;
+          }
           const d = decoderFor(userId);
           try {
             d.decoder.decode(new EncodedAudioChunk({ type: 'key', timestamp: (d.ts += 20000), data }));
@@ -172,7 +190,10 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
     } else {
       offAudio?.();
       offAudio = null;
-      for (const d of decoders.values()) if (d.decoder.state !== 'closed') d.decoder.close();
+      for (const d of decoders.values()) {
+        if (d.decoder.state !== 'closed') d.decoder.close();
+        d.gain?.disconnect();
+      }
       decoders.clear();
     }
   }
