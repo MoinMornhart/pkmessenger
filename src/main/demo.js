@@ -250,6 +250,12 @@ function createDemo() {
     if (/SEARCH: <short/.test(sys)) content = /<web_results/.test(user) ? '🌤 **Wetter heute:** sonnig, bis 21 °C – perfekt fürs Treffen um 19 Uhr! (Quelle: wetter.example)' : 'SEARCH: wetter heute berlin';
     return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content } }] }) };
   };
+  // Sperrlisten im Demo: kleine Listen statt Download
+  const blocklistFetch = async (url) => ({
+    ok: true,
+    status: 200,
+    text: async () => (url.endsWith('.txt') ? 'grabify.link\nfree-nitro-demo.example\n' : url.includes('suspicious') ? '{"domains":["komisch-demo.example"]}' : '{"domains":["steam-gift-demo.example"]}'),
+  });
   // Gedächtnis im Demo: nur im Arbeitsspeicher
   let memRaw = null;
   const memoryVault = { get: () => memRaw, set: (v) => (memRaw = v), clear: () => (memRaw = null) };
@@ -290,7 +296,7 @@ function createDemo() {
     autoUpdater.emit('checking-for-update');
     setTimeout(() => autoUpdater.emit('update-not-available'), 1200);
   };
-  return { world, envPath, createClient: () => client, voiceLib, stats, aiSecret, aiFetch, aiSearch, githubFetch, simulate, autoUpdater, memoryVault };
+  return { world, envPath, createClient: () => client, voiceLib, stats, aiSecret, aiFetch, aiSearch, githubFetch, simulate, autoUpdater, memoryVault, blocklistFetch };
 }
 
 module.exports = { createDemo };

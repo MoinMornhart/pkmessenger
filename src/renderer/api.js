@@ -36,6 +36,8 @@ export const api = Object.fromEntries(
     'errorReport',
     'openLogFolder',
     'setupCheck',
+    'blocklistGet',
+    'blocklistUpdate',
     'setPresence',
     'lockHello',
     'lockSetHello',

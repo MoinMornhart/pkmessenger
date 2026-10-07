@@ -301,6 +301,47 @@ function ProfileSection({ toast, guildId }) {
 }
 
 // Bildschirmschutz: andere Programme (Screenshots, Aufnahmen, Bildschirm teilen) sehen nur ein schwarzes Fenster
+// Öffentliche Sperrlisten: Stand + Quellen + „Jetzt aktualisieren“
+function BlocklistStatus() {
+  const [st, setSt] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api
+      .blocklistGet()
+      .then((r) => setSt({ at: r.at, total: r.total, sources: r.sources, error: r.error }))
+      .catch(() => setSt(null));
+  }, []);
+  const update = async () => {
+    setBusy(true);
+    try {
+      setSt(await api.blocklistUpdate());
+    } catch (e) {
+      setSt((s) => ({ ...(s || {}), error: e.message }));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="settings__field" data-setting="blocklist">
+      <span className="settings__label">📋 Sperrlisten (Betrug, Phishing, IP-Grabber)</span>
+      <p className="small">
+        {st?.total ? `${st.total.toLocaleString('de-DE')} gesperrte Adressen` : 'Noch nicht geladen'}
+        {st?.at ? ` · Stand ${new Date(st.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
+      </p>
+      {st?.sources && (
+        <p className="muted small">
+          Quellen: {Object.values(st.sources).map((s) => `${s.label} (${s.count.toLocaleString('de-DE')}${s.stale ? ', alt' : ''})`).join(' · ')}
+        </p>
+      )}
+      {st?.error && <p className="warn small">⚠ {st.error}</p>}
+      <button className="btn btn--small" disabled={busy} onClick={update}>
+        {busy ? 'Lade …' : '↻ Jetzt aktualisieren'}
+      </button>
+      <p className="muted small">Die Listen kommen täglich automatisch von GitHub (öffentliche Projekte der Discord-Community). Deine Links werden dabei nie verschickt, geprüft wird nur auf diesem PC.</p>
+    </div>
+  );
+}
+
 // Online-Status anzeigen (Issue #1) – braucht „Presence Intent“ im Entwicklerportal
 function PresenceToggle() {
   const [on, setOn] = useState(null);
@@ -401,7 +442,8 @@ function MediaPrivacy() {
       <label className="composer__ping" data-setting="links">
         <input type="checkbox" checked={p.linkWarn} onChange={(e) => prefs.set({ linkWarn: e.target.checked })} /> 🔗 Vor dem Öffnen von Links warnen
       </label>
-      <p className="muted small">🛡 Link-Schutz ist immer an: IP-Grabber, Betrugs-Links („gratis Nitro“) und nachgemachte Adressen werden erkannt, gesperrt und nicht kopierbar gemacht. Geprüft wird nur auf diesem PC, ohne fremde Dienste.</p>
+      <p className="muted small">🛡 Link-Schutz ist immer an: IP-Grabber, Betrugs-Links („gratis Nitro“) und nachgemachte Adressen werden erkannt, gesperrt und nicht kopierbar gemacht. Geprüft wird nur auf diesem PC, deine Links werden nie an einen Dienst geschickt.</p>
+      <BlocklistStatus />
       <TrustedDomains />
       <PresenceToggle />
     </>

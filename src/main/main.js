@@ -18,6 +18,7 @@ const { createAiManager, createSecretFile } = require('./ai');
 const { createMemory } = require('./ai-memory');
 const { createHello } = require('./hello');
 const { createLogger, buildReport } = require('./logger');
+const { createBlocklist } = require('./blocklist');
 const { createAppLock } = require('./app-lock');
 const { createTokenStore } = require('./secrets');
 
@@ -148,6 +149,9 @@ const openLogFolder = () => {
   shell.openPath(LOG_DIR);
   return true;
 };
+
+// Öffentliche Sperrlisten für den Link-Schutz: täglich von GitHub, lokal geprüft (Demo: kleine Liste, kein Netz)
+const blocklist = createBlocklist({ dir: demo ? null : app.getPath('userData'), emit: broadcast, ...(demo ? { fetchImpl: demo.blocklistFetch } : {}) });
 
 // Windows Hello zum Entsperren (Issue #29) – Windows-eigene Prüfung, siehe hello.js
 const hello = demo ? { availability: async () => 'Available', verify: async () => true } : createHello();
@@ -306,13 +310,16 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
   const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist }, isTrustedSender);
   // Automatische Sperre: PC eine Weile unbenutzt → App sperren
   setInterval(() => appLock.idleTick(powerMonitor.getSystemIdleTime()), 30000).unref?.();
   createWindow();
   updateTray();
   service.connect(); // async – blockiert das Fenster nicht
   updater.start();
+  // Sperrlisten: kurz nach dem Start, dann alle 6 Stunden prüfen (geladen wird nur, wenn älter als 24 h)
+  setTimeout(() => blocklist.update().catch(() => {}), 8000).unref?.();
+  setInterval(() => blocklist.update().catch(() => {}), 6 * 60 * 60 * 1000).unref?.();
   ai.start();
 });
 

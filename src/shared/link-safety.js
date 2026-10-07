@@ -57,7 +57,10 @@ function editDistance(a, b) {
  * Link prüfen. trustedExtra: eigene vertraute Domains aus den Einstellungen.
  * @returns {{ level: 'trusted'|'ok'|'unknown'|'warn'|'danger', host: string, reasons: string[] }}
  */
-function checkLink(url, trustedExtra = []) {
+/**
+ * lists: { danger: Set, warn: Set } aus den öffentlichen Sperrlisten (src/main/blocklist.js), optional.
+ */
+function checkLink(url, trustedExtra = [], lists = null) {
   let u;
   try {
     u = new URL(url);
@@ -70,6 +73,14 @@ function checkLink(url, trustedExtra = []) {
 
   if (IP_LOGGERS.some((d) => isOrSub(host, d))) return { level: 'danger', host, reasons: ['Bekannter IP-Grabber: Wer draufklickt, verrät seine IP-Adresse und oft auch Gerät und ungefähren Ort.'] };
   if (/(^|[.-])(grabify|iplogger|ipgrab|iptrack|ip-?logger|ip-?grab)/.test(host)) return { level: 'danger', host, reasons: ['Die Adresse sieht nach einem IP-Logger aus.'] };
+
+  // Öffentliche, täglich aktualisierte Sperrlisten (Betrug, Phishing, IP-Grabber) – Host und alle Oberdomains prüfen
+  if (lists) {
+    const parts = host.split('.');
+    const candidates = parts.map((_, i) => parts.slice(i).join('.')).filter((d) => d.includes('.'));
+    if (candidates.some((d) => lists.danger?.has(d))) return { level: 'danger', host, reasons: ['Steht auf einer öffentlichen Sperrliste für Betrug, Phishing und IP-Grabber.'], listed: true };
+    if (candidates.some((d) => lists.warn?.has(d))) return { level: 'warn', host, reasons: ['Steht auf einer öffentlichen Liste verdächtiger Seiten.'], listed: true };
+  }
 
   const trusted = [...TRUSTED, ...trustedExtra.map(lower)].some((d) => d && isOrSub(host, d));
   if (trusted) return { level: 'trusted', host, reasons: [] };
@@ -100,9 +111,9 @@ function checkLink(url, trustedExtra = []) {
 
 /** Alle Links einer Nachricht prüfen → schlimmste Stufe zuerst. */
 const RANK = { danger: 4, warn: 3, unknown: 2, ok: 1, trusted: 0 };
-function checkMessageLinks(content, trustedExtra = []) {
+function checkMessageLinks(content, trustedExtra = [], lists = null) {
   const urls = String(content || '').match(/https?:\/\/[^\s<>()]+/gi) || [];
-  return urls.map((url) => ({ url, ...checkLink(url, trustedExtra) })).sort((a, b) => RANK[b.level] - RANK[a.level]);
+  return urls.map((url) => ({ url, ...checkLink(url, trustedExtra, lists) })).sort((a, b) => RANK[b.level] - RANK[a.level]);
 }
 
 /** Domain für „vertrauen“ normalisieren: nur Hostname, ohne www. */
