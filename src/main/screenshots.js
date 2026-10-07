@@ -209,6 +209,26 @@ async function runScreenshots(win, dir, { demo, stats }) {
   console.log(`[ui] Kategorien: ${cats}, Zeilen vorher ${rowsBefore}, eingeklappt ${rowsAfter}`);
   await js(win, `[...document.querySelectorAll('.chatlist__category')].find(b=>b.textContent.includes('Projekte'))?.click()`);
   await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Sortierung wechseln"]')?.click()`);
+  // Privatnachrichten: Bereich öffnen, Chat mit Chiara, antworten, neuen Privatchat mit Anna starten
+  await js(win, `document.querySelector('.rail__dm')?.click()`);
+  await wait(600);
+  const dmRows = await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].map(r=>r.querySelector('.chatrow__name')?.textContent).join(',')`);
+  await js(win, `document.querySelector('.chatlist__items .chatrow')?.click()`);
+  await wait(700);
+  await js(win, `(() => { const el=document.querySelector('.composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'Erinnerung steht ✅'); el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); })()`);
+  await wait(800);
+  await shoot(win, dir, '22-privatchat');
+  const dmInfo = await js(win, `JSON.stringify({ blasen: document.querySelectorAll('.msg').length, gesendet: [...document.querySelectorAll('.msg--out')].some(m=>m.textContent.includes('Erinnerung steht')), kopf: document.querySelector('.chat__head')?.textContent.slice(0,80) })`);
+  console.log(`[dm] Liste: ${dmRows} · Chat: ${dmInfo}`);
+  await js(win, `document.querySelector('.newdm-btn')?.click()`);
+  await wait(300);
+  await js(win, `(() => { const el=document.querySelector('#newdm-query'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,'An'); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+  await wait(600);
+  await shoot(win, dir, '23-neuer-privatchat');
+  await js(win, `document.querySelector('.newdm__item')?.click()`);
+  await wait(800);
+  const dmRows2 = await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].map(r=>r.querySelector('.chatrow__name')?.textContent).join(',')`);
+  console.log(`[dm] Nach "Neuer Privatchat": ${dmRows2} · offen: ${await js(win, `document.querySelector('.chat__head')?.textContent.slice(0,40)`)}`);
 }
 
 module.exports = { runScreenshots };

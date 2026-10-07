@@ -95,7 +95,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
   const updateSuggestions = useCallback(
     async (value, caret) => {
       const q = findMentionQuery(value, caret);
-      if (!q) return setSuggest(null);
+      if (!q || guild.isDM) return setSuggest(null); // Privatchat: keine Rollen/Kanäle/Mitgliedersuche
       const seq = ++searchSeq.current;
       if (q.trigger === '#') {
         const needle = q.query.toLowerCase();
@@ -116,7 +116,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
       }
       return undefined;
     },
-    [allChannels, guild.id],
+    [allChannels, guild.id, guild.isDM],
   );
 
   const onChange = (e) => {
@@ -387,8 +387,8 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
           }}
           onClick={(e) => updateSuggestions(text, e.currentTarget.selectionStart)}
           onBlur={() => setTimeout(() => setSuggest(null), 150)}
-          placeholder={editing ? 'Nachricht bearbeiten' : `Nachricht an #${channel.name}`}
-          aria-label={`Nachricht an #${channel.name}`}
+          placeholder={editing ? 'Nachricht bearbeiten' : `Nachricht an ${channel.type === 'dm' ? '' : '#'}${channel.name}`}
+          aria-label={`Nachricht an ${channel.type === 'dm' ? '' : '#'}${channel.name}`}
           spellCheck
         />
         <button className="send-btn" onClick={submit} disabled={empty || tooLong} aria-label={editing ? 'Speichern' : 'Senden'} title={editing ? 'Speichern (Enter)' : 'Senden (Enter)'}>

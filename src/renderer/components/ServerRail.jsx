@@ -1,6 +1,8 @@
 import { memo } from 'react';
 import Logo from './Logo.jsx';
 
+export const DM_ID = '@dm';
+
 function ServerRail({ guilds, activeId, unreadGuilds, onSelect, onInvite, onJoin }) {
   return (
     <nav className="rail" aria-label="Server">
@@ -8,6 +10,15 @@ function ServerRail({ guilds, activeId, unreadGuilds, onSelect, onInvite, onJoin
         <Logo size={40} />
       </div>
       <div className="rail__sep" />
+      <button
+        className={`rail__item rail__dm ${activeId === DM_ID ? 'is-active' : ''} ${unreadGuilds.has(DM_ID) ? 'is-unread' : ''}`}
+        title="Privatnachrichten mit dem Bot"
+        aria-label="Privatnachrichten"
+        onClick={() => onSelect(DM_ID)}
+      >
+        <span className="rail__pill" />
+        💬
+      </button>
       <div className="rail__list">
         {guilds === null &&
           Array.from({ length: 3 }, (_, i) => <div key={i} className="rail__item skeleton" />)}

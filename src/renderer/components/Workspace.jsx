@@ -3,7 +3,8 @@ import { api } from '../api';
 import { bus, messageStore, NavContext } from '../state';
 import { compareSnowflakes, timestampOf } from '../../shared/snowflake';
 import { toPlainText } from '../../shared/mentions';
-import ServerRail from './ServerRail.jsx';
+import ServerRail, { DM_ID } from './ServerRail.jsx';
+import NewDMDialog from './NewDMDialog.jsx';
 import ChatList from './ChatList.jsx';
 import ChatView from './ChatView.jsx';
 import QuickSwitcher from './QuickSwitcher.jsx';
@@ -15,6 +16,8 @@ import { ThreadsPanel } from './SidePanels.jsx';
 import { useVoice } from '../voice/useVoice';
 
 const TYPING_MS = 10000;
+// Privatnachrichten werden wie ein eigener „Server“ in der Leiste behandelt
+const DM_GUILD = Object.freeze({ id: DM_ID, name: 'Privatnachrichten', isDM: true });
 
 export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [guilds, setGuilds] = useState(null);
@@ -34,6 +37,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [accessOpen, setAccessOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
+  const [newDmOpen, setNewDmOpen] = useState(false);
   const [activeThread, setActiveThread] = useState(null); // F12: geöffneter Thread (als Chat)
   const [forum, setForum] = useState(null); // F12: geöffnetes Forum (Beitragsliste)
   const [refreshing, setRefreshing] = useState(false);
@@ -76,18 +80,40 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     }
   }, [toast]);
 
+  // Privatchats laden (Vorschau kommt direkt mit)
+  const loadDMs = useCallback(async () => {
+    try {
+      const list = (await api.listDMs()).map((d) => ({ ...d, guildId: DM_ID }));
+      setChannelsByGuild((m) => ({ ...m, [DM_ID]: [{ category: null, channels: list }] }));
+      setPreviews((old) => {
+        const next = { ...old };
+        for (const d of list) if (d.preview && (!next[d.id] || next[d.id].timestamp <= d.preview.timestamp)) next[d.id] = d.preview;
+        return next;
+      });
+      setLastIds((m) => {
+        const next = { ...m };
+        for (const d of list) if (d.lastMessageId && (!next[d.id] || compareSnowflakes(d.lastMessageId, next[d.id]) > 0)) next[d.id] = d.lastMessageId;
+        return next;
+      });
+      return list;
+    } catch {
+      setChannelsByGuild((m) => ({ ...m, [DM_ID]: m[DM_ID] || [] }));
+      return [];
+    }
+  }, []);
+
   const loadGuilds = useCallback(async () => {
     try {
       const list = await api.listGuilds();
       setGuilds(list);
-      await Promise.all(list.map((g) => loadChannels(g.id)));
+      await Promise.all([...list.map((g) => loadChannels(g.id)), loadDMs()]);
       return list;
     } catch (e) {
       toast({ kind: 'error', title: e.message, text: e.hint });
       setGuilds([]);
       return [];
     }
-  }, [loadChannels, toast]);
+  }, [loadChannels, loadDMs, toast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,7 +145,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   }, [guildId, channels, channelId]);
 
   useEffect(() => {
-    if (guildId || channelId) api.setLastLocation({ guildId, channelId }).catch(() => {});
+    if (guildId || channelId) api.setLastLocation({ guildId: guildId === DM_ID ? null : guildId, channelId }).catch(() => {});
   }, [guildId, channelId]);
 
   // ---------- Live-Events ----------
@@ -165,9 +191,11 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         }, 400);
       } else if (type === 'guilds:changed') {
         loadGuilds();
+      } else if (type === 'dms:changed') {
+        loadDMs();
       }
     });
-  }, [loadChannels, loadGuilds]);
+  }, [loadChannels, loadGuilds, loadDMs]);
 
   // Abgelaufene Tipp-Anzeigen entfernen (Timer läuft nur, wenn jemand tippt).
   const anyTyping = Object.values(typing).some((u) => Object.keys(u).length > 0);
@@ -292,7 +320,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
       lastRefresh.current = Date.now();
       setRefreshing(true);
       try {
-        const res = await api.refresh(guildId ? { guildId } : {});
+        const res = await api.refresh(guildId && guildId !== DM_ID ? { guildId } : {});
         await loadGuilds();
         if (!silent) {
           if (res?.failed?.length) toast({ kind: 'warn', title: 'Teilweise aktualisiert', text: `Nicht erreichbar: ${res.failed.join(', ')}` });
@@ -350,7 +378,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     [channelById, openChannel, toast],
   );
 
-  const guild = guilds?.find((g) => g.id === guildId) || null;
+  const guild = guildId === DM_ID ? DM_GUILD : guilds?.find((g) => g.id === guildId) || null;
   const typingNames = channelId ? Object.values(typing[channelId] || {}).map((v) => v.name) : [];
 
   return (
@@ -403,6 +431,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           access={accessByGuild[guildId]}
           onShowAccess={() => setAccessOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
+          onNewDM={() => setNewDmOpen(true)}
         />
         {accessOpen && (
           <AccessDialog
@@ -416,7 +445,22 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           />
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
-        {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} guildId={guildId} />}
+        {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} guildId={guildId === DM_ID ? null : guildId} />}
+        {newDmOpen && (
+          <NewDMDialog
+            guilds={guilds || []}
+            onClose={() => setNewDmOpen(false)}
+            toast={toast}
+            onOpened={async (dm) => {
+              setNewDmOpen(false);
+              await loadDMs();
+              setGuildId(DM_ID);
+              setActiveThread(null);
+              setForum(null);
+              setChannelId(dm.id);
+            }}
+          />
+        )}
         {activeThread ? (
           <ChatView
             key={activeThread.id}
@@ -468,7 +512,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         {quickOpen && (
           <QuickSwitcher
             channels={flatChannels}
-            guilds={guilds || []}
+            guilds={[...(guilds || []), DM_GUILD]}
             isUnread={isUnread}
             onSelect={(id) => {
               openChannel(id);

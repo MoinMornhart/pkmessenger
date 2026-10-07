@@ -63,6 +63,11 @@ const service = createDiscordService({
   envPath: ENV_PATH,
   emit: broadcast,
   ...(tokenStore ? { getToken: () => tokenStore.load() } : {}),
+  // Bekannte Privatchats: nur Kanal- und Nutzer-ID, max. 100 (Discord liefert Bots keine DM-Liste)
+  dmStore: {
+    list: () => (Array.isArray(store.get().dmChannels) ? store.get().dmChannels : []),
+    add: (entry) => store.set('dmChannels', [entry, ...(store.get().dmChannels || []).filter((e) => e.channelId !== entry.channelId)].slice(0, 100)),
+  },
   ...(demo ? { createClient: demo.createClient, statusExtra: { demo: true } } : {}),
 });
 const store = createStore(path.join(app.getPath('userData'), demo || SHOTS_ARG ? 'settings-dev-demo.json' : 'settings.json'));

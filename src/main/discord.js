@@ -18,7 +18,7 @@ const FATAL_CLOSE_CODES = new Set([4004, 4010, 4011, 4012, 4013, 4014]);
  * @param {(type: string, payload: any) => void} opts.emit  Events an den Renderer
  * @param {() => object} [opts.createClient]  Fabrik für den Client (Tests)
  */
-function createDiscordService({ discord, envPath, emit, createClient, loginTimeoutMs = LOGIN_TIMEOUT_MS, statusExtra = {}, getToken = () => loadToken(envPath) }) {
+function createDiscordService({ discord, envPath, emit, createClient, loginTimeoutMs = LOGIN_TIMEOUT_MS, statusExtra = {}, getToken = () => loadToken(envPath), dmStore = { list: () => [], add: () => {} } }) {
   const { GatewayIntentBits, PermissionFlagsBits, ChannelType, Events, RESTEvents, Partials, MessageFlags, Routes } = discord;
   const TEXT_TYPES = new Set([ChannelType.GuildText, ChannelType.GuildAnnouncement]);
   // Sprachkanäle (Stage-Kanäle bewusst nicht – dort gelten Sprecher-Regeln).
@@ -44,9 +44,15 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
           GatewayIntentBits.GuildVoiceStates, // nicht privilegiert; nötig für Sprachkanäle (wer ist drin, Beitreten)
           GatewayIntentBits.GuildMessageReactions, // F8: Reaktionen live (nicht privilegiert)
           GatewayIntentBits.GuildMessagePolls, // Umfragen: Stimmen live (nicht privilegiert)
+          // Privatnachrichten mit dem Bot (offiziell, nicht privilegiert; Inhalt von DMs ist ohne MessageContent-Freigabe lesbar)
+          GatewayIntentBits.DirectMessages,
+          GatewayIntentBits.DirectMessageTyping,
+          GatewayIntentBits.DirectMessageReactions,
+          GatewayIntentBits.DirectMessagePolls,
         ],
         // F8: Reaktionen auch an älteren, nicht im Speicher liegenden Nachrichten erkennen
-        partials: Partials ? [Partials.Message, Partials.Reaction] : [],
+        // Channel: DMs kommen sonst nicht an, wenn der Privatchat (noch) nicht im Speicher liegt
+        partials: Partials ? [Partials.Message, Partials.Reaction, Partials.Channel] : [],
         // Sicherheitsnetz: standardmäßig pingt der Bot NIEMANDEN, nur explizit gelistete IDs.
         allowedMentions: { parse: [], repliedUser: false },
       }));
@@ -77,12 +83,30 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return guild;
   }
 
+  // Privatchat (DM) mit einer Person: dort gibt es keine Rollen, Discord erlaubt dem Bot diese Aktionen
+  const isDM = (ch) => Boolean(ch) && ch.type === ChannelType.DM;
+  const DM_ALLOWED = new Set(
+    [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.SendMessages,
+      PermissionFlagsBits.ReadMessageHistory,
+      PermissionFlagsBits.AddReactions,
+      PermissionFlagsBits.AttachFiles,
+      PermissionFlagsBits.EmbedLinks,
+      PermissionFlagsBits.SendPolls,
+      PermissionFlagsBits.PinMessages,
+    ].filter((f) => f !== undefined),
+  );
+  // Nachricht/Event betrifft einen Server-Kanal oder einen Privatchat des Bots?
+  const inScope = (m) => Boolean(m?.guildId) || isDM(m?.channel);
+
   function permsIn(channel) {
     const me = channel.guild?.members?.me;
     return me ? channel.permissionsFor(me) : null;
   }
 
   function can(channel, flag) {
+    if (isDM(channel)) return DM_ALLOWED.has(flag);
     const p = permsIn(channel);
     return Boolean(p && p.has(flag));
   }
@@ -94,7 +118,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
 
   function requireTextChannel(channelId) {
     const channel = requireReady().channels.cache.get(channelId);
-    const textLike = channel && (TEXT_TYPES.has(channel.type) || isThread(channel));
+    const textLike = channel && (TEXT_TYPES.has(channel.type) || isThread(channel) || isDM(channel));
     if (!textLike || !can(channel, PermissionFlagsBits.ViewChannel)) throw appError('NOT_FOUND', 'Kanal nicht gefunden oder für den Bot nicht sichtbar.');
     return channel;
   }
@@ -136,19 +160,20 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     c.on(Events.Error, (err) => emit('log', { level: 'error', message: describeError(err).message }));
 
     c.on(Events.MessageCreate, (msg) => {
-      if (!msg?.guildId) return; // keine DMs (nicht Teil des Produkts)
+      if (!inScope(msg)) return;
+      if (!msg.guildId) rememberDM(msg.channel, msg.author?.id === c.user?.id ? null : msg.author?.id);
       emit('message:create', serializeMessage(msg));
     });
     c.on(Events.MessageUpdate, (_old, msg) => {
-      if (!msg?.guildId || msg.partial) return;
+      if (!inScope(msg) || msg.partial) return;
       emit('message:update', serializeMessage(msg));
     });
     c.on(Events.MessageDelete, (msg) => {
-      if (!msg?.guildId || !msg.id) return;
+      if (!inScope(msg) || !msg.id) return;
       emit('message:delete', { id: msg.id, channelId: msg.channelId });
     });
     c.on(Events.TypingStart, (typing) => {
-      if (!typing?.guild || !typing.channel?.id || !typing.user?.id || typing.user.id === c.user?.id) return;
+      if (!(typing?.guild || isDM(typing?.channel)) || !typing.channel?.id || !typing.user?.id || typing.user.id === c.user?.id) return;
       emit('typing', {
         channelId: typing.channel.id,
         userId: typing.user.id,
@@ -170,21 +195,21 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         if (reaction?.partial) await reaction.fetch();
         let m = reaction?.message;
         if (m?.partial) m = await m.fetch();
-        if (m?.guildId) emit('message:update', serializeMessage(m));
+        if (inScope(m)) emit('message:update', serializeMessage(m));
       } catch {
         /* Nachricht evtl. gelöscht oder nicht mehr sichtbar */
       }
     };
     c.on(Events.MessageReactionAdd, onReaction);
     c.on(Events.MessageReactionRemove, onReaction);
-    c.on(Events.MessageReactionRemoveAll, (m) => m?.guildId && !m.partial && emit('message:update', serializeMessage(m)));
+    c.on(Events.MessageReactionRemoveAll, (m) => inScope(m) && !m.partial && emit('message:update', serializeMessage(m)));
     // Umfragen: neue/entfernte Stimme → Nachricht neu an die Oberfläche
     const onVote = async (answer) => {
       try {
         const poll = answer?.poll;
         let m = poll?.channel?.messages?.cache?.get?.(poll.messageId);
         if (!m && poll?.channel?.messages?.fetch) m = await poll.channel.messages.fetch(poll.messageId);
-        if (m?.guildId) emit('message:update', serializeMessage(m));
+        if (inScope(m)) emit('message:update', serializeMessage(m));
       } catch {
         /* Nachricht nicht mehr erreichbar */
       }
@@ -880,6 +905,77 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return { ...commandsState, commands: COMMANDS.map((c) => `/${c.name}`) };
   }
 
+  // ---------- Privatnachrichten (DMs) ----------
+  // Discord bietet Bots keine Liste ihrer Privatchats → bekannte Chats (nur IDs) lokal merken.
+  function rememberDM(channel, userId) {
+    if (!channel?.id) return;
+    const known = dmStore.list().some((e) => e.channelId === channel.id);
+    const uid = userId || channel.recipientId || null;
+    if (!known && uid) {
+      dmStore.add({ channelId: channel.id, userId: uid });
+      emit('dms:changed', {});
+    }
+  }
+
+  async function dmEntry(ch) {
+    let user = ch.recipient || null;
+    if (!user && ch.recipientId) user = await client.users.fetch(ch.recipientId).catch(() => null);
+    let preview = null;
+    try {
+      const last = await ch.messages.fetch({ limit: 1 });
+      const m = last?.first?.() ?? [...(last?.values?.() || [])][0];
+      if (m) preview = previewOf(m);
+    } catch {
+      preview = null;
+    }
+    return {
+      id: ch.id,
+      guildId: null,
+      type: 'dm',
+      userId: user?.id ?? ch.recipientId ?? null,
+      name: displayNameOf(user, null),
+      avatarUrl: avatarOf(user),
+      isBot: Boolean(user?.bot),
+      topic: '',
+      position: 0,
+      lastMessageId: ch.lastMessageId || preview?.messageId || null,
+      preview,
+      canSend: true,
+      canReadHistory: true,
+      canMentionEveryone: false,
+      canPin: true,
+      canCreateThreads: false,
+      canAttach: true,
+      canEmbed: true,
+      canPoll: true,
+    };
+  }
+
+  /** Alle bekannten Privatchats (gemerkte + gerade im Speicher), neueste zuerst. */
+  async function listDMs() {
+    const c = requireReady();
+    const chans = new Map();
+    for (const ch of c.channels.cache.values()) if (isDM(ch)) chans.set(ch.id, ch);
+    for (const e of dmStore.list().slice(0, 50)) {
+      if (chans.has(e.channelId)) continue;
+      const ch = await c.channels.fetch(e.channelId).catch(() => null);
+      if (isDM(ch)) chans.set(ch.id, ch);
+    }
+    const list = await Promise.all([...chans.values()].map(dmEntry));
+    return list.sort((a, b) => (b.preview?.timestamp || 0) - (a.preview?.timestamp || 0));
+  }
+
+  /** Privatchat mit einer Person öffnen (geht nur, wenn sie einen Server mit dem Bot teilt). */
+  async function openDM({ userId }) {
+    const c = requireReady();
+    if (userId === c.user.id) throw appError('VALIDATION', 'Der Bot kann sich nicht selbst schreiben.');
+    const user = await c.users.fetch(userId).catch(() => null);
+    if (!user) throw appError('NOT_FOUND', 'Diese Person wurde nicht gefunden.');
+    const ch = await user.createDM();
+    rememberDM(ch, user.id);
+    return dmEntry(ch);
+  }
+
   // ---------- Bot-Profil (Name, Bild, Beschreibung, Spitzname je Server) ----------
   // Offizielle Endpunkte: PATCH /users/@me, PATCH /applications/@me, PATCH /guilds/{id}/members/@me
   async function getProfile({ guildId } = {}) {
@@ -1003,6 +1099,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     getCommandsState,
     getProfile,
     updateProfile,
+    listDMs,
+    openDM,
   };
 }
 

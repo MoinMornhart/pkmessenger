@@ -43,13 +43,16 @@ export function hueFor(id) {
 
 export function ChannelAvatar({ channel, size = 46 }) {
   const hue = hueFor(channel.id);
+  const [broken, setBroken] = useState(false);
+  if (channel.type === 'dm' && channel.avatarUrl && !broken)
+    return <img className="chat-avatar" src={channel.avatarUrl} alt="" style={{ width: size, height: size }} onError={() => setBroken(true)} />;
   return (
     <div
       className="chat-avatar"
       style={{ width: size, height: size, background: `linear-gradient(135deg, hsl(${hue} 45% 40%), hsl(${(hue + 50) % 360} 55% 28%))` }}
       aria-hidden="true"
     >
-      {channel.type === 'voice' ? '🔊' : channel.type === 'announcement' ? '📢' : '#'}
+      {channel.type === 'dm' ? (channel.name || '?').slice(0, 1).toUpperCase() : channel.type === 'voice' ? '🔊' : channel.type === 'announcement' ? '📢' : '#'}
     </div>
   );
 }
@@ -187,7 +190,7 @@ function CategoryHeader({ group, collapsed, unread, onToggle }) {
   );
 }
 
-function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings, onOpenForum = () => {} }) {
+function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings, onOpenForum = () => {}, onNewDM = () => {} }) {
   const [filter, setFilter] = useState('');
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase().replace(/^#/, '');
@@ -197,7 +200,8 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
   // Sortierung „Neueste zuerst“ oder „Nach Kategorien“ (einklappbar) – wird pro PC gemerkt
   const [sort, setSort] = useState(() => ({ mode: prefs.get().chatSort, collapsed: prefs.get().collapsed }));
   useEffect(() => prefs.subscribe((p) => setSort({ mode: p.chatSort, collapsed: p.collapsed })), []);
-  const byCategory = sort.mode === 'categories' && !filter.trim() && chatGroups.length > 0;
+  const isDM = Boolean(guild?.isDM);
+  const byCategory = !isDM && sort.mode === 'categories' && !filter.trim() && chatGroups.length > 0;
   const toggleCategory = (id) => {
     const next = { ...sort.collapsed };
     if (next[id]) delete next[id];
@@ -280,7 +284,18 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
               </div>
             </div>
           ))}
-        {!loading && hasGuilds && chats.length === 0 && (
+        {isDM && (
+          <button className="newdm-btn" onClick={onNewDM}>
+            ＋ Neuer Privatchat
+          </button>
+        )}
+        {isDM && !loading && chats.length === 0 && (
+          <div className="empty empty--small">
+            <p>Noch keine Privatchats.</p>
+            <p className="muted small">Wenn dir jemand privat an den Bot schreibt, erscheint es hier. Oder starte selbst einen Chat.</p>
+          </div>
+        )}
+        {!isDM && !loading && hasGuilds && chats.length === 0 && (
           <div className="empty empty--small">
             <p>Der Bot sieht hier keine Textkanäle.</p>
             <p className="muted small">Was kann ich tun? Gib der Bot-Rolle in den Kanaleinstellungen „Kanal ansehen“.</p>

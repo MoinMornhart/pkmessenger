@@ -24,9 +24,9 @@ function ListHeader({ state, channelName }) {
   if (!state.hasMore)
     return (
       <div className="channel-start">
-        <div className="channel-start__icon">#</div>
-        <h3>Willkommen in #{channelName}</h3>
-        <p className="muted">Das ist der Anfang des Kanals.</p>
+        <div className="channel-start__icon">{channelName.dm ? '💬' : '#'}</div>
+        <h3>{channelName.dm ? `Privatchat mit ${channelName.name}` : `Willkommen in #${channelName.name}`}</h3>
+        <p className="muted">{channelName.dm ? 'Das ist der Anfang eures Privatchats. Nur ihr beide seht ihn.' : 'Das ist der Anfang des Kanals.'}</p>
       </div>
     );
   return <div className="list-note" />;
@@ -211,13 +211,14 @@ const MessageList = forwardRef(function MessageList({ channel, state, onLoadOlde
   }, [state.status, state.hasMore, state.loadingOlder, rows.length, onNearTop]);
 
   const Comp = virtual ? VirtualRows : PlainRows;
+  const title = useMemo(() => ({ name: channel.name, dm: channel.type === 'dm' }), [channel.name, channel.type]);
   return (
     <div className="msglist-wrap">
       <Comp
         ref={inner}
         rows={rows}
         state={state}
-        channelName={channel.name}
+        channelName={title}
         channelId={channel.id}
         renderRow={renderRow}
         ctrl={ctrl}

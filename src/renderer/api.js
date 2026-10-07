@@ -53,6 +53,8 @@ export const api = Object.fromEntries(
     'listEmojis',
     'commandsState',
     'getProfile',
+    'listDMs',
+    'openDM',
     'updateProfile',
     'refresh',
     'channelAccess',

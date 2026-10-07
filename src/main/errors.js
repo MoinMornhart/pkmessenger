@@ -10,6 +10,7 @@ const API_ERRORS = {
   50001: ['Kein Zugriff auf diesen Kanal.', 'Gib der Bot-Rolle in den Kanaleinstellungen "Kanal ansehen" und "Nachrichtenverlauf lesen".'],
   50013: ['Dem Bot fehlt eine Berechtigung.', 'Prüfe in Discord unter Servereinstellungen → Rollen → Bot-Rolle die Rechte für diesen Kanal (z. B. "Nachrichten senden").'],
   50035: ['Discord hat die Anfrage abgelehnt (ungültige Daten).', 'Prüfe Länge und Inhalt der Nachricht.'],
+  50007: ['Diese Person nimmt keine Privatnachrichten vom Bot an.', 'Sie muss einen Server mit dem Bot teilen und in ihren Discord-Einstellungen Direktnachrichten von Servermitgliedern erlauben.'],
   50006: ['Leere Nachricht.', 'Gib einen Text ein.'],
   40005: ['Datei ist zu groß.', 'Maximal 25 MiB pro Upload.'],
   20028: ['Zu viele Nachrichten in kurzer Zeit (Slowmode/Rate-Limit).', 'Warte kurz und versuche es erneut.'],

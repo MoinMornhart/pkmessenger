@@ -86,6 +86,10 @@ PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau
     <td><img src="docs/images/umfrage.png" alt="Umfrage erstellen"><br><sub><b>Umfragen:</b> erstellen, Ergebnisse live, vorzeitig beenden.</sub></td>
     <td><img src="docs/images/bot-profil.png" alt="Bot-Profil in den Einstellungen"><br><sub><b>Bot-Profil:</b> Name, Bild, „Über mich“, Spitzname je Server.</sub></td>
   </tr>
+  <tr>
+    <td><img src="docs/images/privatchat.png" alt="Privatchat mit dem Bot"><br><sub><b>Privatnachrichten:</b> privat mit einzelnen Leuten schreiben (als Bot).</sub></td>
+    <td><img src="docs/images/kategorien.png" alt="Chatliste nach Kategorien"><br><sub><b>Kategorien einklappen</b> und Bildschirmschutz.</sub></td>
+  </tr>
 </table>
 
 ---
@@ -241,7 +245,7 @@ Mehr Details: [AGENTS.md](AGENTS.md) (Architektur, Entscheidungen, Teststand) ·
 - [x] Bot-Profil bearbeiten (Name, Bild, Beschreibung, Spitzname je Server)
 - [x] Chatliste nach Kategorien, einklappbar (☰ oben in der Liste)
 - [x] Bildschirmschutz: Screenshots und Aufnahmen anderer Programme verbieten (Einstellungen → Datenschutz)
-- [ ] Privatnachrichten mit dem Bot
+- [x] Privatnachrichten mit dem Bot (💬 in der Leiste links)
 - [ ] Designs und Animationen zum Umschalten
 - [ ] Moderation per Rechtsklick (Rollen, Timeout, Kick, Bann)
 - [ ] Live-Test aller Funktionen auf einem echten Server

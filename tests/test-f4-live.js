@@ -21,7 +21,7 @@ test('Eigene Bot-Nachricht wird als isOwn markiert', async () => {
   assert.equal(events.find((e) => e.type === 'message:create').payload.isOwn, true);
 });
 
-test('DMs werden ignoriert (nicht Teil des Produkts)', async () => {
+test('Nachrichten ohne Server, die kein Privatchat sind, werden ignoriert', async () => {
   const { world, events } = await readyService();
   const dm = makeMessage({ id: '1000000000000000003', channel: world.channels.allgemein, author: world.makeUser('555555555555555555', 'anna') });
   dm.guildId = null;

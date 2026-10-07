@@ -150,6 +150,10 @@ function usernameOf(name) {
 }
 
 const validators = {
+  userRef(p) {
+    const { userId } = obj(p);
+    return { userId: snowflake(userId, 'userId') };
+  },
   profileRef(p) {
     if (p === undefined || p === null) return {};
     const { guildId } = obj(p);

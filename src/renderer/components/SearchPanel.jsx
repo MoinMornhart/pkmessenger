@@ -40,9 +40,11 @@ export default function SearchPanel({ messages, guild, channelId, onJump, onClos
         <button role="tab" aria-selected={mode === 'chat'} className={mode === 'chat' ? 'is-sel' : ''} onClick={() => setMode('chat')}>
           Dieser Chat
         </button>
-        <button role="tab" aria-selected={mode === 'server'} className={mode === 'server' ? 'is-sel' : ''} onClick={() => setMode('server')}>
-          Ganzer Server
-        </button>
+        {!guild?.isDM && (
+          <button role="tab" aria-selected={mode === 'server'} className={mode === 'server' ? 'is-sel' : ''} onClick={() => setMode('server')}>
+            Ganzer Server
+          </button>
+        )}
         <button className="icon-btn" onClick={onClose} aria-label="Suche schließen">
           ×
         </button>

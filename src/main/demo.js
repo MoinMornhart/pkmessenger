@@ -107,6 +107,11 @@ function createDemo() {
   add(channels.ankuendigungen, client.user, '📢 Server-Regeln:\n1. Respektvoll bleiben\n2. Kein Spam\n3. Bot-Befehle nur in #projekt-a', 3 * 24 * 60);
   add(channels.projektA, chiara, 'Projekt A startet nächste Woche!', 300);
   add(channels.nurLesen, bernd, 'Dieser Kanal ist für den Bot nur lesbar.', 500);
+  // Privatchat mit Chiara (sie hat dem Bot privat geschrieben)
+  const dm = world.makeDM(chiara);
+  add(dm, chiara, 'Hey Bot, kannst du mich morgen an das Treffen erinnern? 🙏', 30);
+  add(dm, client.user, 'Klar, mache ich! Um 18 Uhr bekommst du eine Nachricht.', 28);
+
   for (let i = 0; i < 260; i++) add(channels.projektA, i % 2 ? anna : bernd, `Testnachricht Nr. ${i + 1} für das Nachladen & die Virtualisierung`, 290 - i);
 
   // Live-Simulation: gelegentlich tippt jemand und schreibt eine Nachricht.

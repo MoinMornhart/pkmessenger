@@ -32,8 +32,8 @@ function makeMessage({ id, channel, author, content = '', createdTimestamp = Dat
   const msg = {
     id,
     channelId: channel.id,
-    guildId: channel.guild.id,
-    guild: channel.guild,
+    guildId: channel.guild?.id ?? null,
+    guild: channel.guild ?? null,
     channel,
     member: null,
     author,
@@ -219,6 +219,7 @@ function createFakeWorld({ loginBehavior = 'ready', withExtraTypes = false } = {
     client._ready = false;
   };
 
+  const world = {};
   const guild = { id: GUILD_ID, name: 'Testserver', nameAcronym: 'T', client, iconURL: () => null };
   const me = { id: BOT_ID, nickname: null, permissions: { has: (flag) => me.permFlags.has(flag) }, permFlags: new Set() };
   const members = new Map();
@@ -241,6 +242,7 @@ function createFakeWorld({ loginBehavior = 'ready', withExtraTypes = false } = {
   const addMember = (id, name) => {
     const user = makeUser(id, name.toLowerCase());
     members.set(id, { id, user, displayName: name, displayAvatarURL: avatar });
+    user.createDM = async () => [...client.channels.cache.values()].find((c) => c.type === ChannelType.DM && c.recipientId === user.id) || world.makeDM(user);
     return user;
   };
   guild.roles = {
@@ -282,9 +284,37 @@ function createFakeWorld({ loginBehavior = 'ready', withExtraTypes = false } = {
   guild.channels.fetch = track('channels');
   guild.voiceAdapterCreator = () => ({ sendPayload: () => true, destroy: () => {} });
   client.guilds = { cache: new Map([[GUILD_ID, guild]]) };
-  client.channels = { cache: guild.channels.cache };
+  client.channels = {
+    cache: guild.channels.cache,
+    fetchCalls: [],
+    async fetch(id) {
+      client.channels.fetchCalls.push(id);
+      return client.channels.cache.get(id) || dmArchive.get(id) || Promise.reject(Object.assign(new Error('Unknown Channel'), { code: 10003 }));
+    },
+  };
+  // Privatchats: wie discord.js ein Kanal vom Typ DM mit recipientId; "dmArchive" = nicht im Speicher, nur per fetch erreichbar
+  const dmArchive = new Map();
+  const allUsers = () => [client.user, ...[...members.values()].map((m) => m.user)];
+  client.users = {
+    async fetch(id) {
+      const u = allUsers().find((x) => x.id === id);
+      if (!u) throw Object.assign(new Error('Unknown User'), { code: 10013 });
+      return u;
+    },
+  };
+  function makeDM(user, { cached = true, id } = {}) {
+    const ch = makeChannel(guild, { id: id || discord.SnowflakeUtil.generate().toString(), name: undefined, type: ChannelType.DM, perms: [] });
+    delete ch.guild;
+    ch.guildId = null;
+    ch.recipientId = user.id;
+    ch.recipient = user;
+    if (cached) client.channels.cache.set(ch.id, ch);
+    else dmArchive.set(ch.id, ch);
+    return ch;
+  }
+  world.makeDM = makeDM;
 
-  return { client, guild, channels, category, addMember, makeUser, makeMessage };
+  return Object.assign(world, { client, guild, channels, category, addMember, makeUser, makeMessage, makeDM, dmArchive });
 }
 
 function tmpEnv(content) {
@@ -305,6 +335,7 @@ function createTestService(opts = {}) {
     emit: (type, payload) => events.push({ type, payload }),
     createClient: () => world.client,
     loginTimeoutMs: opts.loginTimeoutMs ?? 300,
+    ...(opts.dmStore ? { dmStore: opts.dmStore } : {}),
   });
   return { service, world, events, envPath };
 }

@@ -41,7 +41,7 @@ function HeaderSubtitle({ names, channel, guild }) {
   }
   return (
     <span className="chat__sub" title={channel.topic || ''}>
-      {channel.topic || `${guild.name} · ${channel.canSend ? 'Bot darf schreiben' : 'Bot darf nur lesen'}`}
+      {channel.topic || (guild.isDM ? `Privatchat mit ${channel.name}${channel.isBot ? ' (Bot)' : ''}` : `${guild.name} · ${channel.canSend ? 'Bot darf schreiben' : 'Bot darf nur lesen'}`)}
     </span>
   );
 }
@@ -57,7 +57,7 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
   const [emojis, setEmojis] = useState([]); // F8 Server-Emojis
 
   useEffect(() => {
-    if (guild?.id) api.listEmojis({ guildId: guild.id }).then(setEmojis).catch(() => setEmojis([]));
+    if (guild?.id && !guild.isDM) api.listEmojis({ guildId: guild.id }).then(setEmojis).catch(() => setEmojis([]));
   }, [guild?.id]);
 
   useEffect(() => {
@@ -222,7 +222,7 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
           )}
         </div>
         <div className="chat__tools">
-          {channel.type !== 'thread' && (
+          {channel.type !== 'thread' && channel.type !== 'dm' && (
             <button className={`icon-btn icon-btn--lg ${panel === 'threads' ? 'is-on' : ''}`} onClick={() => setPanel((p) => (p === 'threads' ? null : 'threads'))} title="Threads" aria-label="Threads">
               🧵
             </button>
