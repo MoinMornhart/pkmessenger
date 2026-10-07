@@ -82,6 +82,10 @@ PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau
     <td><img src="docs/images/embed.png" alt="Embed-Baukasten mit Vorschau"><br><sub><b>Embed-Baukasten</b> mit Live-Vorschau.</sub></td>
     <td><img src="docs/images/server-beitreten.png" alt="Server beitreten mit Vorschau"><br><sub><b>Server beitreten:</b> selbst in Discord beitreten, Bot nachholen.</sub></td>
   </tr>
+  <tr>
+    <td><img src="docs/images/umfrage.png" alt="Umfrage erstellen"><br><sub><b>Umfragen:</b> erstellen, Ergebnisse live, vorzeitig beenden.</sub></td>
+    <td><img src="docs/images/bot-profil.png" alt="Bot-Profil in den Einstellungen"><br><sub><b>Bot-Profil:</b> Name, Bild, „Über mich“, Spitzname je Server.</sub></td>
+  </tr>
 </table>
 
 ---
@@ -233,6 +237,9 @@ Mehr Details: [AGENTS.md](AGENTS.md) (Architektur, Entscheidungen, Teststand) ·
 - [x] Serverweite Suche
 - [x] Slash-Befehle (<code>/ping</code>, <code>/pkmessenger</code>)
 - [x] Sprachkanäle, Server beitreten, verschlüsselter Token, Einstellungen
+- [x] Umfragen (erstellen, Ergebnisse live, beenden)
+- [x] Bot-Profil bearbeiten (Name, Bild, Beschreibung, Spitzname je Server)
+- [ ] Moderation per Rechtsklick (Rollen, Timeout, Kick, Bann)
 - [ ] Live-Test aller Funktionen auf einem echten Server
 - [ ] Helles Design und eigene Akzentfarben
 

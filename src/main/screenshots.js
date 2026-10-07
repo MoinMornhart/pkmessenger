@@ -181,6 +181,18 @@ async function runScreenshots(win, dir, { demo, stats }) {
   await shoot(win, dir, '18-serversuche');
   const hits = await js(win, `document.querySelectorAll('.search-hit').length`);
   console.log(`[f7-f15] Serversuche-Treffer angezeigt: ${hits}`);
+  await js(win, `document.querySelector('.search-panel .icon-btn')?.click()`);
+  // Bot-Profil in den Einstellungen: Beschreibung ändern, speichern, Ergebnis prüfen
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+  await wait(800);
+  await js(win, `(() => { const el=document.querySelector('#profile-desc'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'Ich helfe beim Organisieren von Treffen 🎉'); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+  await wait(200);
+  await shoot(win, dir, '20-bot-profil');
+  await js(win, `[...document.querySelectorAll('.settings .btn')].find(b=>b.textContent.includes('Profil speichern'))?.click()`);
+  await wait(600);
+  const prof = await js(win, `JSON.stringify({ felder: document.querySelectorAll('#profile-name,#profile-desc,#profile-nick').length, toast: [...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' | ').slice(0,80), gespeichertAktiv: !document.querySelector('.settings .btn--primary')?.disabled })`);
+  console.log(`[profil] ${prof}`);
+  await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
 }
 
 module.exports = { runScreenshots };

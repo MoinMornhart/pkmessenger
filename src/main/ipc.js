@@ -44,6 +44,8 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:search-messages': (p) => service.searchMessages(validators.search(p)),
     'pk:list-emojis': (p) => service.listEmojis(validators.guildRef(p)),
     'pk:commands-state': () => service.getCommandsState(),
+    'pk:get-profile': (p) => service.getProfile(validators.profileRef(p)),
+    'pk:update-profile': (p) => service.updateProfile(validators.profileUpdate(p)),
     'pk:refresh':(p) => service.refresh(validators.optionalGuildRef(p)),
     'pk:channel-access': (p) => service.getChannelAccess(validators.guildRef(p)),
     'pk:list-voice-members': (p) => service.listVoiceMembers(validators.guildRef(p)),

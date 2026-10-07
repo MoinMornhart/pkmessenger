@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld('api', {
   searchMessages: call('pk:search-messages'),
   listEmojis: call('pk:list-emojis'),
   commandsState: call('pk:commands-state'),
+  getProfile: call('pk:get-profile'),
+  updateProfile: call('pk:update-profile'),
   refresh: call('pk:refresh'),
   channelAccess: call('pk:channel-access'),
   // Sprachkanäle

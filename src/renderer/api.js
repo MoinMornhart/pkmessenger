@@ -51,6 +51,8 @@ export const api = Object.fromEntries(
     'searchMessages',
     'listEmojis',
     'commandsState',
+    'getProfile',
+    'updateProfile',
     'refresh',
     'channelAccess',
     'listVoiceMembers',

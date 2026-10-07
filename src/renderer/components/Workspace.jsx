@@ -406,7 +406,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           />
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
-        {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} />}
+        {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} guildId={guildId} />}
         {activeThread ? (
           <ChatView
             key={activeThread.id}

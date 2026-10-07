@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { prefs } from '../prefs';
 
@@ -87,6 +87,114 @@ function TokenSection({ toast }) {
   );
 }
 
+// Bot-Profil: Name, Bild, Beschreibung (gilt überall) + Spitzname auf dem aktuellen Server
+const AVATAR_MAX = 8 * 1024 * 1024;
+
+function ProfileSection({ toast, guildId }) {
+  const [profile, setProfile] = useState(null);
+  const [error, setError] = useState('');
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [nick, setNick] = useState('');
+  const [avatar, setAvatar] = useState(null); // { data: Uint8Array, preview: dataURL }
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+
+  const apply = useCallback((p) => {
+    setProfile(p);
+    setName(p.username);
+    setDesc(p.description || '');
+    setNick(p.server?.nick || '');
+    setAvatar(null);
+  }, []);
+
+  useEffect(() => {
+    api
+      .getProfile(guildId ? { guildId } : {})
+      .then(apply)
+      .catch((e) => setError(e.message));
+  }, [guildId, apply]);
+
+  if (error) return <p className="muted small">Profil nicht verfügbar: {error}</p>;
+  if (!profile) return <p className="muted small">Lade Profil …</p>;
+
+  const pickFile = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > AVATAR_MAX) return toast({ kind: 'warn', title: 'Bild zu groß', text: 'Höchstens 8 MiB.' });
+    const reader = new FileReader();
+    reader.onload = async () => setAvatar({ data: new Uint8Array(await file.arrayBuffer()), preview: reader.result });
+    reader.readAsDataURL(file);
+  };
+
+  const changes = {};
+  if (name.trim() !== profile.username) changes.username = name;
+  if (avatar) changes.avatar = avatar.data;
+  if (desc.trim() !== (profile.description || '')) changes.description = desc;
+  if (profile.server && nick.trim() !== profile.server.nick) Object.assign(changes, { guildId: profile.server.guildId, nick });
+  const dirty = Object.keys(changes).length > 0;
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      // Server-ID immer mitschicken, damit das zurückgelieferte Profil den Spitznamen-Bereich behält
+      const res = await api.updateProfile(profile.server ? { guildId: profile.server.guildId, ...changes } : changes);
+      apply(res.profile);
+      toast({ kind: 'info', title: 'Profil gespeichert ✓', text: 'In Discord kann es ein paar Sekunden dauern, bis alle es sehen.' });
+    } catch (e) {
+      toast({ kind: 'error', title: e.message, text: e.hint });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="profile">
+        <button className="profile__avatar" onClick={() => fileRef.current?.click()} title="Profilbild ändern" aria-label="Profilbild ändern">
+          <img src={avatar?.preview || profile.avatarUrl} alt="" />
+          <span>Ändern</span>
+        </button>
+        <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={pickFile} />
+        <div className="profile__fields">
+          <label className="settings__label" htmlFor="profile-name">
+            Name <span className="muted small">(max. 2 Änderungen pro Stunde)</span>
+          </label>
+          <div className="settings__row">
+            <input id="profile-name" value={name} maxLength={32} onChange={(e) => setName(e.target.value)} />
+          </div>
+        </div>
+      </div>
+      <label className="settings__label" htmlFor="profile-desc">
+        Über mich <span className="muted small">{desc.length}/400</span>
+      </label>
+      <textarea id="profile-desc" className="profile__desc" value={desc} maxLength={400} rows={3} onChange={(e) => setDesc(e.target.value)} placeholder="Was macht dein Bot?" />
+      {profile.server && (
+        <>
+          <label className="settings__label" htmlFor="profile-nick">
+            Spitzname auf „{profile.server.guildName}“ <span className="muted small">(leer = normaler Name)</span>
+          </label>
+          <div className="settings__row">
+            <input id="profile-nick" value={nick} maxLength={32} disabled={!profile.server.canChangeNick} onChange={(e) => setNick(e.target.value)} placeholder={profile.username} />
+          </div>
+          {!profile.server.canChangeNick && <p className="muted small">💡 Dafür braucht die Bot-Rolle auf diesem Server das Recht „Nickname ändern“.</p>}
+        </>
+      )}
+      <div className="settings__row">
+        <button className="btn btn--primary" disabled={!dirty || busy} onClick={save}>
+          {busy ? 'Speichere …' : 'Profil speichern'}
+        </button>
+        {avatar && (
+          <button className="btn btn--ghost btn--small" onClick={() => setAvatar(null)}>
+            Bild verwerfen
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
 function AudioSection() {
   const [p, setP] = useState(prefs.get());
   const [devices, setDevices] = useState({ inputs: [], outputs: [] });
@@ -145,7 +253,7 @@ function AudioSection() {
   );
 }
 
-export default function SettingsDialog({ onClose, toast, appInfo }) {
+export default function SettingsDialog({ onClose, toast, appInfo, guildId }) {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -162,6 +270,10 @@ export default function SettingsDialog({ onClose, toast, appInfo }) {
             ×
           </button>
         </div>
+        <section>
+          <h4>🪪 Bot-Profil</h4>
+          <ProfileSection toast={toast} guildId={guildId} />
+        </section>
         <section>
           <h4>🔑 Bot-Token</h4>
           <TokenSection toast={toast} />

@@ -880,6 +880,59 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return { ...commandsState, commands: COMMANDS.map((c) => `/${c.name}`) };
   }
 
+  // ---------- Bot-Profil (Name, Bild, Beschreibung, Spitzname je Server) ----------
+  // Offizielle Endpunkte: PATCH /users/@me, PATCH /applications/@me, PATCH /guilds/{id}/members/@me
+  async function getProfile({ guildId } = {}) {
+    const c = requireReady();
+    let description = '';
+    try {
+      const app = await c.application.fetch();
+      description = app?.description || '';
+    } catch {
+      description = c.application?.description || '';
+    }
+    const out = { ...botInfo(), avatarUrl: c.user.displayAvatarURL({ size: 256, extension: 'png' }), description, server: null };
+    if (guildId) {
+      const guild = requireGuild(guildId);
+      const me = guild.members.me;
+      out.server = { guildId, guildName: guild.name, nick: me?.nickname || '', canChangeNick: Boolean(me?.permissions?.has?.(PermissionFlagsBits.ChangeNickname)) };
+    }
+    return out;
+  }
+
+  async function updateProfile({ username, avatar, description, guildId, nick }) {
+    const c = requireReady();
+    const changed = [];
+    try {
+      if (username !== undefined || avatar !== undefined) {
+        const body = {};
+        if (username !== undefined && username !== c.user.username) body.username = username;
+        if (avatar !== undefined) body.avatar = avatar; // Data-URI oder null (= Standardbild)
+        if (Object.keys(body).length) {
+          await c.user.edit(body);
+          changed.push(...Object.keys(body));
+        }
+      }
+      if (description !== undefined) {
+        await c.application.edit({ description });
+        changed.push('description');
+      }
+      if (guildId && nick !== undefined) {
+        const guild = requireGuild(guildId);
+        if (!guild.members.me?.permissions?.has?.(PermissionFlagsBits.ChangeNickname))
+          throw appError('MISSING_PERMISSION', 'Der Bot darf seinen Spitznamen auf diesem Server nicht ändern.', 'Gib der Bot-Rolle das Recht „Nickname ändern“.');
+        await guild.members.editMe({ nick: nick || null });
+        changed.push('nick');
+      }
+    } catch (err) {
+      if (err?.code === 50035 && /username/i.test(JSON.stringify(err.rawError || err.message || '')))
+        throw appError('VALIDATION', 'Discord hat den Namen abgelehnt.', 'Der Name ist vergeben oder wurde zu oft geändert (max. 2× pro Stunde).');
+      throw err;
+    }
+    if (changed.some((k) => k === 'username' || k === 'avatar')) setStatus({ ...status, bot: botInfo() });
+    return { changed, profile: await getProfile({ guildId }) };
+  }
+
   // ---------- Sprachkanäle ----------
 
   /** Teilnehmer aller Sprachkanäle eines Servers: { [channelId]: [{ id, name, avatarUrl, bot, muted, deafened }] } */
@@ -948,6 +1001,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     searchMessages,
     listEmojis,
     getCommandsState,
+    getProfile,
+    updateProfile,
   };
 }
 

@@ -172,7 +172,22 @@ function makeChannel(guild, { id, name, type = ChannelType.GuildText, parentId =
 function createFakeWorld({ loginBehavior = 'ready', withExtraTypes = false } = {}) {
   const client = new EventEmitter();
   client.user = makeUser(BOT_ID, 'PKBot', { bot: true });
-  client.application = { id: BOT_ID };
+  client.profileCalls = [];
+  client.user.edit = async (body) => {
+    client.profileCalls.push(["user", body]);
+    if (body.username) client.user.username = body.username;
+    return client.user;
+  };
+  client.application = {
+    id: BOT_ID,
+    description: "Testbot",
+    fetch: async () => client.application,
+    edit: async ({ description }) => {
+      client.profileCalls.push(["app", { description }]);
+      client.application.description = description;
+      return client.application;
+    },
+  };
   client.rest = new EventEmitter();
   client._ready = false;
   client.isReady = () => client._ready;
@@ -205,10 +220,15 @@ function createFakeWorld({ loginBehavior = 'ready', withExtraTypes = false } = {
   };
 
   const guild = { id: GUILD_ID, name: 'Testserver', nameAcronym: 'T', client, iconURL: () => null };
-  const me = { id: BOT_ID, permissions: { has: () => false } };
+  const me = { id: BOT_ID, nickname: null, permissions: { has: (flag) => me.permFlags.has(flag) }, permFlags: new Set() };
   const members = new Map();
   guild.members = {
     me,
+    async editMe({ nick }) {
+      client.profileCalls.push(["member", { nick }]);
+      me.nickname = nick;
+      return me;
+    },
     cache: members,
     searchCalls: [],
     searchShouldFail: false,

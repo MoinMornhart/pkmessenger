@@ -146,3 +146,14 @@
 ## Hinweis (kein Fehler): „NativeCommandError“ beim Renderer-Build in PowerShell
 
 esbuild schreibt seine normale Erfolgsmeldung (`build\renderer\app.js 276.3kb … Done`) auf stderr. Windows PowerShell 5.1 zeigt das rot als `NativeCommandError` an, obwohl der Build erfolgreich war (Exit-Code 0). Kein Handlungsbedarf.
+
+---
+
+## #12 – Spitznamen-Feld verschwand nach „Profil speichern“
+
+1. **Datum & Uhrzeit:** 07.10.2026
+2. **Was passiert ist:** Im automatischen Demo-Lauf zählte die Prüfung nach dem Speichern nur noch 2 statt 3 Profilfelder (`[profil] {"felder":2,…}`).
+3. **Ursache (geprüft):** `updateProfile` lädt das Profil danach mit der Server-ID aus der Anfrage neu. Die Oberfläche schickte die Server-ID nur mit, wenn sich der Spitzname geändert hatte. Ohne Server-ID fehlte im Ergebnis `server`, und das Feld verschwand.
+4. **Lösung:** Die Oberfläche schickt die Server-ID immer mit (`SettingsDialog.jsx`), dazu kommt ein Regressionstest in `tests/test-profile.js`.
+5. **Testergebnis:** Demo-Lauf `{"felder":3,…}`, Tests grün.
+6. **Prävention:** Nach Speichern-Aktionen im Screenshot-Lauf den Zustand erneut prüfen, nicht nur die Erfolgsmeldung.

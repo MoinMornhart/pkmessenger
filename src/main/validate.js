@@ -119,7 +119,57 @@ function pollOf(poll) {
   return { question: question.trim(), answers: clean, durationHours, allowMultiselect: allowMultiselect === true };
 }
 
+// Bot-Profil: Bild per Magic-Bytes prüfen (nicht dem Dateinamen trauen) und als Data-URI an Discord geben
+const AVATAR_MAX_BYTES = 8 * 1024 * 1024;
+function imageMime(d) {
+  if (d[0] === 0x89 && d[1] === 0x50 && d[2] === 0x4e && d[3] === 0x47) return 'image/png';
+  if (d[0] === 0xff && d[1] === 0xd8 && d[2] === 0xff) return 'image/jpeg';
+  if (d[0] === 0x47 && d[1] === 0x49 && d[2] === 0x46 && d[3] === 0x38) return 'image/gif';
+  if (d[0] === 0x52 && d[1] === 0x49 && d[2] === 0x46 && d[3] === 0x46 && d[8] === 0x57 && d[9] === 0x45 && d[10] === 0x42 && d[11] === 0x50) return 'image/webp';
+  return null;
+}
+
+function avatarOf(avatar) {
+  if (avatar === undefined) return undefined;
+  if (avatar === null) return null; // zurück zum Standardbild
+  if (!(avatar instanceof Uint8Array) || avatar.byteLength < 12) throw new ValidationError('Ungültiges Bild.');
+  if (avatar.byteLength > AVATAR_MAX_BYTES) throw new ValidationError('Das Bild ist größer als 8 MiB.');
+  const mime = imageMime(avatar);
+  if (!mime) throw new ValidationError('Nur PNG, JPG, GIF oder WebP sind als Profilbild erlaubt.');
+  return `data:${mime};base64,${Buffer.from(avatar.buffer, avatar.byteOffset, avatar.byteLength).toString('base64')}`;
+}
+
+// Discord-Regeln für Benutzernamen (Doku "Usernames and Nicknames")
+function usernameOf(name) {
+  if (name === undefined) return undefined;
+  if (typeof name !== 'string') throw new ValidationError('Ungültiger Name.');
+  const n = name.trim();
+  if (n.length < 2 || n.length > 32) throw new ValidationError('Der Name muss 2–32 Zeichen haben.');
+  if (/[@#:]|```/.test(n) || /discord/i.test(n) || /^(everyone|here)$/i.test(n)) throw new ValidationError('Der Name darf nicht @, #, :, ``` oder „discord“ enthalten.');
+  return n;
+}
+
 const validators = {
+  profileRef(p) {
+    if (p === undefined || p === null) return {};
+    const { guildId } = obj(p);
+    return { guildId: optionalSnowflake(guildId, 'guildId') };
+  },
+  profileUpdate(p) {
+    const { username, avatar, description, guildId, nick } = obj(p);
+    if (description !== undefined && (typeof description !== 'string' || description.length > 400)) throw new ValidationError('Die Beschreibung darf höchstens 400 Zeichen haben.');
+    if (nick !== undefined && (typeof nick !== 'string' || nick.trim().length > 32)) throw new ValidationError('Der Spitzname darf höchstens 32 Zeichen haben.');
+    if (nick !== undefined && guildId == null) throw new ValidationError('Für den Spitznamen fehlt der Server.');
+    const out = {
+      username: usernameOf(username),
+      avatar: avatarOf(avatar),
+      description: description === undefined ? undefined : description.trim(),
+      guildId: optionalSnowflake(guildId, 'guildId'),
+      nick: nick === undefined ? undefined : nick.trim(),
+    };
+    if (out.username === undefined && out.avatar === undefined && out.description === undefined && out.nick === undefined) throw new ValidationError('Nichts zu ändern.');
+    return out;
+  },
   guildRef(p) {
     const { guildId } = obj(p);
     return { guildId: snowflake(guildId, 'guildId') };
