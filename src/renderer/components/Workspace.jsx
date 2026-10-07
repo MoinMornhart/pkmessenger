@@ -21,6 +21,7 @@ import { checkLink } from '../../shared/link-safety';
 import { getLists, loadLists, onListsChanged } from '../linkLists';
 import ProfileCard from './ProfileCard.jsx';
 import Tour from './Tour.jsx';
+import WhatsNew from './WhatsNew.jsx';
 import SetupWizard from './SetupWizard.jsx';
 import { prefs } from '../prefs';
 import JoinServerDialog from './JoinServerDialog.jsx';
@@ -599,6 +600,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
         <Tour />
+        <WhatsNew version={appInfo?.version} />
         {wizardOpen && (
           <div className="modal-backdrop" onMouseDown={() => setWizardOpen(false)}>
             <div className="modal wizard-modal" role="dialog" aria-label="Einrichtungs-Assistent" onMouseDown={(e) => e.stopPropagation()}>

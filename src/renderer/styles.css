@@ -4346,3 +4346,24 @@ kbd {
 .wizard {
   margin: 8px 0;
 }
+
+/* ---------- „Das ist neu“ nach Updates (Issue #44) ---------- */
+.whats-new {
+  padding: 22px;
+  width: min(560px, 94vw);
+  max-height: 84vh;
+  overflow-y: auto;
+}
+.whats-new__list {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+.whats-new__list ul {
+  margin: 4px 0 0;
+  padding-left: 4px;
+  list-style: none;
+  display: grid;
+  gap: 3px;
+  font-size: 13.5px;
+}
