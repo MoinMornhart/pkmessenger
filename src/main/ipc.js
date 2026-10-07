@@ -9,7 +9,7 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist }) {
   const requireAi = () => {
     if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
     return ai;
@@ -179,6 +179,8 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:error-report': (p) => (errorReport ? errorReport(validators.logError({ where: p?.where, message: p?.error })) : ''),
     'pk:open-log-folder': () => (openLogFolder ? openLogFolder() : false),
     'pk:setup-check': () => service.setupCheck(),
+    'pk:blocklist-get': () => (blocklist ? blocklist.get() : { danger: [], warn: [] }),
+    'pk:blocklist-update': () => (blocklist ? blocklist.update({ force: true }) : null),
     'pk:set-presence': (p) => service.setPresence(validators.backgroundSet(p)),
   };
 }

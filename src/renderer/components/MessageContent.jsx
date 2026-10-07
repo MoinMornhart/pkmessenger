@@ -4,6 +4,7 @@ import { NavContext } from '../state';
 import { createPortal } from 'react-dom';
 import { prefs } from '../prefs';
 import { checkLink } from '../../shared/link-safety';
+import { getLists } from '../linkLists';
 
 // Sicheres Mini-Markdown: erzeugt nur React-Elemente, NIEMALS innerHTML.
 const CODE_BLOCK = /```(?:[a-zA-Z0-9_+-]*\n)?([\s\S]*?)```/g;
@@ -72,7 +73,7 @@ export const OwnMessageContext = createContext(false);
 // Link-Schutz (Issue #38): gefährliche Links (IP-Grabber, Betrug) sind weder klickbar noch kopierbar
 function Link({ href }) {
   const nav = useContext(NavContext);
-  const check = checkLink(href, prefs.get().trustedDomains);
+  const check = checkLink(href, prefs.get().trustedDomains, getLists());
   if (check.level === 'danger')
     return (
       <span className="link-danger" title={check.reasons.join(' ')} onCopy={(e) => e.preventDefault()} onContextMenu={(e) => e.stopPropagation()}>

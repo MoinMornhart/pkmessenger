@@ -4195,3 +4195,8 @@ kbd {
 .chatrow__preview .typing__dots {
   margin-right: 6px;
 }
+.settings__body label.composer__ping {
+  white-space: normal;
+  display: flex;
+  width: 100%;
+}

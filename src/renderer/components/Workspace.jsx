@@ -18,6 +18,7 @@ import AccessDialog from './AccessDialog.jsx';
 import SettingsDialog from './SettingsDialog.jsx';
 import LinkWarnDialog from './LinkWarnDialog.jsx';
 import { checkLink } from '../../shared/link-safety';
+import { getLists, loadLists, onListsChanged } from '../linkLists';
 import ProfileCard from './ProfileCard.jsx';
 import Tour from './Tour.jsx';
 import { prefs } from '../prefs';
@@ -206,6 +207,13 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [presence, setPresence] = useState({});
   useEffect(() => onEvent((type, p) => type === 'presence' && p?.userId && setPresence((m) => ({ ...m, [p.userId]: p.status }))), []);
   const typingIn = useMemo(() => Object.fromEntries(Object.entries(typing).map(([cid, who]) => [cid, Object.values(who).map((v) => v.name)])), [typing]);
+
+  // Sperrlisten für den Link-Schutz laden; danach Nachrichten neu prüfen lassen
+  const [, setListsVersion] = useState(0);
+  useEffect(() => {
+    loadLists();
+    return onListsChanged(() => setListsVersion((v) => v + 1));
+  }, []);
 
   // „🤖 KI schreibt gerade an …“ (Issue #1)
   const [aiBusy, setAiBusy] = useState({}); // channelId → userName
@@ -466,7 +474,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
       openChannel,
       openExternal: (url) => {
         // Link-Schutz (Issue #38): vertraute Seiten direkt, gefährliche/verdächtige IMMER mit Warnung
-        const { level } = checkLink(url, prefs.get().trustedDomains);
+        const { level } = checkLink(url, prefs.get().trustedDomains, getLists());
         const ask = level === 'danger' || level === 'warn' || (level !== 'trusted' && prefs.get().linkWarn);
         if (ask) setLinkAsk(url);
         else api.openExternal({ url }).catch((e) => toast({ kind: 'error', title: e.message }));

@@ -351,6 +351,10 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     await js(win, `document.querySelector('[data-setting="presence"]')?.scrollIntoView({block:'center'})`);
     await wait(200);
     await shoot(win, dir, '67-online-status-pruefung');
+    await js(win, `document.querySelector('[data-setting="blocklist"]')?.scrollIntoView({block:'center'})`);
+    await wait(300);
+    await shoot(win, dir, '69-sperrlisten');
+    console.log(`[sperrlisten] ${await js(win, `document.querySelector('[data-setting="blocklist"] p')?.textContent || null`)}`);
     const pres = await js(win, `JSON.stringify({ an: document.querySelector('[data-setting="presence"] input')?.checked, hinweis: document.querySelector('[data-setting="presence"] .warn')?.textContent.slice(0,70) || null, verbunden: document.querySelector('.me__status, .chatlist__me')?.textContent.includes('Verbunden') ?? null })`);
     await js(win, `document.querySelector('.settings__nav [data-nav="alle"]')?.click()`);
     await js(win, `document.querySelector('.settings .icon-btn')?.click()`);

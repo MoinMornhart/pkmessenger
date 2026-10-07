@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { prefs } from '../prefs';
 import { checkLink, trustKey } from '../../shared/link-safety';
+import { getLists } from '../linkLists';
 
 // Warnung vor dem Öffnen eines Links (Issue #1): zeigt das echte Ziel, warnt bei verdächtigen Adressen.
 // Häkchen „Nicht mehr fragen“ schaltet die Warnung ab (wieder einschaltbar unter Einstellungen → Datenschutz).
@@ -8,7 +9,7 @@ export default function LinkWarnDialog({ url, onOpen, onClose }) {
   const [skip, setSkip] = useState(false);
   const [trust, setTrust] = useState(false);
   const [risk, setRisk] = useState(false); // gefährliche Links nur mit „Ich verstehe das Risiko“
-  const { level, host, reasons: warnings } = checkLink(url, prefs.get().trustedDomains);
+  const { level, host, reasons: warnings } = checkLink(url, prefs.get().trustedDomains, getLists());
   const danger = level === 'danger';
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();

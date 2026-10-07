@@ -9,6 +9,7 @@ import MediaGate from './MediaGate.jsx';
 import { openProfile } from './ProfileCard.jsx';
 import { prefs } from '../prefs';
 import { checkMessageLinks } from '../../shared/link-safety';
+import { getLists } from '../linkLists';
 import { attachmentKind } from '../../shared/media';
 
 function Avatar({ author }) {
@@ -91,7 +92,7 @@ function SystemRow({ m, highlighted }) {
 
 // Warnung bei gefährlichen Links in fremden Nachrichten (Issue #38); „Für mich ausblenden“ wird empfohlen
 function LinkAlarm({ m, actions }) {
-  const danger = checkMessageLinks(m.content, prefs.get().trustedDomains).filter((x) => x.level === 'danger');
+  const danger = checkMessageLinks(m.content, prefs.get().trustedDomains, getLists()).filter((x) => x.level === 'danger');
   if (!danger.length) return null;
   return (
     <div className="link-alarm" role="alert">
