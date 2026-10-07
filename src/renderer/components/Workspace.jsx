@@ -21,6 +21,7 @@ import { checkLink } from '../../shared/link-safety';
 import { getLists, loadLists, onListsChanged } from '../linkLists';
 import ProfileCard from './ProfileCard.jsx';
 import Tour from './Tour.jsx';
+import SetupWizard from './SetupWizard.jsx';
 import { prefs } from '../prefs';
 import JoinServerDialog from './JoinServerDialog.jsx';
 import { ThreadsPanel } from './SidePanels.jsx';
@@ -207,6 +208,21 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [presence, setPresence] = useState({});
   useEffect(() => onEvent((type, p) => type === 'presence' && p?.userId && setPresence((m) => ({ ...m, [p.userId]: p.status }))), []);
   const typingIn = useMemo(() => Object.fromEntries(Object.entries(typing).map(([cid, who]) => [cid, Object.values(who).map((v) => v.name)])), [typing]);
+
+  // Einrichtungs-Assistent (#38): per Knopf, oder von selbst, wenn der Bot noch auf keinem Server ist
+  const [wizardOpen, setWizardOpen] = useState(false);
+  useEffect(() => {
+    const onOpen = () => setWizardOpen(true);
+    window.addEventListener('pk:setup-wizard', onOpen);
+    return () => window.removeEventListener('pk:setup-wizard', onOpen);
+  }, []);
+  const autoWizard = useRef(false);
+  useEffect(() => {
+    if (!autoWizard.current && guilds && guilds.length === 0 && !/[?&]shots=1/.test(window.location.search)) {
+      autoWizard.current = true;
+      setWizardOpen(true);
+    }
+  }, [guilds]);
 
   // Sperrlisten für den Link-Schutz laden; danach Nachrichten neu prüfen lassen
   const [, setListsVersion] = useState(0);
@@ -583,6 +599,19 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
         <Tour />
+        {wizardOpen && (
+          <div className="modal-backdrop" onMouseDown={() => setWizardOpen(false)}>
+            <div className="modal wizard-modal" role="dialog" aria-label="Einrichtungs-Assistent" onMouseDown={(e) => e.stopPropagation()}>
+              <div className="settings__head">
+                <h3>🧭 Einrichtungs-Assistent</h3>
+                <button className="icon-btn" onClick={() => setWizardOpen(false)} aria-label="Schließen">
+                  ×
+                </button>
+              </div>
+              <SetupWizard status={status} onReconnect={onReconnect} onClose={() => setWizardOpen(false)} />
+            </div>
+          </div>
+        )}
         {Object.keys(aiBusy).length > 0 && (
           <div className="ai-busy" role="status">
             {Object.entries(aiBusy).map(([cid, name]) => (

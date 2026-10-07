@@ -341,6 +341,13 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
     await wait(300);
     console.log(`[hilfe] Check: ${check} · Ups: ${oops}`);
+    // Einrichtungs-Assistent (#38)
+    await js(win, `window.dispatchEvent(new CustomEvent('pk:setup-wizard'))`);
+    await wait(1500);
+    await shoot(win, dir, '71-einrichtungs-assistent');
+    console.log(`[assistent] ${await js(win, `JSON.stringify({ schritte: document.querySelectorAll('.wizard__step').length, erledigt: document.querySelectorAll('.wizard__step.is-done').length, jetzt: document.querySelector('.wizard__now')?.closest('.wizard__step')?.querySelector('.wizard__head span:nth-child(2)')?.textContent || null })`)}`);
+    await js(win, `document.querySelector('.wizard-modal .icon-btn')?.click()`);
+    await wait(300);
     // Online-Status (Issue #1): im Demo ist „Presence Intent“ aus → verständliche Ablehnung statt Verbindungsabbruch
     await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
     await wait(500);

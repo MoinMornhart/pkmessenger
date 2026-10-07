@@ -10,6 +10,7 @@ import { THEMES, ACCENTS, MOTIONS } from '../theme';
 import WallpaperDialog from './WallpaperDialog.jsx';
 import { tourState, startTour } from './Tour.jsx';
 import { reportError } from './OopsDialog.jsx';
+import { openSetupWizard } from './SetupWizard.jsx';
 import { fuzzyFilter } from '../../shared/fuzzy';
 
 function TokenSection({ toast }) {
@@ -566,6 +567,15 @@ function HelpSection({ onClose }) {
         }}
       >
         🎓 Tour starten
+      </button>{' '}
+      <button
+        className="btn btn--small"
+        onClick={() => {
+          onClose();
+          setTimeout(openSetupWizard, 200);
+        }}
+      >
+        🧭 Einrichtungs-Assistent
       </button>
       <ul className="settings__keys">
         <li>
