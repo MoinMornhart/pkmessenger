@@ -99,6 +99,24 @@ function TokenSection({ toast }) {
   );
 }
 
+// Schreiben: Namensvorschläge beim Tippen von @ (Issue #1: „Autovervollständigung alle Server abfragen, als Einstellung“)
+function WritingSection() {
+  const [p, setP] = useState(prefs.get());
+  useEffect(() => prefs.subscribe(setP), []);
+  return (
+    <>
+      <label className="settings__label" htmlFor="mention-scope">
+        Namensvorschläge beim Tippen von @
+      </label>
+      <select id="mention-scope" value={p.mentionScope} onChange={(e) => prefs.set({ mentionScope: e.target.value })}>
+        <option value="server">nur Personen von diesem Server</option>
+        <option value="alle">auch Personen von allen anderen Servern des Bots</option>
+      </select>
+      <p className="muted small">💡 Personen von anderen Servern sehen die Erwähnung nur, wenn sie auch auf diesem Server sind.</p>
+    </>
+  );
+}
+
 // Aussehen: Design, Akzentfarbe, Animationen, Dichte – wirkt sofort, wird pro PC gemerkt
 function AppearanceSection() {
   const [p, setP] = useState(prefs.get());
@@ -369,6 +387,10 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
         <section>
           <h4>🎨 Aussehen</h4>
           <AppearanceSection />
+        </section>
+        <section>
+          <h4>✍️ Schreiben</h4>
+          <WritingSection />
         </section>
         <section>
           <h4>🔔 Benachrichtigungen</h4>
