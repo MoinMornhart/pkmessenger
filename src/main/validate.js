@@ -189,6 +189,33 @@ const validators = {
     if (!isValidSchedule(clean)) throw new ValidationError('Ungültiger Zeitplan (mind. alle 15 Minuten, Uhrzeit HH:MM, mind. ein Wochentag).');
     return { ...(id ? { id } : {}), name: name.trim(), channelId: snowflake(channelId, 'channelId'), channelName: channelName?.trim() || '', prompt: prompt.trim(), schedule: clean, context, enabled };
   },
+  aiResponder(p) {
+    const { enabled, channelIds, dms, allowUsers, blockUsers, instructions, context, notify } = obj(p);
+    for (const [k, v] of Object.entries({ enabled, dms, context, notify })) if (typeof v !== 'boolean') throw new ValidationError(`Ungültiges Feld "${k}".`);
+    if (!Array.isArray(channelIds) || channelIds.length > 100) throw new ValidationError('Ungültige Kanalliste.');
+    const people = (list, field) => {
+      if (!Array.isArray(list) || list.length > 100) throw new ValidationError(`Ungültige Liste "${field}".`);
+      const seen = new Set();
+      return list
+        .map((u) => {
+          const { id, name } = obj(u);
+          if (typeof name !== 'string' || name.length > 100) throw new ValidationError('Ungültiger Name in der Personenliste.');
+          return { id: snowflake(id, field), name: name.trim() || 'Unbekannt' };
+        })
+        .filter((u) => !seen.has(u.id) && seen.add(u.id));
+    };
+    if (typeof instructions !== 'string' || instructions.length > 1500) throw new ValidationError('Die Anweisungen dürfen höchstens 1500 Zeichen haben.');
+    return {
+      enabled,
+      channelIds: [...new Set(channelIds.map((c) => snowflake(c, 'channelIds')))],
+      dms,
+      allowUsers: people(allowUsers, 'allowUsers'),
+      blockUsers: people(blockUsers, 'blockUsers'),
+      instructions: instructions.trim(),
+      context,
+      notify,
+    };
+  },
   aiJobRef(p) {
     const { id } = obj(p);
     if (!(typeof id === 'string' && /^[0-9a-f-]{36}$/.test(id))) throw new ValidationError('Ungültige Auftrags-ID.');

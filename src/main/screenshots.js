@@ -25,7 +25,7 @@ const typeInto = (selector, text) => `(() => {
 
 const key = (k, opts = {}) => `window.dispatchEvent(new KeyboardEvent('keydown', ${JSON.stringify({ key: k, bubbles: true, ...opts })}))`;
 
-async function runScreenshots(win, dir, { demo, stats }) {
+async function runScreenshots(win, dir, { demo, stats, simulate }) {
   fs.mkdirSync(dir, { recursive: true });
   await wait(3500);
   if (!demo) {
@@ -279,6 +279,26 @@ async function runScreenshots(win, dir, { demo, stats }) {
   await wait(800);
   const posted = await js(win, `[...document.querySelectorAll('.msg--out')].some(m=>m.textContent.includes('Guten Morgen, Team'))`);
   console.log(`[ki] Nachricht im Kanal sichtbar: ${posted}`);
+  // Antwort-Agent: für #allgemein einschalten, dann erwähnt Anna den Bot → KI antwortet als Reply
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+  await wait(500);
+  await js(win, `[...document.querySelectorAll('.ai-responder label.composer__ping')].find(l=>l.textContent.includes('erwähnt'))?.querySelector('input')?.click()`);
+  await wait(300);
+  await js(win, `[...document.querySelectorAll('.ai-channel')].find(l=>l.textContent.includes('#allgemein'))?.querySelector('input')?.click()`);
+  await js(win, `(() => { const el=document.querySelector('#ai-instr'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'Du bist PKBot, locker und hilfsbereit.'); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+  await wait(200);
+  await win.webContents.executeJavaScript(`document.querySelector('.ai-responder')?.scrollIntoView({block:'center'})`);
+  await wait(300);
+  await shoot(win, dir, '29-ki-antworten');
+  await clickText('.ai-responder .btn', 'Speichern');
+  await wait(400);
+  await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+  await wait(400);
+  simulate?.mention('Wann ist das Treffen heute?');
+  await wait(1500);
+  await shoot(win, dir, '30-ki-antwort-im-chat');
+  const reply = await js(win, `JSON.stringify({ hinweis: [...document.querySelectorAll('.toast')].map(t=>t.textContent).find(t=>t.includes('geantwortet'))?.slice(0,60) || null, antwortAlsReply: [...document.querySelectorAll('.msg--out')].some(m=>m.querySelector('.reply-quote') && m.textContent.includes('19 Uhr** in der Lounge') || m.textContent.includes('in der Lounge 🎉')) })`);
+  console.log(`[ki-antwort] ${reply}`);
   // Aussehen: Einstellungen zeigen, dann Designs „Hell“ und „Lila + Pink“ im Chat
   await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
   await wait(600);

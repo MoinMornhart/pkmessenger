@@ -51,6 +51,14 @@ function broadcast(type, payload) {
       /* Sprach-Manager noch nicht initialisiert – dann gibt es auch keine Verbindung */
     }
   }
+  // KI-Antwort-Agent (Beta): neue Nachrichten prüfen (antwortet nur, wenn eingeschaltet und der Bot erwähnt wird)
+  if (type === 'message:create') {
+    try {
+      ai.onMessage(payload).catch(() => {});
+    } catch {
+      /* KI-Manager noch nicht initialisiert */
+    }
+  }
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send('pk:event', { type, payload });
   }
@@ -170,7 +178,7 @@ function createWindow() {
     const dir = path.resolve(SHOTS_ARG.split('=')[1]);
     mainWindow.webContents.once('did-finish-load', () => {
       require('./screenshots')
-        .runScreenshots(mainWindow, dir, { demo: DEMO, stats: demo?.stats })
+        .runScreenshots(mainWindow, dir, { demo: DEMO, stats: demo?.stats, simulate: demo?.simulate })
         .catch((e) => console.error('[screenshots] Fehler:', e))
         .finally(() => app.quit());
     });

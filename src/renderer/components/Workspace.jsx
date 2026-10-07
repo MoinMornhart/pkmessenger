@@ -202,9 +202,11 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         loadGuilds();
       } else if (type === 'dms:changed') {
         loadDMs();
+      } else if (type === 'ai:replied') {
+        toast({ kind: 'info', title: `🤖 KI hat ${p.userName} geantwortet`, text: p.answer, duration: 6000 });
       }
     });
-  }, [loadChannels, loadGuilds, loadDMs]);
+  }, [loadChannels, loadGuilds, loadDMs, toast]);
 
   // Abgelaufene Tipp-Anzeigen entfernen (Timer läuft nur, wenn jemand tippt).
   const anyTyping = Object.values(typing).some((u) => Object.keys(u).length > 0);
@@ -392,7 +394,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     const gName = new Map((guilds || []).map((g) => [g.id, g.name]));
     return flatChannels
       .filter((c) => c.canSend && (c.type === 'text' || c.type === 'announcement' || c.type === 'dm'))
-      .map((c) => ({ id: c.id, label: c.type === 'dm' ? `💬 ${c.name} (privat)` : `#${c.name} · ${gName.get(c.guildId) || ''}` }));
+      .map((c) => ({ id: c.id, dm: c.type === 'dm', label: c.type === 'dm' ? `💬 ${c.name} (privat)` : `#${c.name} · ${gName.get(c.guildId) || ''}` }));
   }, [flatChannels, guilds]);
 
   const guild = guildId === DM_ID ? DM_GUILD : guilds?.find((g) => g.id === guildId) || null;
@@ -462,7 +464,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           />
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
-        {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} guildId={guildId === DM_ID ? null : guildId} aiTargets={aiTargets} />}
+        {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} guildId={guildId === DM_ID ? null : guildId} aiTargets={aiTargets} guilds={guilds || []} />}
         {newDmOpen && (
           <NewDMDialog
             guilds={guilds || []}
