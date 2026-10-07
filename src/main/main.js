@@ -239,7 +239,7 @@ function createWindow() {
     if (!app.isPackaged && input.control && input.shift && input.key.toLowerCase() === 'i') mainWindow.webContents.toggleDevTools();
   });
 
-  mainWindow.loadFile(RENDERER_HTML);
+  mainWindow.loadFile(RENDERER_HTML, SHOTS_ARG ? { query: { shots: '1' } } : undefined);
   if (SHOTS_ARG) {
     // Testlauf: Fehler aus der Oberfläche im Terminal sichtbar machen
     mainWindow.webContents.on('console-message', (e) => {

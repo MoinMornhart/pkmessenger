@@ -7,7 +7,23 @@ import { ConnectingScreen, ErrorScreen } from './components/StatusScreens.jsx';
 import Toasts from './components/Toasts.jsx';
 import LockScreen from './components/LockScreen.jsx';
 
+// Knöpfe mit Symbol statt Text: Beschriftung (aria-label) auch als Hinweis beim Drüberfahren zeigen
+function useButtonHints() {
+  useEffect(() => {
+    const apply = (root) => {
+      for (const b of root.querySelectorAll?.('button[aria-label]:not([title])') || []) b.title = b.getAttribute('aria-label');
+    };
+    apply(document);
+    const obs = new MutationObserver((list) => {
+      for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1) apply(n.parentNode || n);
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, []);
+}
+
 export default function App() {
+  useButtonHints();
   const [status, setStatus] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [appInfo, setAppInfo] = useState({ version: null, update: { state: 'idle' } });

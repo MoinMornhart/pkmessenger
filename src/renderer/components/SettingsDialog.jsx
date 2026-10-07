@@ -8,6 +8,8 @@ import VoiceFxSection from './VoiceFxSection.jsx';
 import SecuritySection from './SecuritySection.jsx';
 import { THEMES, ACCENTS, MOTIONS } from '../theme';
 import WallpaperDialog from './WallpaperDialog.jsx';
+import { tourState, startTour } from './Tour.jsx';
+import { fuzzyFilter } from '../../shared/fuzzy';
 
 function TokenSection({ toast }) {
   const [info, setInfo] = useState(null);
@@ -409,6 +411,58 @@ function AudioSection() {
   );
 }
 
+// Bereiche in sinnvoller Reihenfolge: Alltägliches oben, Technik unten, Beta (experimentell) ganz unten (Issue #1)
+const SECTIONS = [
+  { id: 'aussehen', icon: '🎨', title: 'Aussehen', desc: 'Design, Farbe, Animationen, Chat-Hintergrund.', keywords: ['farbe', 'theme', 'hell', 'dunkel', 'hintergrund', 'kompakt', 'animation'] },
+  { id: 'schreiben', icon: '✍️', title: 'Schreiben', desc: 'Wie Namensvorschläge beim Schreiben funktionieren.', keywords: ['erwähnen', 'mention', 'namen', 'vorschläge', '@'] },
+  { id: 'toene', icon: '🔔', title: 'Benachrichtigungen', desc: 'Töne, eigener Ton, Nicht stören.', keywords: ['ton', 'sound', 'lautstärke', 'nicht stören', 'benachrichtigung'] },
+  { id: 'datenschutz', icon: '🔒', title: 'Datenschutz', desc: 'Bildschirmschutz, Bilder/GIFs/Videos laden, Warnung vor Links.', keywords: ['bilder', 'gif', 'video', 'medien', 'link', 'screenshot', 'ip'] },
+  { id: 'sicherheit', icon: '🛡', title: 'Sicherheit & Start', desc: 'App-Passwort, Windows Hello, mit Windows starten, im Hintergrund weiterlaufen.', keywords: ['passwort', 'sperre', 'hello', 'fingerabdruck', 'autostart', 'hintergrund', 'tray'] },
+  { id: 'profil', icon: '🪪', title: 'Bot-Profil', desc: 'Name, Bild und Beschreibung deines Bots.', keywords: ['name', 'avatar', 'bild', 'über mich', 'spitzname'] },
+  { id: 'token', icon: '🔑', title: 'Bot-Token', desc: 'Den geheimen Schlüssel deines Bots ersetzen oder entfernen.', keywords: ['token', 'schlüssel', 'anmelden'] },
+  { id: 'audio', icon: '🎧', title: 'Audio', desc: 'Mikrofon, Lautsprecher und Stimme für Sprachkanäle.', keywords: ['mikrofon', 'lautsprecher', 'sprachkanal', 'rauschen', 'stimme'] },
+  { id: 'updates', icon: '🔄', title: 'Updates', desc: 'Nach neuen Versionen suchen, sehen was neu ist, neu installieren.', keywords: ['update', 'version', 'neu', 'release', 'installieren'] },
+  { id: 'hilfe', icon: '❓', title: 'Hilfe & Tour', desc: 'Die Einführungs-Tour neu starten und Tastenkürzel.', keywords: ['tour', 'hilfe', 'tutorial', 'tasten', 'kürzel'] },
+  { id: 'beta', icon: '🧪', title: 'Beta', desc: 'Experimentelle Funktionen wie KI-Agenten. Standardmäßig aus, kann sich noch ändern.', keywords: ['ki', 'ai', 'agent', 'openai', 'claude', 'ollama', 'experimentell'] },
+];
+
+// Hilfe & Tour
+function HelpSection({ onClose }) {
+  const t = tourState();
+  return (
+    <>
+      <p className="muted small">Tour: {t?.status === 'done' ? 'abgeschlossen ✓' : t?.status === 'skipped' ? 'übersprungen' : 'noch nicht gemacht'}</p>
+      <button
+        className="btn btn--small"
+        onClick={() => {
+          onClose();
+          setTimeout(startTour, 200);
+        }}
+      >
+        🎓 Tour starten
+      </button>
+      <ul className="settings__keys">
+        <li>
+          <kbd>Strg</kbd> + <kbd>K</kbd> Schnell zu einem Chat springen
+        </li>
+        <li>
+          <kbd>Strg</kbd> + <kbd>F</kbd> Im Chat suchen
+        </li>
+        <li>
+          <kbd>/</kbd> Befehle · <kbd>@</kbd> Namen · <kbd>#</kbd> Kanäle
+        </li>
+        <li>
+          <kbd>Strg</kbd> + <kbd>B</kbd>/<kbd>I</kbd>/<kbd>U</kbd> Fett, kursiv, unterstrichen
+        </li>
+        <li>
+          <kbd>Esc</kbd> Fenster schließen, Antworten abbrechen
+        </li>
+      </ul>
+      <p className="muted small">💡 Fährst du mit der Maus über einen Knopf, steht dort, was er macht.</p>
+    </>
+  );
+}
+
 export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTargets = [], guilds = [], focus = null }) {
   // „Hier aktivieren“ (z. B. Medien) → direkt dorthin scrollen und kurz hervorheben
   useEffect(() => {
@@ -428,56 +482,77 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState(SECTIONS[0].id);
+  const bodyRef = useRef(null);
+  const visible = query.trim() ? fuzzyFilter(SECTIONS, query, (x) => [x.title, x.desc, ...x.keywords]) : SECTIONS;
+  const shown = new Set(visible.map((x) => x.id));
+  // Welcher Bereich ist gerade sichtbar? (Markierung in der Navigation)
+  const onScroll = () => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const top = body.getBoundingClientRect().top + 60;
+    let cur = SECTIONS[0].id;
+    for (const el of body.querySelectorAll('section[data-section]')) if (el.getBoundingClientRect().top <= top) cur = el.dataset.section;
+    setActive(cur);
+  };
+  const jump = (id) => {
+    bodyRef.current?.querySelector(`section[data-section="${id}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    setActive(id);
+  };
+  const render = {
+    aussehen: () => <AppearanceSection />,
+    schreiben: () => <WritingSection />,
+    toene: () => <NotificationSection toast={toast} />,
+    datenschutz: () => <PrivacySection toast={toast} />,
+    sicherheit: () => <SecuritySection toast={toast} />,
+    profil: () => <ProfileSection toast={toast} guildId={guildId} />,
+    token: () => <TokenSection toast={toast} />,
+    audio: () => (
+      <>
+        <AudioSection />
+        <VoiceFxSection />
+      </>
+    ),
+    updates: () => <UpdateSection appInfo={appInfo} toast={toast} />,
+    hilfe: () => <HelpSection onClose={onClose} />,
+    beta: () => <AiSection toast={toast} targets={aiTargets} guilds={guilds} />,
+  };
+
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal settings" role="dialog" aria-label="Einstellungen" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="settings__head">
+        <nav className="settings__nav" aria-label="Bereiche">
           <h3>Einstellungen</h3>
-          <button className="icon-btn" onClick={onClose} aria-label="Schließen">
-            ×
-          </button>
+          <input className="settings__search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="🔎 Einstellung suchen …" aria-label="Einstellung suchen" />
+          {visible.length === 0 && <p className="muted small">Nichts gefunden.</p>}
+          {visible.map((x) => (
+            <button key={x.id} data-nav={x.id} className={`settings__navitem ${active === x.id ? 'is-on' : ''}`} onClick={() => jump(x.id)} title={x.desc}>
+              <span>{x.icon}</span> {x.title}
+              {x.id === 'beta' && <span className="settings__beta">experimentell</span>}
+            </button>
+          ))}
+        </nav>
+        <div className="settings__body" ref={bodyRef} onScroll={onScroll}>
+          <div className="settings__head">
+            <span className="muted small">Alles wird nur auf diesem PC gespeichert.</span>
+            <button className="icon-btn" onClick={onClose} aria-label="Schließen" title="Schließen (Esc)">
+              ×
+            </button>
+          </div>
+          {SECTIONS.map((x) =>
+            shown.has(x.id) ? (
+              <section key={x.id} data-section={x.id}>
+                <h4>
+                  {x.icon} {x.title}
+                  {x.id === 'beta' && <span className="settings__beta">experimentell</span>}
+                </h4>
+                <p className="settings__desc">{x.desc}</p>
+                {render[x.id]()}
+              </section>
+            ) : null,
+          )}
         </div>
-        <section>
-          <h4>🎨 Aussehen</h4>
-          <AppearanceSection />
-        </section>
-        <section>
-          <h4>✍️ Schreiben</h4>
-          <WritingSection />
-        </section>
-        <section>
-          <h4>🔔 Benachrichtigungen</h4>
-          <NotificationSection toast={toast} />
-        </section>
-        <section>
-          <h4>🪪 Bot-Profil</h4>
-          <ProfileSection toast={toast} guildId={guildId} />
-        </section>
-        <section>
-          <h4>🔑 Bot-Token</h4>
-          <TokenSection toast={toast} />
-        </section>
-        <section>
-          <h4>🎧 Audio (Sprachkanäle)</h4>
-          <AudioSection />
-          <VoiceFxSection />
-        </section>
-        <section>
-          <h4>🔄 Updates</h4>
-          <UpdateSection appInfo={appInfo} toast={toast} />
-        </section>
-        <section>
-          <h4>🧪 Beta</h4>
-          <AiSection toast={toast} targets={aiTargets} guilds={guilds} />
-        </section>
-        <section>
-          <h4>🛡 Sicherheit & Start</h4>
-          <SecuritySection toast={toast} />
-        </section>
-        <section>
-          <h4>🔒 Datenschutz</h4>
-          <PrivacySection toast={toast} />
-        </section>
       </div>
     </div>
   );
