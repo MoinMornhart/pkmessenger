@@ -5,6 +5,7 @@ import AiSection from './AiSection.jsx';
 import UpdateSection from './UpdateSection.jsx';
 import NotificationSection from './NotificationSection.jsx';
 import VoiceFxSection from './VoiceFxSection.jsx';
+import SecuritySection from './SecuritySection.jsx';
 import { THEMES, ACCENTS, MOTIONS } from '../theme';
 
 function TokenSection({ toast }) {
@@ -393,6 +394,10 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
         <section>
           <h4>🧪 Beta</h4>
           <AiSection toast={toast} targets={aiTargets} guilds={guilds} />
+        </section>
+        <section>
+          <h4>🛡 Sicherheit & Start</h4>
+          <SecuritySection toast={toast} />
         </section>
         <section>
           <h4>🔒 Datenschutz</h4>

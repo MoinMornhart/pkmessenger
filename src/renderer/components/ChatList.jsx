@@ -200,7 +200,15 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
 
   // Sortierung „Neueste zuerst“ oder „Nach Kategorien“ (einklappbar) – wird pro PC gemerkt
   const [sort, setSort] = useState(() => ({ mode: prefs.get().chatSort, collapsed: prefs.get().collapsed }));
-  useEffect(() => prefs.subscribe((p) => setSort({ mode: p.chatSort, collapsed: p.collapsed })), []);
+  const [dnd, setDnd] = useState(() => prefs.get().dnd);
+  useEffect(
+    () =>
+      prefs.subscribe((p) => {
+        setSort({ mode: p.chatSort, collapsed: p.collapsed });
+        setDnd(p.dnd);
+      }),
+    [],
+  );
   const isDM = Boolean(guild?.isDM);
   const byCategory = !isDM && sort.mode === 'categories' && !filter.trim() && chatGroups.length > 0;
   const toggleCategory = (id) => {
@@ -256,6 +264,15 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
           aria-pressed={sort.mode === 'categories'}
         >
           ☰
+        </button>
+        <button
+          className={`icon-btn ${dnd ? 'is-on' : ''}`}
+          onClick={() => prefs.set({ dnd: !dnd })}
+          title={dnd ? 'Nicht stören ist an – klicken zum Ausschalten' : 'Nicht stören (keine Töne)'}
+          aria-label="Nicht stören"
+          aria-pressed={dnd}
+        >
+          {dnd ? '🔕' : '🔔'}
         </button>
         <button className="icon-btn" onClick={onOpenSettings} title="Einstellungen" aria-label="Einstellungen">
           ⚙

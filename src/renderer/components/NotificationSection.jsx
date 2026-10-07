@@ -53,6 +53,9 @@ export default function NotificationSection({ toast }) {
   return (
     <>
       <label className="composer__ping">
+        <input type="checkbox" checked={p.dnd} onChange={(e) => prefs.set({ dnd: e.target.checked })} /> 🔕 Nicht stören (keine Töne, bis du es wieder ausschaltest)
+      </label>
+      <label className="composer__ping">
         <input type="checkbox" checked={s.enabled} onChange={(e) => setSound({ enabled: e.target.checked })} /> 🔔 Töne einschalten
       </label>
       {s.enabled && (

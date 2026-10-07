@@ -5,12 +5,14 @@ import Workspace from './components/Workspace.jsx';
 import SetupScreen from './components/SetupScreen.jsx';
 import { ConnectingScreen, ErrorScreen } from './components/StatusScreens.jsx';
 import Toasts from './components/Toasts.jsx';
+import LockScreen from './components/LockScreen.jsx';
 
 export default function App() {
   const [status, setStatus] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [appInfo, setAppInfo] = useState({ version: null, update: { state: 'idle' } });
   const everReady = useRef(false);
+  const [locked, setLocked] = useState(null); // null = noch unbekannt
 
   const toast = useCallback((t) => {
     const id = Math.random().toString(36).slice(2);
@@ -24,9 +26,14 @@ export default function App() {
       else if (type === 'ratelimit') toast({ kind: 'warn', title: 'Discord bremst kurz (Rate-Limit)', text: `Automatischer neuer Versuch in ${Math.ceil((payload.retryAfterMs || 1000) / 1000)} s.` });
       else if (type === 'log') console.warn('[PKMessenger]', payload.message);
       else if (type === 'update') setAppInfo((i) => ({ ...i, update: payload }));
+      else if (type === 'lock') setLocked(Boolean(payload?.locked));
       else bus.emit(type, payload);
     });
     api.getAppInfo().then(setAppInfo).catch(() => {});
+    api
+      .lockStatus()
+      .then((s) => setLocked(Boolean(s?.locked)))
+      .catch(() => setLocked(false));
     api.getStatus().then(setStatus).catch(() => setStatus({ state: 'error', error: { message: 'Interner Fehler beim Start.', hint: 'App neu starten.' } }));
     return off;
   }, [toast]);
@@ -36,7 +43,9 @@ export default function App() {
   if (status?.state === 'ready') everReady.current = true;
 
   let screen;
-  if (!status || status.state === 'idle' || (status.state === 'connecting' && !everReady.current)) screen = <ConnectingScreen />;
+  if (locked) screen = <LockScreen onUnlocked={() => setLocked(false)} />;
+  else if (locked === null) screen = <ConnectingScreen />;
+  else if (!status || status.state === 'idle' || (status.state === 'connecting' && !everReady.current)) screen = <ConnectingScreen />;
   else if (status.state === 'setup') screen = <SetupScreen status={status} onReconnect={reconnect} />;
   else if (status.state === 'error' && !everReady.current) screen = <ErrorScreen status={status} onReconnect={reconnect} />;
   else if (status.state === 'disconnected' && !everReady.current) screen = <ErrorScreen status={status} onReconnect={reconnect} />;

@@ -277,6 +277,23 @@ const validators = {
     if (!(typeof id === 'string' && /^[0-9a-f-]{36}$/.test(id))) throw new ValidationError('Ungültige Auftrags-ID.');
     return { id };
   },
+  lockPassword(p) {
+    const { password } = obj(p);
+    if (typeof password !== 'string' || password.length > 200) throw new ValidationError('Ungültiges Passwort.');
+    return { password };
+  },
+  lockSet(p) {
+    const { password, current, idleMinutes } = obj(p);
+    if (typeof password !== 'string' || password.length > 200) throw new ValidationError('Ungültiges Passwort.');
+    if (current !== undefined && (typeof current !== 'string' || current.length > 200)) throw new ValidationError('Ungültiges Passwort.');
+    if (idleMinutes !== undefined && !Number.isInteger(idleMinutes)) throw new ValidationError('Ungültige Zeit.');
+    return { password, current, idleMinutes: idleMinutes ?? 0 };
+  },
+  lockIdle(p) {
+    const { idleMinutes } = obj(p);
+    if (!Number.isInteger(idleMinutes)) throw new ValidationError('Ungültige Zeit.');
+    return { idleMinutes };
+  },
   memberRef(p) {
     const { guildId, userId } = obj(p);
     return { guildId: snowflake(guildId, 'guildId'), userId: snowflake(userId, 'userId') };

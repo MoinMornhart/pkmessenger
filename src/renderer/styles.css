@@ -3376,3 +3376,52 @@ img.chat-avatar {
   color: var(--text);
   font: inherit;
 }
+
+/* ---------- Sperrbildschirm + Sicherheit ---------- */
+.lock-screen {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--accent) 12%, var(--bg)), var(--bg));
+}
+.lock-card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  width: min(380px, calc(100vw - 32px));
+  padding: 32px 28px;
+  border-radius: 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  animation: pop 0.25s var(--ease);
+}
+.lock-card h1 {
+  margin: 4px 0 0;
+  font-size: 20px;
+}
+.lock-card input,
+.lock-form input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+.lock-card input:focus,
+.lock-form input:focus {
+  border-color: var(--accent);
+}
+.lock-card .btn {
+  width: 100%;
+}
+.lock-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}

@@ -2,7 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, shell, session, Menu, autoUpdater, safeStorage, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, session, Menu, autoUpdater, safeStorage, clipboard, powerMonitor } = require('electron');
 
 // Squirrel-Installer (Windows): beim Installieren/Deinstallieren Verknüpfungen anlegen und sofort beenden.
 if (handleSquirrelEvent()) return;
@@ -15,6 +15,7 @@ const { registerIpc } = require('./ipc');
 const { createUpdater, parseRepo } = require('./updater');
 const { createVoiceManager } = require('./voice');
 const { createAiManager, createSecretFile } = require('./ai');
+const { createAppLock } = require('./app-lock');
 const { createTokenStore } = require('./secrets');
 
 if (!app.requestSingleInstanceLock()) {
@@ -86,6 +87,7 @@ if (SHOTS_ARG) {
   store.set('ai', null);
   store.set('dmChannels', []);
   store.set('screenProtection', false);
+  store.set('appLock', null);
 }
 const voice = createVoiceManager({
   voiceLib: demo ? demo.voiceLib : require('@discordjs/voice'),
@@ -114,6 +116,22 @@ const soundFile = {
   get: () => (fs.existsSync(SOUND_PATH) ? new Uint8Array(fs.readFileSync(SOUND_PATH)) : null),
   set: (data) => fs.writeFileSync(SOUND_PATH, Buffer.from(data.buffer, data.byteOffset, data.byteLength)),
   clear: () => fs.rmSync(SOUND_PATH, { force: true }),
+};
+
+// App-Sperre (Passwort-Hash in settings.json unter „appLock“)
+const appLock = createAppLock({ store, emit: broadcast });
+
+// Mit Windows starten: Squirrel-Apps über Update.exe starten (bleibt nach Updates gültig)
+const SQUIRREL_UPDATE = path.join(path.dirname(process.execPath), '..', 'Update.exe');
+const autostart = {
+  get: () => {
+    const available = app.isPackaged && fs.existsSync(SQUIRREL_UPDATE);
+    return { available, enabled: available && app.getLoginItemSettings({ path: SQUIRREL_UPDATE, args: ['--processStart', `"${path.basename(process.execPath)}"`] }).openAtLogin };
+  },
+  set: (on) => {
+    app.setLoginItemSettings({ openAtLogin: on, path: SQUIRREL_UPDATE, args: ['--processStart', `"${path.basename(process.execPath)}"`] });
+    return autostart.get();
+  },
 };
 
 // KI-Agenten (Beta): API-Schlüssel verschlüsselt in ai-key.enc; im Demo simulierter Anbieter
@@ -221,7 +239,9 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
   const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t) }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart }, isTrustedSender);
+  // Automatische Sperre: PC eine Weile unbenutzt → App sperren
+  setInterval(() => appLock.idleTick(powerMonitor.getSystemIdleTime()), 30000).unref?.();
   createWindow();
   service.connect(); // async – blockiert das Fenster nicht
   updater.start();
