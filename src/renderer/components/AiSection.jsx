@@ -19,10 +19,40 @@ const INTERVALS = [15, 30, 60, 120, 240, 720, 1440];
 const intervalLabel = (m) => describeSchedule({ kind: 'interval', minutes: m });
 const WEEK = [1, 2, 3, 4, 5, 6, 0];
 
-function JobForm({ targets, initial, onSave, onCancel }) {
-  const [job, setJob] = useState(
-    initial || { name: '', channelId: targets[0]?.id || '', prompt: '', schedule: { kind: 'daily', time: '08:00', days: [1, 2, 3, 4, 5] }, context: false, enabled: true },
-  );
+const JOB_DEFAULTS = { maxLength: 1800, language: 'auto', persona: '', contextSize: 0, postAs: 'message', notify: true };
+// Nur die Felder, die der Validator kennt (keine lastRun/nextRun usw. zurückschicken)
+const jobPayload = (j) => ({
+  ...(j.id ? { id: j.id } : {}),
+  name: j.name,
+  channelId: j.channelId,
+  channelName: j.channelName,
+  prompt: j.prompt,
+  schedule: j.schedule,
+  context: j.contextSize > 0,
+  enabled: j.enabled,
+  maxLength: j.maxLength,
+  language: j.language,
+  persona: j.persona,
+  contextSize: j.contextSize,
+  postAs: j.postAs,
+  notify: j.notify,
+});
+
+function JobForm({ targets, initial, onSave, onCancel, toast }) {
+  const [job, setJob] = useState({
+    ...JOB_DEFAULTS,
+    ...(initial || { name: '', channelId: targets[0]?.id || '', prompt: '', schedule: { kind: 'daily', time: '08:00', days: [1, 2, 3, 4, 5] }, enabled: true }),
+  });
+  const [preview, setPreview] = useState(null); // { text, durationMs, model } | 'busy'
+  const runPreview = async () => {
+    setPreview('busy');
+    try {
+      setPreview(await api.aiPreviewJob(jobPayload({ ...job, channelName: targets.find((t) => t.id === job.channelId)?.label || '' })));
+    } catch (e) {
+      setPreview(null);
+      toast?.({ kind: 'error', title: e.message, text: e.hint });
+    }
+  };
   const set = (patch) => setJob((j) => ({ ...j, ...patch }));
   const setSchedule = (patch) => setJob((j) => ({ ...j, schedule: { ...j.schedule, ...patch } }));
   const daily = job.schedule.kind === 'daily';
@@ -90,15 +120,68 @@ function JobForm({ targets, initial, onSave, onCancel }) {
           ))}
         </div>
       )}
-      <label className="composer__ping">
-        <input type="checkbox" checked={job.context} onChange={(e) => set({ context: e.target.checked })} /> Letzte 20 Nachrichten als Kontext mitschicken
+      <div className="ai-opts">
+        <label>
+          Länge
+          <select value={job.maxLength} onChange={(e) => set({ maxLength: Number(e.target.value) })}>
+            {[300, 800, 1500, 1800, 2000].map((n) => (
+              <option key={n} value={n}>
+                max. {n} Zeichen
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Sprache
+          <select value={job.language} onChange={(e) => set({ language: e.target.value })}>
+            <option value="auto">wie der Auftrag</option>
+            <option value="de">Deutsch</option>
+            <option value="en">Englisch</option>
+          </select>
+        </label>
+        <label>
+          Kontext
+          <select value={job.contextSize} onChange={(e) => set({ contextSize: Number(e.target.value) })}>
+            <option value={0}>keiner</option>
+            <option value={10}>letzte 10 Nachrichten</option>
+            <option value={20}>letzte 20 Nachrichten</option>
+            <option value={50}>letzte 50 Nachrichten</option>
+          </select>
+        </label>
+        <label>
+          Posten als
+          <select value={job.postAs} onChange={(e) => set({ postAs: e.target.value })}>
+            <option value="message">Nachricht</option>
+            <option value="thread">neuer Thread</option>
+          </select>
+        </label>
+      </div>
+      {job.contextSize > 0 && <p className="muted small">⚠ Diese Nachrichten gehen an deinen KI-Anbieter. Für die KI sind sie nur Daten, keine Anweisungen.</p>}
+      <label className="settings__label" htmlFor="ai-job-persona">
+        Tonfall / Persona <span className="muted small">(optional)</span>
       </label>
-      {job.context && <p className="muted small">⚠ Diese Nachrichten gehen dann an deinen KI-Anbieter. Nur einschalten, wenn das für den Chat in Ordnung ist.</p>}
+      <div className="settings__row">
+        <input id="ai-job-persona" value={job.persona} maxLength={300} onChange={(e) => set({ persona: e.target.value })} placeholder="z. B. locker, mit Emojis, wie ein Sportmoderator" />
+      </div>
+      <label className="composer__ping">
+        <input type="checkbox" checked={job.notify} onChange={(e) => set({ notify: e.target.checked })} /> Hinweis in der App bei Erfolg oder Fehler
+      </label>
+      {preview && preview !== 'busy' && (
+        <div className="ai-preview" role="status">
+          <div className="muted small">
+            👁 Vorschau – wird NICHT gepostet · {preview.model} · {(preview.durationMs / 1000).toFixed(1)} s
+          </div>
+          <div className="ai-preview__text">{preview.text}</div>
+        </div>
+      )}
       <div className="confirm__actions">
         <button className="btn btn--ghost" onClick={onCancel}>
           Abbrechen
         </button>
-        <button className="btn btn--primary" disabled={!ok} onClick={() => onSave({ ...job, channelName: targets.find((t) => t.id === job.channelId)?.label || '' })}>
+        <button className="btn" disabled={!ok || preview === 'busy'} onClick={runPreview} title="Die KI schreibt eine Probe – es wird nichts gepostet">
+          {preview === 'busy' ? 'KI schreibt …' : '👁 Vorschau'}
+        </button>
+        <button className="btn btn--primary" disabled={!ok} onClick={() => onSave(jobPayload({ ...job, channelName: targets.find((t) => t.id === job.channelId)?.label || '' }))}>
           Auftrag speichern
         </button>
       </div>
@@ -253,6 +336,63 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
   );
 }
 
+// Harte Limits (gelten für alle KI-Anfragen zusammen)
+function LimitsRow({ cfg, onSave }) {
+  const [l, setL] = useState(cfg.limits);
+  const dirty = l.perHour !== cfg.limits.perHour || l.perDay !== cfg.limits.perDay;
+  return (
+    <div className="settings__row ai-limits">
+      <label>
+        Max. pro Stunde
+        <input type="number" min="1" max="500" value={l.perHour} onChange={(e) => setL({ ...l, perHour: Math.round(Number(e.target.value)) || 1 })} />
+      </label>
+      <label>
+        Max. pro Tag
+        <input type="number" min="1" max="5000" value={l.perDay} onChange={(e) => setL({ ...l, perDay: Math.round(Number(e.target.value)) || 1 })} />
+      </label>
+      {dirty && (
+        <button className="btn btn--primary btn--small" onClick={() => onSave(l)}>
+          Limits speichern
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Anbieterprofile: Anbieter + Adresse + Modell merken (der Schlüssel bleibt im Tresor)
+function ProfilesRow({ cfg, setDraft, wrap, setCfg }) {
+  const [name, setName] = useState('');
+  return (
+    <div className="settings__row ai-profiles">
+      {cfg.profiles.length > 0 && (
+        <select
+          aria-label="Gespeichertes Anbieterprofil"
+          value=""
+          onChange={(e) =>
+            e.target.value &&
+            wrap('profile', async () => {
+              const c = await api.aiUseProfile({ id: e.target.value });
+              setCfg(c);
+              setDraft({ provider: c.provider, baseUrl: c.baseUrl, model: c.model });
+            })()
+          }
+        >
+          <option value="">Profil laden …</option>
+          {cfg.profiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} – {p.model}
+            </option>
+          ))}
+        </select>
+      )}
+      <input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="Profilname, z. B. Ollama lokal" aria-label="Profilname" />
+      <button className="btn btn--small" disabled={!name.trim()} onClick={wrap('profile', async () => (setCfg(await api.aiSaveProfile({ name })), setName('')))}>
+        Aktuelle Einstellung als Profil speichern
+      </button>
+    </div>
+  );
+}
+
 export default function AiSection({ toast, targets = [], guilds = [] }) {
   const [cfg, setCfg] = useState(null);
   const [draft, setDraft] = useState(null); // Anbieter-Einstellungen in Bearbeitung
@@ -303,6 +443,24 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
       <p className="muted small">Eine KI erledigt Aufträge zu festen Zeiten (z. B. „jeden Morgen einen Gruß posten“). Gepostet wird als dein Bot. Läuft nur, solange PKMessenger offen ist.</p>
       {cfg.enabled && (
         <div className="ai-box">
+          <div className="ai-status" role="status">
+            <span>
+              🧠 <b>KI an</b> · {cfg.model || 'kein Modell'} ({PRESETS.find((p) => p.baseUrl === cfg.baseUrl)?.label || cfg.baseUrl})
+            </span>
+            <span>
+              🤖 Aufträge aktiv: {cfg.jobs.filter((j) => j.enabled).length}/{cfg.jobs.length} · 💬 Antworten auf Erwähnungen: {cfg.responder.enabled ? 'an' : 'aus'}
+            </span>
+            <span className={cfg.usage.hour >= cfg.limits.perHour || cfg.usage.day >= cfg.limits.perDay ? 'warn' : ''}>
+              📊 Verbrauch: {cfg.usage.hour}/{cfg.limits.perHour} pro Stunde · {cfg.usage.day}/{cfg.limits.perDay} pro Tag
+            </span>
+            {cfg.running.length > 0 && (
+              <button className="btn btn--danger btn--small" onClick={wrap('abort', () => api.aiAbort())}>
+                ⏹ Laufende KI-Anfragen stoppen
+              </button>
+            )}
+          </div>
+          <LimitsRow cfg={cfg} onSave={(l) => wrap('limits', async () => setCfg(await api.aiSetLimits(l)))()} />
+          <ProfilesRow cfg={cfg} draft={draft} setDraft={setDraft} wrap={wrap} setCfg={setCfg} />
           <label className="settings__label" htmlFor="ai-preset">
             KI-Anbieter
           </label>
@@ -383,10 +541,11 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
                 key={j.id}
                 targets={targets}
                 initial={j}
+                toast={toast}
                 onCancel={() => setEditing(null)}
                 onSave={(job) =>
                   wrap('save', async () => {
-                    await api.aiSaveJob({ id: j.id, name: job.name, channelId: job.channelId, channelName: job.channelName, prompt: job.prompt, schedule: job.schedule, context: job.context, enabled: job.enabled });
+                    await api.aiSaveJob({ ...job, id: j.id });
                     setEditing(null);
                   })()
                 }
@@ -397,11 +556,17 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
                   <b>{j.name}</b>
                   <span className="muted small">
                     {describeSchedule(j.schedule)} → {j.channelName || 'Kanal'}
-                    {j.context ? ' · mit Kontext' : ''}
+                    {j.postAs === 'thread' ? ' · als Thread' : ''}
+                    {j.contextSize > 0 ? ` · Kontext ${j.contextSize}` : ''}
                   </span>
+                  {j.enabled && j.nextRun && (
+                    <span className="muted small">⏭ nächster Lauf: {new Date(j.nextRun).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                  )}
                   {j.lastRun && (
                     <span className={`small ${j.lastRun.ok ? 'ok' : 'warn'}`}>
-                      {j.lastRun.ok ? '✓' : '⚠'} {formatListTime(j.lastRun.at, Date.now())}: {j.lastRun.message}
+                      {j.lastRun.ok ? '✓' : '⚠'} {formatListTime(j.lastRun.at, Date.now())}
+                      {j.lastRun.durationMs ? ` · ${(j.lastRun.durationMs / 1000).toFixed(1)} s` : ''}
+                      {j.lastRun.model ? ` · ${j.lastRun.model}` : ''}: {j.lastRun.message}
                     </span>
                   )}
                 </div>
@@ -411,7 +576,7 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
                       type="checkbox"
                       checked={j.enabled}
                       onChange={wrap('save', () =>
-                        api.aiSaveJob({ id: j.id, name: j.name, channelId: j.channelId, channelName: j.channelName, prompt: j.prompt, schedule: j.schedule, context: j.context, enabled: !j.enabled }),
+                        api.aiSaveJob(jobPayload({ ...JOB_DEFAULTS, ...j, enabled: !j.enabled })),
                       )}
                     />
                     {j.enabled ? 'aktiv' : 'pausiert'}
@@ -440,6 +605,7 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
             targets.length ? (
               <JobForm
                 targets={targets}
+                toast={toast}
                 onCancel={() => setEditing(null)}
                 onSave={(job) =>
                   wrap('save', async () => {

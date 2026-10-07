@@ -214,6 +214,9 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         loadGuilds();
       } else if (type === 'dms:changed') {
         loadDMs();
+      } else if (type === 'ai:job-done') {
+        if (p.ok) notify('ai');
+        toast({ kind: p.ok ? 'info' : 'error', title: p.ok ? `🤖 Auftrag „${p.name}“ erledigt` : `🤖 Auftrag „${p.name}“ fehlgeschlagen`, text: p.ok ? p.message : `${p.message} ${p.hint || ''}`.trim(), duration: 6000 });
       } else if (type === 'ai:replied') {
         notify('ai');
         toast({ kind: 'info', title: `🤖 KI hat ${p.userName} geantwortet`, text: p.answer, duration: 6000 });

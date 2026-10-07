@@ -171,6 +171,31 @@ Die App zeigt dir diese Schritte auch selbst an:
 ## ❓ Häufige Fragen
 
 <details>
+<summary><b>🔔 Ich höre keine Töne – was kann ich tun?</b></summary>
+
+1. Einstellungen → 🔔 Benachrichtigungen: „Töne einschalten“ an, Lautstärke über 0 %.
+2. Beim jeweiligen Ereignis den Haken setzen und mit ▶ den Testton prüfen.
+3. Im **offenen** Chat bleibt es standardmäßig still („Kein Ton für den Chat, den ich gerade offen habe“).
+4. Höchstens ein Ton pro 1,5 Sekunden, für eigene Nachrichten nie.
+5. Windows-Lautstärkemixer: Ist PKMessenger stummgeschaltet?
+
+Töne werden in der App erzeugt (keine Downloads). Eine eigene Datei muss eine `.wav` bis 2 MB sein und bleibt auf deinem PC.
+</details>
+
+<details>
+<summary><b>🧪 KI-Agenten: Wie probiere ich gefahrlos aus?</b></summary>
+
+- **🔌 Verbindung testen** und **👁 Vorschau** posten **nie** etwas nach Discord – die Antwort erscheint nur in der App.
+- Pro Auftrag einstellbar: Länge, Sprache, Tonfall/Persona, Kontext (0/10/20/50 Nachrichten), als Nachricht oder neuer Thread, Hinweis bei Erfolg/Fehler.
+- **Harte Limits** (Standard: 60 Anfragen pro Stunde, 300 pro Tag) gelten für alle KI-Anfragen zusammen; der Verbrauch steht oben im KI-Bereich.
+- Beta ausschalten oder **⏹ Laufende KI-Anfragen stoppen** bricht laufende Anfragen sofort ab.
+- `@everyone`/`@here` aus KI-Texten werden unschädlich gemacht, und der Bot pingt grundsätzlich niemanden.
+- Chatverlauf ist für die KI nur „Datenmaterial“ – Anweisungen darin werden ignoriert.
+- **Lokales Modell (Ollama) antwortet nicht?** Im Terminal `ollama serve` starten, Modell mit `ollama pull <name>` laden, Adresse `http://localhost:11434/v1`.
+- **Anbieterprofile** merken Anbieter, Adresse und Modell – der API-Schlüssel bleibt verschlüsselt und wird nie angezeigt.
+</details>
+
+<details>
 <summary><b>Kann ich über meinen persönlichen Discord-Account schreiben?</b></summary>
 
 Nein. Discord bietet dafür keine erlaubte Schnittstelle, das wäre ein sogenannter Self-Bot und kann zur Sperrung deines Accounts führen. PKMessenger nutzt deshalb immer einen eigenen Bot.

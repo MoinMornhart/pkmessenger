@@ -58,6 +58,12 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:ai-save-job': (p) => requireAi().saveJob(validators.aiJob(p)),
     'pk:ai-delete-job': (p) => requireAi().deleteJob(validators.aiJobRef(p)),
     'pk:ai-run-job': (p) => requireAi().runJob(validators.aiJobRef(p)),
+    'pk:ai-preview-job': (p) => requireAi().previewJob(validators.aiJob(p)), // postet NIE
+    'pk:ai-set-limits': (p) => requireAi().setLimits(validators.aiLimits(p)),
+    'pk:ai-save-profile': (p) => requireAi().saveProfile(validators.aiProfileName(p)),
+    'pk:ai-use-profile': (p) => requireAi().useProfile(validators.aiJobRef(p)),
+    'pk:ai-delete-profile': (p) => requireAi().deleteProfile(validators.aiJobRef(p)),
+    'pk:ai-abort': () => ({ aborted: requireAi().abort() }),
     'pk:ai-set-responder': (p) => requireAi().setResponder(validators.aiResponder(p)),
     'pk:open-dm': (p) => service.openDM(validators.userRef(p)),
     'pk:get-profile': (p) => service.getProfile(validators.profileRef(p)),
