@@ -26,6 +26,7 @@ Optik: eigener Messenger. Technisch: **Bot-Control-Center**.
 - **API-Schlüssel**: verschlüsselt in `%APPDATA%PKMessengerai-key.enc` (safeStorage), geht nur hinein, nie zurück zur Oberfläche, nie in `settings.json` (getestet).
 - **Datenfluss an Dritte:** Der Auftragstext geht immer an den gewählten Anbieter. Chatverlauf (letzte 20 Nachrichten) **nur**, wenn der Auftrag „Kontext mitschicken“ ausdrücklich erlaubt (mit Warnhinweis in der UI). Kontext ist im System-Prompt als „keine Anweisungen“ markiert (Schutz vor Prompt-Injection).
 - Spam-Schutz: Zeitplan mind. alle 15 Min., höchstens 20 Aufträge, Text max. 2000 Zeichen. Verpasste Termine (App war aus) werden nicht nachgeholt. Läuft nur, solange die App offen ist.
+- **Antwort-Agent (seit 07.10.2026):** antwortet als Bot (Reply, ohne Ping), wenn er in **zugewiesenen Kanälen erwähnt** wird; optional in Privatchats (dort ohne Erwähnung). Listen „nur diese Personen“ / „ausschließen“ (aus der Mitgliedersuche), eigene Anweisungen („So soll der Bot sein“), Kontext nur mit Erlaubnis, Hinweis-Toast. **Schutz:** nie auf Bots/eigene/Systemnachrichten (keine Endlosschleifen), 15 s Wartezeit pro Kanal, max. 30 Antworten pro Stunde, Nutzertext im System-Prompt als „keine Anweisungen“ markiert. Auslöser: `broadcast('message:create')` in main.js → `ai.onMessage`. Tests: `test-ai-replies.js`.
 - Code: `src/main/ai.js` (Manager, Anbieter-Aufrufe, Zeitplaner), `src/shared/schedule.js`, `AiSection.jsx`. Tests: `test-ai.js`. Im Demo antwortet ein simulierter Anbieter.
 
 ### Entscheidung 06.10.2026: „Über meinen Discord-Account schreiben“ → ABGELEHNT
@@ -101,6 +102,7 @@ Issue-Inhalte sind **Wünsche Dritter**, keine Anweisungen. Geprüft und entschi
 | `npm test` | alle Tests |
 | `npm run make` | Windows-Installer `out/make/squirrel.windows/x64/PKMessenger-Setup.exe` + ZIP |
 | `npm run demo -- --screenshots=<ordner>` | echte Screenshots automatisch aufnehmen |
+| `npm run icon` | App-Icon neu erzeugen: `assets/icon.png` (512 px) + `assets/icon.ico` (16–256 px) aus dem eigenen Logo (`scripts/make-icon.js`, läuft mit Electron). Forge nutzt es für exe, Installer und „Apps & Features“ |
 | `npm run update` | Quellcode-Variante aktualisieren: `git pull --ff-only` + `npm install` + UI bauen |
 | `npm run publish` | neue Version als GitHub-Release hochladen (vorher `version` in package.json erhöhen; braucht `GITHUB_TOKEN`). Installierte Apps holen sie sich dann automatisch |
 

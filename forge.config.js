@@ -11,11 +11,22 @@ module.exports = {
     name: 'PKMessenger',
     executableName: 'PKMessenger',
     asar: true,
+    // App-Icon (erzeugt mit `npm run icon` aus dem eigenen Logo); Electron Packager hängt unter Windows .ico an
+    icon: 'assets/icon',
     // NIEMALS .env, Tests, Quellcode des Renderers oder Doku mit ausliefern.
     ignore: [/^\/\.env/, /^\/tests/, /^\/src\/renderer/, /^\/scripts/, /^\/docs/, /^\/out/, /^\/\.git/, /^\/screenshots/, /^\/src\/main\/demo\.js$/, /^\/src\/main\/screenshots\.js$/, /\.md$/],
   },
   makers: [
-    { name: '@electron-forge/maker-squirrel', config: { name: 'PKMessenger', setupExe: 'PKMessenger-Setup.exe' } },
+    {
+      name: '@electron-forge/maker-squirrel',
+      config: {
+        name: 'PKMessenger',
+        setupExe: 'PKMessenger-Setup.exe',
+        setupIcon: 'assets/icon.ico',
+        // Symbol in „Apps & Features“ (muss eine öffentliche Adresse sein)
+        ...(owner ? { iconUrl: `https://raw.githubusercontent.com/${owner}/${name}/main/assets/icon.ico` } : {}),
+      },
+    },
     { name: '@electron-forge/maker-zip', platforms: ['win32'] },
   ],
   // `npm run publish` lädt Installer + Update-Pakete als GitHub-Release hoch (Token per Umgebungsvariable GITHUB_TOKEN).

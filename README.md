@@ -254,6 +254,7 @@ Mehr Details: [AGENTS.md](AGENTS.md) (Architektur, Entscheidungen, Teststand) ·
 - [x] Bildschirmschutz: Screenshots und Aufnahmen anderer Programme verbieten (Einstellungen → Datenschutz)
 - [x] Privatnachrichten mit dem Bot (💬 in der Leiste links)
 - [x] 🧪 Beta: KI-Agenten – eine KI postet zu festen Zeiten (beliebiger Anbieter, eigener API-Schlüssel)
+- [x] 🧪 Beta: KI antwortet, wenn der Bot erwähnt wird (Kanäle, Personen, Persönlichkeit einstellbar)
 - [x] 🎨 Aussehen: 5 Designs (Nacht, Ozean, Lila, AMOLED, Hell), Akzentfarbe, Animationen (voll/dezent/aus), kompakte Ansicht
 - [ ] Moderation per Rechtsklick (Rollen, Timeout, Kick, Bann)
 - [ ] Live-Test aller Funktionen auf einem echten Server

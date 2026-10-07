@@ -62,6 +62,7 @@ export const api = Object.fromEntries(
     'aiSaveJob',
     'aiDeleteJob',
     'aiRunJob',
+    'aiSetResponder',
     'openDM',
     'updateProfile',
     'refresh',
