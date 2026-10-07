@@ -4200,3 +4200,62 @@ kbd {
   display: flex;
   width: 100%;
 }
+
+/* ---------- Beta / KI-Bereich: Kacheln + Karten (Issue #1: „schöner und mehr“) ---------- */
+.ai-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 8px;
+}
+.ai-status > span {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel-2));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  font-size: 13px;
+}
+.ai-card {
+  margin: 12px 0;
+  padding: 4px 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel-2) 55%, transparent);
+}
+.ai-card > summary {
+  margin: 0 -14px 6px;
+  padding: 10px 14px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  list-style: none;
+  border-bottom: 1px solid transparent;
+}
+.ai-card[open] > summary {
+  border-bottom-color: var(--line);
+}
+.ai-card > summary::-webkit-details-marker {
+  display: none;
+}
+.ai-card > summary::after {
+  content: '▾';
+  float: right;
+  color: var(--text-2);
+  transition: transform 0.15s;
+}
+.ai-card:not([open]) > summary::after {
+  transform: rotate(-90deg);
+}
+.ai-memory {
+  display: grid;
+  gap: 6px;
+}
+.ai-memory__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.ai-memory__head input {
+  max-width: 220px;
+}

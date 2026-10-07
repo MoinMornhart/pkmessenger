@@ -127,6 +127,8 @@ contextBridge.exposeInMainWorld('api', {
   aiMemoryView: call('pk:ai-memory-view'),
   aiMemoryForget: call('pk:ai-memory-forget'),
   aiMemoryForgetAll: call('pk:ai-memory-forget-all'),
+  aiMemoryCompact: call('pk:ai-memory-compact'),
+  aiMemorySetSummary: call('pk:ai-memory-set-summary'),
   setActiveChat: call('pk:set-active-chat'),
   openDM: call('pk:open-dm'),
   updateProfile: call('pk:update-profile'),

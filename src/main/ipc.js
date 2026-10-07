@@ -85,6 +85,8 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:ai-memory-view': (p) => requireAi().memoryApi.view(validators.userRef(p)),
     'pk:ai-memory-forget': (p) => requireAi().memoryApi.forget(validators.userRef(p)),
     'pk:ai-memory-forget-all': () => requireAi().memoryApi.forgetAll(),
+    'pk:ai-memory-compact': (p) => requireAi().memoryApi.compactNow(validators.userRef(p)),
+    'pk:ai-memory-set-summary': (p) => requireAi().memoryApi.setSummary(validators.memorySummary(p)),
     'pk:set-active-chat': (p) => (ai ? ai.setActiveChat(validators.activeChat(p)) : true),
     'pk:open-dm': (p) => service.openDM(validators.userRef(p)),
     'pk:get-profile': (p) => service.getProfile(validators.profileRef(p)),

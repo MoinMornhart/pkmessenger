@@ -117,3 +117,45 @@ test('Validierung: Gedächtnis-Schalter und Budget', () => {
   assert.equal(validators.aiResponder({ ...base, memory: true, memoryBudget: 8000 }).memoryBudget, 8000);
   assert.throws(() => validators.aiResponder({ ...base, memoryBudget: 123 }), /Gedächtnisgröße/);
 });
+
+test('Verwaltung: „Jetzt zusammenfassen“ auch unter dem Budget, Ergebnis und Fehler werden gemerkt', async () => {
+  const mem = createMemory({ vault: vault(), now: () => 5000 });
+  for (let i = 0; i < 6; i++) mem.remember('1', 'Anna', `Ich erzähle dir etwas Langes Nummer ${i} `.repeat(5), `Okay, verstanden ${i} `.repeat(5));
+  // unter Budget ohne force: nichts passiert
+  assert.equal((await mem.compact('1', 100000, async () => 'x')).compacted, false);
+  const ok = await mem.compact('1', 100000, async () => '- Anna erzählt gern', { force: true });
+  assert.equal(ok.ok, true);
+  assert.equal(mem.list()[0].lastCompact.ok, true);
+  assert.ok(mem.list()[0].lastCompact.after < mem.list()[0].lastCompact.before);
+  // Fehler der KI → sichtbar, nichts kaputt
+  for (let i = 0; i < 6; i++) mem.remember('1', 'Anna', 'noch mehr', 'ok');
+  const bad = await mem.compact('1', 100000, async () => {
+    throw new Error('Der KI-Anbieter ist nicht erreichbar.');
+  }, { force: true });
+  assert.equal(bad.ok, false);
+  assert.match(mem.list()[0].lastCompact.error, /nicht erreichbar/);
+  assert.equal(mem.view('1').summary, '- Anna erzählt gern'); // alte Zusammenfassung bleibt
+});
+
+test('Verwaltung: Zusammenfassung von Hand bearbeiten; Automatik abschaltbar', async () => {
+  const mem = createMemory({ vault: vault() });
+  mem.remember('1', 'Anna', 'Hallo', 'Hi');
+  assert.equal(mem.setSummary('1', '- Anna mag Katzen').summary, '- Anna mag Katzen');
+  assert.match(mem.context('1'), /Anna mag Katzen/);
+  assert.equal(mem.setSummary('nix', 'x'), null);
+  const base = { enabled: true, channelIds: [], dms: true, allowUsers: [], blockUsers: [], instructions: '', context: false, notify: true, memory: true };
+  assert.equal(validators.aiResponder(base).memoryAuto, true);
+  assert.equal(validators.aiResponder({ ...base, memoryAuto: false }).memoryAuto, false);
+  assert.throws(() => validators.memorySummary({ userId: '500000000000000001', summary: 'x'.repeat(5000) }), /4000/);
+});
+
+test('Antwort-Agent mit Gedächtnis-Automatik aus: merkt sich, fasst aber nicht selbst zusammen', async () => {
+  const { ai, bodies, msg } = aiSetup();
+  ai.setResponder(validators.aiResponder({ enabled: true, channelIds: [], dms: true, allowUsers: [], blockUsers: [], instructions: '', context: false, notify: false, memory: true, memoryBudget: 1000, memoryAuto: false }));
+  for (let i = 0; i < 4; i++) await ai.onMessage(msg({ channelId: `30000000000000001${i}`, content: 'x'.repeat(1500) }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(!bodies.some((b) => /private memory/.test(b.messages[0].content)));
+  const r = await ai.memoryApi.compactNow({ userId: '500000000000000001' });
+  assert.equal(r.ok, true);
+  assert.ok(bodies.some((b) => /private memory/.test(b.messages[0].content)));
+});

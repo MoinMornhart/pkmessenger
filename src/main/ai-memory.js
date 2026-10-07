@@ -86,41 +86,61 @@ function createMemory({ vault, now = () => Date.now() }) {
    * Budget überschritten? Ältere Wortwechsel zusammenfassen lassen.
    * summarize(text) → Promise<string> (ruft die KI). Ergebnis nur übernehmen, wenn es kürzer ist.
    */
-  async function compact(userId, budget, summarize) {
+  /** force: auch unter dem Budget zusammenfassen („Jetzt zusammenfassen“ in der Oberfläche). */
+  async function compact(userId, budget, summarize, { force = false } = {}) {
     const p = load().people[userId];
-    if (!p || tokensOf(p) <= budget) return { compacted: false };
-    const old = p.turns.slice(0, Math.max(0, p.turns.length - KEEP_TURNS));
-    if (!old.length && !p.summary) return { compacted: false };
+    if (!p || (!force && tokensOf(p) <= budget)) return { compacted: false };
+    // Von Hand ausgelöst: alles zusammenfassen; automatisch: die letzten Wortwechsel bleiben wörtlich
+    const old = p.turns.slice(0, Math.max(0, p.turns.length - (force ? 0 : KEEP_TURNS)));
+    if (!old.length) return { compacted: false, ok: false, error: force ? 'Noch nichts zum Zusammenfassen.' : null };
     const before = estimateTokens(p.summary) + old.reduce((n, t) => n + estimateTokens(t.text), 0);
     const material = [p.summary && `Previous summary:\n${p.summary}`, old.length && `Conversation:\n${old.map((t) => `${t.role === 'user' ? p.name || 'User' : 'Bot'}: ${t.text}`).join('\n')}`].filter(Boolean).join('\n\n');
+    const tokensBefore = tokensOf(p);
     let summary = '';
+    let error = null;
     try {
       summary = String((await summarize(material)) || '').trim().slice(0, 4000);
-    } catch {
-      summary = '';
+      if (!summary) error = 'Die KI hat keine Zusammenfassung geliefert.';
+    } catch (err) {
+      error = String(err?.message || err || 'Fehler').slice(0, 200);
     }
+    let ok = false;
     if (summary && estimateTokens(summary) < before) {
       p.summary = summary;
       p.turns = p.turns.slice(old.length);
+      ok = true;
     } else {
+      if (!error) error = 'Die Zusammenfassung war nicht kürzer als das Original – nicht übernommen.';
       // Zusammenfassen hat nichts gebracht → älteste Wortwechsel verwerfen, damit das Budget hält
       while (p.turns.length > 2 && tokensOf(p) > budget) p.turns.splice(0, 2);
     }
+    // Ergebnis merken (für die Oberfläche: „zuletzt zusammengefasst“ bzw. Fehler)
+    p.lastCompact = { at: now(), ok, error: ok ? null : error, before: tokensBefore, after: tokensOf(p) };
     save();
-    return { compacted: true, tokens: tokensOf(p) };
+    return { compacted: true, ok, error: ok ? null : error, tokens: tokensOf(p) };
   }
 
   /** Übersicht für die Oberfläche – Inhalte nur auf ausdrücklichen Wunsch (view). */
   function list() {
     const d = load();
     return Object.entries(d.people)
-      .map(([userId, p]) => ({ userId, name: p.name, tokens: tokensOf(p), turns: p.turns.length / 2, hasSummary: Boolean(p.summary), at: p.at }))
+      .map(([userId, p]) => ({ userId, name: p.name, tokens: tokensOf(p), turns: p.turns.length / 2, hasSummary: Boolean(p.summary), at: p.at, lastCompact: p.lastCompact || null }))
       .sort((a, b) => b.at - a.at);
   }
   function view(userId) {
     const p = load().people[userId];
-    return p ? { userId, name: p.name, summary: p.summary, turns: p.turns.slice(-20), tokens: tokensOf(p) } : null;
+    return p ? { userId, name: p.name, summary: p.summary, turns: p.turns.slice(-20), tokens: tokensOf(p), lastCompact: p.lastCompact || null } : null;
   }
+  /** Zusammenfassung von Hand bearbeiten (Verwaltung durch den Besitzer). */
+  function setSummary(userId, summary) {
+    const p = load().people[userId];
+    if (!p) return null;
+    p.summary = String(summary || '').slice(0, 4000);
+    p.lastCompact = { ...(p.lastCompact || {}), edited: now() };
+    save();
+    return view(userId);
+  }
+
   function forget(userId) {
     const d = load();
     delete d.people[userId];
@@ -134,7 +154,7 @@ function createMemory({ vault, now = () => Date.now() }) {
     return [];
   }
 
-  return { context, remember, compact, list, view, forget, forgetAll, flush, estimateTokens };
+  return { context, remember, compact, list, view, setSummary, forget, forgetAll, flush, estimateTokens };
 }
 
 module.exports = { createMemory, estimateTokens, KEEP_TURNS };

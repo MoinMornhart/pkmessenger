@@ -266,8 +266,8 @@ const validators = {
     return { provider, baseUrl: aiBaseUrl(baseUrl) };
   },
   aiResponder(p) {
-    const { enabled, channelIds, dms, allowUsers, blockUsers, instructions, context, notify, web = false, quietWhenOpen = true, memory = false, memoryBudget = 3000 } = obj(p);
-    if (typeof web !== 'boolean' || typeof quietWhenOpen !== 'boolean' || typeof memory !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
+    const { enabled, channelIds, dms, allowUsers, blockUsers, instructions, context, notify, web = false, quietWhenOpen = true, memory = false, memoryBudget = 3000, memoryAuto = true } = obj(p);
+    if (typeof web !== 'boolean' || typeof quietWhenOpen !== 'boolean' || typeof memory !== 'boolean' || typeof memoryAuto !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
     if (![1000, 3000, 8000, 16000].includes(memoryBudget)) throw new ValidationError('Ungültige Gedächtnisgröße.');
     for (const [k, v] of Object.entries({ enabled, dms, context, notify })) if (typeof v !== 'boolean') throw new ValidationError(`Ungültiges Feld "${k}".`);
     if (!Array.isArray(channelIds) || channelIds.length > 500) throw new ValidationError('Ungültige Kanalliste.');
@@ -296,6 +296,7 @@ const validators = {
       quietWhenOpen,
       memory,
       memoryBudget,
+      memoryAuto,
     };
   },
   aiLimits(p) {
@@ -530,6 +531,11 @@ const validators = {
     const { on } = obj(p);
     if (typeof on !== 'boolean') throw new ValidationError('Ungültiges Feld "on".');
     return on;
+  },
+  memorySummary(p) {
+    const { userId, summary } = obj(p);
+    if (typeof summary !== 'string' || summary.length > 4000) throw new ValidationError('Die Zusammenfassung darf höchstens 4000 Zeichen haben.');
+    return { userId: snowflake(userId, 'userId'), summary };
   },
   logError(p) {
     const { where, message } = obj(p);
