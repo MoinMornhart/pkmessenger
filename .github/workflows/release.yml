@@ -1,16 +1,19 @@
-# Automatischer Release-Bau (Wunsch JoniMoni, Issue #1):
-# Neuer Tag „vX.Y.Z“ oder neues GitHub-Release → prüfen → Windows-Installer bauen → ans Release hängen.
-# Installierte Apps finden das Update danach automatisch (update.electronjs.org).
+# Automatischer Release-Bau (Wunsch JoniMoni, Issue #1): erkennt neue Versionen selbst, baut und veröffentlicht.
 #
-# So veröffentlicht man ein Update:
-#   1. In package.json die Version erhöhen (z. B. 0.3.0 → 0.4.0), per Pull Request nach main
-#   2. Tag „v0.4.0“ auf main setzen (git tag v0.4.0 && git push origin v0.4.0)
-#      ODER auf GitHub „Draft a new release“ mit Tag v0.4.0 → „Publish release“
-#   3. Fertig – dieser Workflow baut und lädt hoch. Doppelte Auslöser schaden nicht (vorhandene Dateien werden übersprungen).
+# So veröffentlicht man ein Update – NUR EIN SCHRITT:
+#   In package.json die Version erhöhen (z. B. 0.3.0 → 0.4.0) und per Pull Request nach main bringen.
+#   → Dieser Workflow erkennt die neue Version, setzt den Tag v0.4.0, testet, baut den Windows-Installer,
+#     legt das Release mit automatischen Release-Notizen an und lädt alles hoch.
+#   → Installierte Apps holen sich das Update danach von selbst (update.electronjs.org).
+#
+# Weiterhin möglich: Tag „vX.Y.Z“ selbst pushen, auf GitHub ein Release veröffentlichen oder „Run workflow“ mit Tag.
+# Doppelte Auslöser schaden nicht: alles läuft nacheinander, vorhandene Dateien werden übersprungen.
 name: Release bauen
 
 on:
   push:
+    branches: ["main"]
+    paths: ["package.json"]
     tags: ["v*.*.*"]
   release:
     types: [published]
@@ -23,60 +26,83 @@ on:
 permissions:
   contents: read
 
-# Pro Tag nur ein Lauf gleichzeitig – Tag- und Release-Ereignis für dieselbe Version laufen nacheinander, nicht doppelt parallel
+# Releases immer nacheinander (nie zwei gleichzeitig) – keine Doppel-Uploads, kein Abbruch eines laufenden Baus
 concurrency:
-  group: release-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+  group: release
   cancel-in-progress: false
 
 jobs:
   analyze:
-    name: Tag prüfen
+    name: Version erkennen + prüfen
     runs-on: ubuntu-latest
     outputs:
+      skip: ${{ steps.check.outputs.skip }}
       tag: ${{ steps.check.outputs.tag }}
-      version: ${{ steps.check.outputs.version }}
+      ref: ${{ steps.check.outputs.ref }}
+      create_tag: ${{ steps.check.outputs.create_tag }}
     steps:
-      - name: Tag bestimmen
-        id: tag
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.sha }}
+          persist-credentials: false
+      - name: Was soll gebaut werden?
+        id: check
         env:
+          EVENT: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ inputs.tag }}
           REF_NAME: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version $VERSION in package.json hat nicht das Format X.Y.Z."
+            exit 1
+          fi
+          if [ "$EVENT" = "push" ] && [ "$GIT_REF" = "refs/heads/main" ]; then
+            # Automatik: neue Version auf main? Nur bauen, wenn es den Tag noch nicht gibt.
+            TAG="v$VERSION"
+            if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+              echo "ℹ Version $VERSION ist schon veröffentlicht (Tag $TAG vorhanden) – nichts zu tun."
+              { echo "skip=true"; echo "tag=$TAG"; } >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "✔ Neue Version erkannt: $VERSION → Tag $TAG wird gesetzt"
+            { echo "skip=false"; echo "tag=$TAG"; echo "ref=$SHA"; echo "create_tag=true"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Tag, Release oder manuell: Tag muss zur package.json passen
           TAG="${RELEASE_TAG:-${INPUT_TAG:-$REF_NAME}}"
           if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Tag $TAG hat nicht das Format vX.Y.Z (z. B. v0.4.0)."
             exit 1
           fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ steps.tag.outputs.tag }}
-          persist-credentials: false
-      - name: Version in package.json passt zum Tag?
-        id: check
-        env:
-          TAG: ${{ steps.tag.outputs.tag }}
-        run: |
-          VERSION="$(node -p "require('./package.json').version")"
           if [ "v$VERSION" != "$TAG" ]; then
-            echo "::error::package.json hat Version $VERSION, der Tag ist $TAG. Erst die Version in package.json auf ${TAG#v} setzen, dann taggen."
+            echo "::error::package.json hat Version $VERSION, der Tag ist $TAG. Erst die Version in package.json auf ${TAG#v} setzen."
             exit 1
           fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "✔ Tag $TAG passt zu package.json $VERSION"
+          { echo "skip=false"; echo "tag=$TAG"; echo "ref=$TAG"; echo "create_tag=false"; } >> "$GITHUB_OUTPUT"
 
   build:
-    name: Windows-Installer bauen + hochladen
+    name: Windows-Installer bauen + veröffentlichen
     needs: analyze
+    if: needs.analyze.outputs.skip != 'true'
     runs-on: windows-latest
     permissions:
-      contents: write # nur hier: Release anlegen bzw. Dateien hochladen
+      contents: write # nur hier: Tag setzen, Release anlegen, Dateien hochladen
+    env:
+      TAG: ${{ needs.analyze.outputs.tag }}
+      REF: ${{ needs.analyze.outputs.ref }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ needs.analyze.outputs.tag }}
+          ref: ${{ needs.analyze.outputs.ref }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -84,17 +110,30 @@ jobs:
           cache: npm
       - name: Abhängigkeiten
         run: npm ci
-      - name: Tests
+      - name: Tests (müssen grün sein, sonst wird nichts veröffentlicht)
         run: npm test
       - name: Oberfläche bauen
         run: npm run build:renderer
+      - name: Tag setzen (Automatik)
+        if: needs.analyze.outputs.create_tag == 'true'
+        shell: bash
+        run: |
+          gh api "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$REF" >/dev/null
+          echo "✔ Tag $TAG auf $REF gesetzt"
       - name: Bauen und ans Release hängen
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-forge publish
+      - name: Release-Notizen ergänzen (falls leer)
+        shell: bash
+        run: |
+          BODY="$(gh release view "$TAG" -R "$REPO" --json body --jq .body)"
+          if [ -z "$BODY" ]; then
+            gh api "repos/$REPO/releases/generate-notes" -f tag_name="$TAG" --jq .body > notes.md
+            gh release edit "$TAG" -R "$REPO" --notes-file notes.md
+            echo "✔ Release-Notizen automatisch erstellt"
+          fi
       - name: Zusammenfassung
-        env:
-          TAG: ${{ needs.analyze.outputs.tag }}
         shell: bash
         run: |
           {
