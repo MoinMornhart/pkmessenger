@@ -31,7 +31,20 @@ function feedUrl(repo, platform, arch, version) {
  * @param {string|null} o.repo  "owner/name"
  * @param {(type:string, payload:any)=>void} o.emit
  */
-function createUpdater({ autoUpdater, isPackaged, version, repo, emit, platform = process.platform, arch = process.arch, argv = process.argv, schedule = setInterval, later = setTimeout, squirrelInstalled = true, now = () => Date.now() }) {
+/** Direkt vom GitHub-Release laden (Squirrel holt …/RELEASES und die .nupkg daneben). */
+function directFeedUrl(repo, latestVersion) {
+  return `https://github.com/${repo}/releases/download/v${latestVersion}`;
+}
+
+/** SemVer X.Y.Z vergleichen: <0, 0, >0 */
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
+  return 0;
+}
+
+function createUpdater({ autoUpdater, isPackaged, version, repo, emit, platform = process.platform, arch = process.arch, argv = process.argv, schedule = setInterval, later = setTimeout, squirrelInstalled = true, now = () => Date.now(), fetchImpl = (...a) => fetch(...a) }) {
   let state = { state: 'idle', version };
   const set = (patch) => {
     state = { ...state, ...patch, at: Date.now() };
@@ -50,7 +63,6 @@ function createUpdater({ autoUpdater, isPackaged, version, repo, emit, platform 
 
   function start() {
     if (!enabled) return state;
-    autoUpdater.setFeedURL({ url: feedUrl(repo, platform, arch, version) });
     autoUpdater.on('checking-for-update', () => set({ state: 'checking', error: null }));
     autoUpdater.on('update-available', () => set({ state: 'downloading', lastChecked: now() }));
     autoUpdater.on('update-not-available', () => set({ state: 'current', lastChecked: now() }));
@@ -68,11 +80,45 @@ function createUpdater({ autoUpdater, isPackaged, version, repo, emit, platform 
     if (!enabled) return state;
     if (state.state === 'ready' || state.state === 'downloading' || state.state === 'checking') return state;
     try {
+      autoUpdater.setFeedURL({ url: feedUrl(repo, platform, arch, version) }); // nach „Jetzt prüfen“ wieder der normale Dienst
       autoUpdater.checkForUpdates();
     } catch (err) {
       set({ state: 'error', error: { message: 'Update-Prüfung fehlgeschlagen.', hint: 'Später erneut versuchen.', detail: String(err?.message || err) } });
     }
     return state;
+  }
+
+  /**
+   * „Jetzt prüfen“ (Wunsch JoniMoni, PR #26): GitHub SOFORT direkt fragen, ohne den Zwischenspeicher von update.electronjs.org.
+   * Gibt es dort eine neuere Version, lädt Squirrel sie direkt vom GitHub-Release (RELEASES + .nupkg liegen dort).
+   * Ist GitHub nicht erreichbar (offline, Abfrage-Limit), wird ganz normal über den Update-Dienst geprüft.
+   */
+  async function checkNow() {
+    if (!enabled) return state;
+    if (state.state === 'ready' || state.state === 'downloading' || state.state === 'checking') return state;
+    set({ state: 'checking', error: null });
+    let latest = null;
+    try {
+      const res = await fetchImpl(`https://api.github.com/repos/${repo}/releases/latest`, {
+        headers: { accept: 'application/vnd.github+json', 'user-agent': 'PKMessenger-Updater' },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.ok) latest = /^v?(\d+\.\d+\.\d+)$/.exec(String((await res.json())?.tag_name || ''))?.[1] || null;
+    } catch {
+      latest = null;
+    }
+    if (!latest) {
+      set({ state: 'idle' });
+      return check(); // Ersatzweg: normaler Update-Dienst
+    }
+    if (compareVersions(latest, version) <= 0) return set({ state: 'current', lastChecked: now(), latest });
+    try {
+      autoUpdater.setFeedURL({ url: directFeedUrl(repo, latest) });
+      autoUpdater.checkForUpdates();
+      return set({ latest });
+    } catch (err) {
+      return set({ state: 'error', error: { message: 'Update-Prüfung fehlgeschlagen.', hint: 'Später erneut versuchen.', detail: String(err?.message || err) } });
+    }
   }
 
   function install() {
@@ -81,7 +127,7 @@ function createUpdater({ autoUpdater, isPackaged, version, repo, emit, platform 
     return true;
   }
 
-  return { start, check, install, getState: () => state };
+  return { start, check, checkNow, install, getState: () => state };
 }
 
-module.exports = { createUpdater, parseRepo, feedUrl, CHECK_INTERVAL_MS, FIRSTRUN_DELAY_MS };
+module.exports = { createUpdater, parseRepo, feedUrl, directFeedUrl, compareVersions, CHECK_INTERVAL_MS, FIRSTRUN_DELAY_MS };

@@ -91,7 +91,7 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:voice-talk': (p) => requireVoice().setTalking(validators.flag(p)),
     'pk:voice-listen': (p) => requireVoice().setListening(validators.flag(p)),
     'pk:get-app-info': () => ({ version: appVersion || null, update: updater ? updater.getState() : { state: 'disabled' } }),
-    'pk:check-updates': () => (updater ? updater.check() : null),
+    'pk:check-updates': () => (updater ? updater.checkNow() : null), // „Jetzt prüfen“: GitHub direkt fragen
     'pk:install-update': () => (updater ? updater.install() : false),
     'pk:get-status': () => service.getStatus(),
     'pk:connect': () => service.connect(),

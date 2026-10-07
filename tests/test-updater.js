@@ -71,7 +71,7 @@ test('Start: Feed setzen, sofort prüfen, alle 15 Minuten erneut (Wunsch JoniMon
 test('Erster Start nach Installation (--squirrel-firstrun): Prüfung nach 60 s statt gar nicht', () => {
   const { u, au, delayed } = make({ argv: ['PKMessenger.exe', '--squirrel-firstrun'] });
   u.start();
-  assert.deepEqual(au.calls.map((c) => c[0]), ['setFeedURL']);
+  assert.deepEqual(au.calls, []); // Feed wird erst bei der Prüfung gesetzt
   assert.equal(delayed.length, 1);
   assert.equal(delayed[0].ms, 60 * 1000);
   delayed[0].fn();
@@ -125,4 +125,50 @@ test('Fehler (z. B. offline) → deutscher Hinweis statt Absturz', () => {
   assert.match(u.getState().error.message, /fehlgeschlagen/);
   au.emit('update-not-available');
   assert.equal(u.getState().state, 'current');
+});
+
+// „Jetzt prüfen“ (JoniMoni, PR #26): GitHub sofort direkt fragen, ohne Zwischenspeicher
+const gh = (tag, ok = true) => async (url) => {
+  gh.urls = [...(gh.urls || []), url];
+  return { ok, status: ok ? 200 : 403, json: async () => ({ tag_name: tag }) };
+};
+
+test('Jetzt prüfen: neuere Version bei GitHub → Squirrel lädt direkt vom GitHub-Release', async () => {
+  gh.urls = [];
+  const { u, au } = make({ fetchImpl: gh('v0.2.0') });
+  u.start();
+  au.emit('update-not-available');
+  au.calls.length = 0;
+  await u.checkNow();
+  assert.equal(gh.urls[0], 'https://api.github.com/repos/pmorn/pkmessenger/releases/latest');
+  assert.deepEqual(au.calls, [['setFeedURL', 'https://github.com/pmorn/pkmessenger/releases/download/v0.2.0'], ['check']]);
+  assert.equal(u.getState().latest, '0.2.0');
+  // spätere automatische Prüfung nutzt wieder den normalen Dienst
+  au.emit('update-not-available');
+  u.check();
+  assert.deepEqual(au.calls.at(-2), ['setFeedURL', 'https://update.electronjs.org/pmorn/pkmessenger/win32-x64/0.1.0']);
+});
+
+test('Jetzt prüfen: schon aktuell → sofort „aktuell“, kein Download', async () => {
+  const { u, au } = make({ fetchImpl: gh('v0.1.0') });
+  const s = await u.checkNow();
+  assert.equal(s.state, 'current');
+  assert.equal(s.lastChecked, 1234);
+  assert.deepEqual(au.calls, []);
+});
+
+test('Jetzt prüfen: GitHub nicht erreichbar → normaler Update-Dienst als Ersatz', async () => {
+  const { u, au } = make({ fetchImpl: async () => Promise.reject(new Error('offline')) });
+  await u.checkNow();
+  assert.deepEqual(au.calls, [['setFeedURL', 'https://update.electronjs.org/pmorn/pkmessenger/win32-x64/0.1.0'], ['check']]);
+  const { u: u2, au: au2 } = make({ fetchImpl: gh('v9.9.9', false) }); // z. B. Abfrage-Limit
+  await u2.checkNow();
+  assert.deepEqual(au2.calls.map((c) => c[0]), ['setFeedURL', 'check']);
+});
+
+test('Versionsvergleich', () => {
+  const { compareVersions } = require('../src/main/updater');
+  assert.ok(compareVersions('0.10.0', '0.9.9') > 0);
+  assert.equal(compareVersions('1.2.3', '1.2.3'), 0);
+  assert.ok(compareVersions('0.8.0', '0.8.1') < 0);
 });

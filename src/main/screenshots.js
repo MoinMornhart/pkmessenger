@@ -446,6 +446,20 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await win.webContents.executeJavaScript(`document.querySelector('.ai-responder')?.scrollIntoView({block:'center'})`);
   await wait(300);
   await shoot(win, dir, '29-ki-antworten');
+  // Personen ausschließen (Issue #1): Vorschläge schon beim Reinklicken und für Teile des Namens
+  const blockInput = `document.querySelector('input[aria-label="Diese Personen ausschließen: Name suchen"]')`;
+  await js(win, `${blockInput}?.focus()`);
+  await wait(700);
+  const onFocus = await js(win, `[...document.querySelectorAll('.ai-people')].at(-1)?.querySelectorAll('.ai-suggest button').length || 0`);
+  await js(win, `(() => { ${SET} setVal(${blockInput}, 'n'); })()`);
+  await wait(700);
+  await js(win, `[...document.querySelectorAll('.ai-people')].at(-1)?.scrollIntoView({block:'center'})`);
+  await wait(200);
+  await shoot(win, dir, '44-personen-vorschlaege');
+  const withN = await js(win, `[...[...document.querySelectorAll('.ai-people')].at(-1).querySelectorAll('.ai-suggest button')].map(b=>b.textContent.trim()).join(', ')`);
+  console.log(`[personen] beim Reinklicken: ${onFocus} Vorschläge · mit „n“: ${withN}`);
+  await js(win, `(() => { ${SET} setVal(${blockInput}, ''); ${blockInput}.blur(); })()`);
+  await wait(300);
   await clickText('.ai-responder .btn', 'Speichern');
   await wait(400);
   await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
