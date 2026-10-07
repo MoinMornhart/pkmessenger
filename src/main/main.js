@@ -122,6 +122,8 @@ function createWindow() {
       spellcheck: true,
     },
   });
+  // Bildschirmschutz: Windows blendet das Fenster bei Screenshots/Aufnahmen anderer Programme schwarz aus
+  if (store.get().screenProtection === true) mainWindow.setContentProtection(true);
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
   // Keine Navigation weg von der App; Links öffnen im Standardbrowser.
@@ -173,7 +175,8 @@ app.whenReady().then(() => {
     cb(perm === 'media' && audioOnly && isOwnUrl(details.requestingUrl));
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore }, isTrustedSender);
+  const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection }, isTrustedSender);
   createWindow();
   service.connect(); // async – blockiert das Fenster nicht
   updater.start();

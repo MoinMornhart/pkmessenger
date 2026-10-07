@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('api', {
   sendTyping: call('pk:send-typing'),
   searchMentionables: call('pk:search-mentionables'),
   getSettings: call('pk:get-settings'),
+  setScreenProtection: call('pk:set-screen-protection'),
   setReadMarker: call('pk:set-read-marker'),
   setLastLocation: call('pk:set-last-location'),
   openExternal: call('pk:open-external'),

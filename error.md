@@ -157,3 +157,16 @@ esbuild schreibt seine normale Erfolgsmeldung (`build\renderer\app.js 276.3kb �
 4. **Lösung:** Die Oberfläche schickt die Server-ID immer mit (`SettingsDialog.jsx`), dazu kommt ein Regressionstest in `tests/test-profile.js`.
 5. **Testergebnis:** Demo-Lauf `{"felder":3,…}`, Tests grün.
 6. **Prävention:** Nach Speichern-Aktionen im Screenshot-Lauf den Zustand erneut prüfen, nicht nur die Erfolgsmeldung.
+
+---
+
+## #13 – Aktionsleiste verdeckte den Namen über kurzen Nachrichten
+
+1. **Datum & Uhrzeit:** 07.10.2026
+2. **Was passiert ist:** Auf JoniMonis Screenshot (Issue #1) fehlte über einer kurzen Nachricht „die Überschrift“ (Name des Absenders).
+3. **Ursache (geprüft):** Die Aktionsleiste (↩ 😊 🧵 📌 🗑) lag beim Drüberfahren mit `top: -16px` **über** der Blase. Ist die Blase schmaler als die Leiste, deckt sie den Namen komplett zu.
+4. **Lösung:** Die Leiste sitzt jetzt **neben** der Blase (`left/right: calc(100% + 6px)`). Der Screenshot-Lauf misst die Überlappung (`[ui] Name neben Aktionsleiste: frei`).
+5. **Testergebnis:** Demo-Lauf „frei“, 142/142 Tests grün.
+6. **Prävention:** Neue Overlays im Screenshot-Lauf per `getBoundingClientRect` auf Überlappung prüfen.
+
+Nebenbei: iCloud hat erneut eine Datei umbenannt (`SettingsDialog.jsx` → `SettingsDialog 2.jsx`, Build schlug fehl) und beim Einfügen per `node -e` ging wieder ein `\d` verloren (#11). Beides vor dem Commit bemerkt und behoben.

@@ -1,6 +1,7 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { formatListTime } from '../../shared/format';
 import { api } from '../api';
+import { prefs } from '../prefs';
 
 const UPDATE_TEXT = {
   idle: 'Updates: –',
@@ -173,12 +174,67 @@ function OtherRows({ channels, activeId, onOpenForum }) {
   );
 }
 
-function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings, onOpenForum = () => {} }) {
+// Kopfzeile einer Kategorie (einklappbar); eingeklappt zeigt sie die Zahl ungelesener Chats
+function CategoryHeader({ group, collapsed, unread, onToggle }) {
+  return (
+    <button className={`chatlist__category ${collapsed ? 'is-collapsed' : ''}`} onClick={onToggle} aria-expanded={!collapsed}>
+      <span className="chatlist__chevron" aria-hidden="true">
+        ▾
+      </span>
+      <span className="chatlist__category-name">{group.category?.name || 'Ohne Kategorie'}</span>
+      {collapsed && unread > 0 && <span className="badge">{unread}</span>}
+    </button>
+  );
+}
+
+function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings, onOpenForum = () => {} }) {
   const [filter, setFilter] = useState('');
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase().replace(/^#/, '');
     return q ? chats.filter((c) => c.name.toLowerCase().includes(q) || (previews[c.id]?.text || '').toLowerCase().includes(q)) : chats;
   }, [chats, filter, previews]);
+
+  // Sortierung „Neueste zuerst“ oder „Nach Kategorien“ (einklappbar) – wird pro PC gemerkt
+  const [sort, setSort] = useState(() => ({ mode: prefs.get().chatSort, collapsed: prefs.get().collapsed }));
+  useEffect(() => prefs.subscribe((p) => setSort({ mode: p.chatSort, collapsed: p.collapsed })), []);
+  const byCategory = sort.mode === 'categories' && !filter.trim() && chatGroups.length > 0;
+  const toggleCategory = (id) => {
+    const next = { ...sort.collapsed };
+    if (next[id]) delete next[id];
+    else next[id] = true;
+    prefs.set({ collapsed: next });
+  };
+
+  const renderRow = (c) => {
+        const p = previews[c.id];
+        const unread = isUnread(c);
+        const count = unreadCounts[c.id] || 0;
+        return (
+          <button key={c.id} className={`chatrow ${c.id === activeId ? 'is-active' : ''} ${unread ? 'is-unread' : ''}`} onClick={() => onSelect(c.id)} title={c.topic || c.name}>
+            <ChannelAvatar channel={c} />
+            <div className="chatrow__main">
+              <div className="chatrow__top">
+                <span className="chatrow__name">{c.name}</span>
+                {p && <span className="chatrow__time">{formatListTime(p.timestamp, now)}</span>}
+              </div>
+              <div className="chatrow__bottom">
+                <span className="chatrow__preview">
+                  {p ? (
+                    <>
+                      {p.isOwn ? <span className="tick" aria-label="gesendet">✓</span> : <span className="chatrow__author">{p.authorName}: </span>}
+                      {p.text || '…'}
+                    </>
+                  ) : (
+                    <span className="muted">{c.topic || (c.canSend ? 'Noch keine Nachrichten' : 'Nur lesen')}</span>
+                  )}
+                </span>
+                {!c.canSend && <span className="chatrow__lock" title="Der Bot darf hier nur lesen">🔒</span>}
+                {unread && <span className="badge">{count > 0 ? (count > 99 ? '99+' : count) : ''}</span>}
+              </div>
+            </div>
+          </button>
+        );
+  };
 
   return (
     <aside className="chatlist">
@@ -186,6 +242,15 @@ function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, on
         <h2 title={guild?.name}>{guild?.name || (hasGuilds ? ' ' : 'PKMessenger')}</h2>
         <button className={`icon-btn ${refreshing ? 'is-spinning' : ''}`} onClick={onRefresh} disabled={refreshing} title="Aktualisieren: Kanäle und Rechte neu von Discord laden" aria-label="Aktualisieren">
           ⟳
+        </button>
+        <button
+          className={`icon-btn ${sort.mode === 'categories' ? 'is-on' : ''}`}
+          onClick={() => prefs.set({ chatSort: sort.mode === 'categories' ? 'recent' : 'categories' })}
+          title={sort.mode === 'categories' ? 'Nach Kategorien sortiert – klicken für „Neueste zuerst“' : 'Neueste zuerst – klicken für „Nach Kategorien“ (einklappbar)'}
+          aria-label="Sortierung wechseln"
+          aria-pressed={sort.mode === 'categories'}
+        >
+          ☰
         </button>
         <button className="icon-btn" onClick={onOpenSettings} title="Einstellungen" aria-label="Einstellungen">
           ⚙
@@ -222,39 +287,22 @@ function ChatList({ guild, chats, previews, activeId, isUnread, unreadCounts, on
           </div>
         )}
         {!loading && filter && visible.length === 0 && <div className="empty empty--small">Kein Chat gefunden.</div>}
-        {visible.map((c) => {
-          const p = previews[c.id];
-          const unread = isUnread(c);
-          const count = unreadCounts[c.id] || 0;
-          return (
-            <button key={c.id} className={`chatrow ${c.id === activeId ? 'is-active' : ''} ${unread ? 'is-unread' : ''}`} onClick={() => onSelect(c.id)} title={c.topic || c.name}>
-              <ChannelAvatar channel={c} />
-              <div className="chatrow__main">
-                <div className="chatrow__top">
-                  <span className="chatrow__name">{c.name}</span>
-                  {p && <span className="chatrow__time">{formatListTime(p.timestamp, now)}</span>}
+        {byCategory
+          ? chatGroups.map((g) => {
+              const key = g.category?.id || 'none';
+              const isCollapsed = Boolean(g.category && sort.collapsed[g.category.id]);
+              return (
+                <div key={key} className="chatlist__group">
+                  <CategoryHeader group={g} collapsed={isCollapsed} unread={g.channels.filter(isUnread).length} onToggle={() => g.category && toggleCategory(g.category.id)} />
+                  {/* Eingeklappt bleibt der offene Chat sichtbar, damit man ihn nicht „verliert“ */}
+                  {(isCollapsed ? g.channels.filter((c) => c.id === activeId) : g.channels).map(renderRow)}
                 </div>
-                <div className="chatrow__bottom">
-                  <span className="chatrow__preview">
-                    {p ? (
-                      <>
-                        {p.isOwn ? <span className="tick" aria-label="gesendet">✓</span> : <span className="chatrow__author">{p.authorName}: </span>}
-                        {p.text || '…'}
-                      </>
-                    ) : (
-                      <span className="muted">{c.topic || (c.canSend ? 'Noch keine Nachrichten' : 'Nur lesen')}</span>
-                    )}
-                  </span>
-                  {!c.canSend && <span className="chatrow__lock" title="Der Bot darf hier nur lesen">🔒</span>}
-                  {unread && <span className="badge">{count > 0 ? (count > 99 ? '99+' : count) : ''}</span>}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+              );
+            })
+          : visible.map(renderRow)}
         {!loading && !filter && access && (access.hidden?.length > 0 || access.readOnly?.length > 0) && (
           <button className="access-hint" onClick={onShowAccess}>
-            🔒 {access.hidden?.length > 0 ? `${access.hidden.length} Kanäle für den Bot gesperrt` : `${access.readOnly.length} Kanäle nur lesbar`}
+            🔒 {access.hidden?.length > 0 ? `${access.hidden.length} ${access.hidden.length === 1 ? 'Kanal' : 'Kanäle'} für den Bot gesperrt` : `${access.readOnly.length} ${access.readOnly.length === 1 ? 'Kanal' : 'Kanäle'} nur lesbar`}
             <span className="muted small"> – warum & wie freigeben?</span>
           </button>
         )}

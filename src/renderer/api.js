@@ -32,6 +32,7 @@ export const api = Object.fromEntries(
     'sendTyping',
     'searchMentionables',
     'getSettings',
+    'setScreenProtection',
     'setReadMarker',
     'setLastLocation',
     'openExternal',

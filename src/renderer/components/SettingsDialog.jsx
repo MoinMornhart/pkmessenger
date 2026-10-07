@@ -7,6 +7,7 @@ function TokenSection({ toast }) {
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [showId, setShowId] = useState(false);
 
   const load = useCallback(() => api.tokenInfo().then(setInfo).catch(() => setInfo(null)), []);
   useEffect(() => {
@@ -40,7 +41,12 @@ function TokenSection({ toast }) {
     <>
       <div className="settings__status">
         {info?.stored ? (
-          <span className="ok">🔐 Verschlüsselt gespeichert (Windows-Datenschutz) · Bot-ID {info.botId}</span>
+          <span className="ok">
+            🔐 Verschlüsselt gespeichert (Windows-Datenschutz) · Bot-ID{' '}
+            <button className="link-btn" onClick={() => setShowId((v) => !v)} title={showId ? 'Verstecken' : 'Anzeigen'}>
+              {showId ? info.botId : '••••••••'} {showId ? '🙈' : '👁'}
+            </button>
+          </span>
         ) : (
           <span className="warn">Kein Token gespeichert.</span>
         )}
@@ -195,6 +201,35 @@ function ProfileSection({ toast, guildId }) {
   );
 }
 
+// Bildschirmschutz: andere Programme (Screenshots, Aufnahmen, Bildschirm teilen) sehen nur ein schwarzes Fenster
+function PrivacySection({ toast }) {
+  const [on, setOn] = useState(null);
+  useEffect(() => {
+    api
+      .getSettings()
+      .then((s) => setOn(s.screenProtection === true))
+      .catch(() => setOn(false));
+  }, []);
+  const toggle = async (next) => {
+    try {
+      setOn(await api.setScreenProtection({ on: next }));
+    } catch (e) {
+      toast({ kind: 'error', title: e.message });
+    }
+  };
+  return (
+    <>
+      <label className="composer__ping">
+        <input type="checkbox" checked={on === true} disabled={on === null} onChange={(e) => toggle(e.target.checked)} /> 🛡 Bildschirmschutz: Screenshots und Aufnahmen verbieten
+      </label>
+      <p className="muted small">Andere Programme (z. B. Snipping Tool, OBS, Bildschirm teilen) sehen dann nur ein schwarzes Fenster. Ein Foto mit dem Handy kann keine App verhindern.</p>
+      <p className="muted small">
+        Keine Cloud, keine Telemetrie. Lokal gespeichert: verschlüsselter Token, zuletzt geöffneter Chat, Lese-Markierungen, diese Einstellungen. Sprachkanäle werden nie aufgezeichnet.
+      </p>
+    </>
+  );
+}
+
 function AudioSection() {
   const [p, setP] = useState(prefs.get());
   const [devices, setDevices] = useState({ inputs: [], outputs: [] });
@@ -296,10 +331,7 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId }) {
         </section>
         <section>
           <h4>🔒 Datenschutz</h4>
-          <p className="muted small">
-            Keine Cloud, keine Telemetrie. Lokal gespeichert: verschlüsselter Token, zuletzt geöffneter Chat, Lese-Markierungen, diese Audio-Einstellungen. Sprachkanäle werden nie
-            aufgezeichnet.
-          </p>
+          <PrivacySection toast={toast} />
         </section>
       </div>
     </div>

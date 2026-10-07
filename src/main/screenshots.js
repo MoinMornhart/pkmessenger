@@ -193,6 +193,22 @@ async function runScreenshots(win, dir, { demo, stats }) {
   const prof = await js(win, `JSON.stringify({ felder: document.querySelectorAll('#profile-name,#profile-desc,#profile-nick').length, toast: [...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' | ').slice(0,80), gespeichertAktiv: !document.querySelector('.settings .btn--primary')?.disabled })`);
   console.log(`[profil] ${prof}`);
   await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+  await wait(300);
+  // Aktionsleiste darf den Namen über der Nachricht nicht verdecken (Issue #1, Screenshot JoniMoni)
+  const overlap = await js(win, `(() => { const m=[...document.querySelectorAll('.msg--in')].find(x=>x.querySelector('.bubble__author')); if(!m) return 'keine Nachricht'; m.classList.add('show-actions'); const a=m.querySelector('.msg-actions').getBoundingClientRect(), n=m.querySelector('.bubble__author').getBoundingClientRect(); const hit = a.left < n.right && a.right > n.left && a.top < n.bottom && a.bottom > n.top; m.classList.remove('show-actions'); return hit ? 'VERDECKT' : 'frei'; })()`);
+  console.log(`[ui] Name neben Aktionsleiste: ${overlap}`);
+  // Chatliste nach Kategorien, eine Kategorie einklappen
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Sortierung wechseln"]')?.click()`);
+  await wait(300);
+  const cats = await js(win, `document.querySelectorAll('.chatlist__category').length`);
+  const rowsBefore = await js(win, `document.querySelectorAll('.chatlist__items .chatrow').length`);
+  await js(win, `[...document.querySelectorAll('.chatlist__category')].find(b=>b.textContent.includes('Projekte'))?.click()`);
+  await wait(300);
+  const rowsAfter = await js(win, `document.querySelectorAll('.chatlist__items .chatrow').length`);
+  await shoot(win, dir, '21-kategorien');
+  console.log(`[ui] Kategorien: ${cats}, Zeilen vorher ${rowsBefore}, eingeklappt ${rowsAfter}`);
+  await js(win, `[...document.querySelectorAll('.chatlist__category')].find(b=>b.textContent.includes('Projekte'))?.click()`);
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Sortierung wechseln"]')?.click()`);
 }
 
 module.exports = { runScreenshots };

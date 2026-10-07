@@ -228,6 +228,15 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     return list.sort((a, b) => activity(b) - activity(a) || a.position - b.position);
   }, [channels, previews, lastIds]);
 
+  // Für die Ansicht „Nach Kategorien“: Textkanäle in Discord-Reihenfolge, gruppiert
+  const chatGroups = useMemo(
+    () =>
+      (channels || [])
+        .map((g) => ({ category: g.category, channels: g.channels.filter((c) => c.type !== 'voice' && !c.unsupported) }))
+        .filter((g) => g.channels.length > 0),
+    [channels],
+  );
+
   const unreadGuilds = useMemo(() => {
     const s = new Set();
     for (const [gid, groups] of Object.entries(channelsByGuild)) if (groups.some((g) => g.channels.some(isUnread))) s.add(gid);
@@ -366,6 +375,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         <ChatList
           guild={guild}
           chats={chats}
+          chatGroups={chatGroups}
           previews={previews}
           activeId={channelId}
           isUnread={isUnread}

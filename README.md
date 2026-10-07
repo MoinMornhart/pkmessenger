@@ -239,6 +239,10 @@ Mehr Details: [AGENTS.md](AGENTS.md) (Architektur, Entscheidungen, Teststand) ·
 - [x] Sprachkanäle, Server beitreten, verschlüsselter Token, Einstellungen
 - [x] Umfragen (erstellen, Ergebnisse live, beenden)
 - [x] Bot-Profil bearbeiten (Name, Bild, Beschreibung, Spitzname je Server)
+- [x] Chatliste nach Kategorien, einklappbar (☰ oben in der Liste)
+- [x] Bildschirmschutz: Screenshots und Aufnahmen anderer Programme verbieten (Einstellungen → Datenschutz)
+- [ ] Privatnachrichten mit dem Bot
+- [ ] Designs und Animationen zum Umschalten
 - [ ] Moderation per Rechtsklick (Rollen, Timeout, Kick, Bann)
 - [ ] Live-Test aller Funktionen auf einem echten Server
 - [ ] Helles Design und eigene Akzentfarben

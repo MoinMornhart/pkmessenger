@@ -9,7 +9,7 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection }) {
   const requireVoice = () => {
     if (!voice) throw Object.assign(new Error('Sprachfunktion nicht verfügbar.'), { code: 'NOT_FOUND' });
     return voice;
@@ -70,6 +70,12 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:send-typing': (p) => service.sendTyping(validators.channelRef(p)),
     'pk:search-mentionables': (p) => service.searchMentionables(validators.searchMentionables(p)),
     'pk:get-settings': () => store.get(),
+    'pk:set-screen-protection': (p) => {
+      const on = validators.flag(p);
+      store.set('screenProtection', on);
+      setScreenProtection?.(on);
+      return on;
+    },
     'pk:set-read-marker': (p) => {
       const { channelId, messageId } = validators.readMarker(p);
       store.setReadMarker(channelId, messageId);
