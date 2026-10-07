@@ -145,6 +145,15 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await shoot(win, dir, '11-im-anruf');
   const r = await js(win, 'JSON.stringify(window.__pkVoiceStats || {})');
   console.log(`[voice-e2e] Renderer: ${r} | Main: ${JSON.stringify(stats || {})}`);
+  // Issue #1: Teilnehmer nur für mich stumm (gegen Doppelt-Hören) → seine Pakete werden übersprungen
+  const ctrls = await js(win, `document.querySelectorAll('.tile__ctrl').length`);
+  await js(win, `[...document.querySelectorAll('.tile')].find(t=>t.textContent.includes('Anna'))?.querySelector('.tile__mute')?.click()`);
+  const skipBefore = await js(win, '(window.__pkVoiceStats||{}).skippedMuted||0');
+  await wait(1500);
+  const skipAfter = await js(win, '(window.__pkVoiceStats||{}).skippedMuted||0');
+  await shoot(win, dir, '11b-teilnehmer-stumm');
+  console.log(`[voice-fx] Regler: ${ctrls} · Anna stumm → übersprungene Pakete: +${skipAfter - skipBefore} · Gate-Stille: ${await js(win, '(window.__pkVoiceStats||{}).gated||0')}`);
+  await js(win, `[...document.querySelectorAll('.tile')].find(t=>t.textContent.includes('Anna'))?.querySelector('.tile__mute')?.click()`);
   await js(win, `document.querySelector('.call-btn--hangup')?.click()`);
   await wait(500);
   const after = await js(win, `document.querySelector('.callbar') ? 'Anrufleiste noch da' : 'aufgelegt'`);
@@ -397,6 +406,20 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   const upd = JSON.stringify({ waehrend: during, ...JSON.parse(updAfter) });
   console.log(`[update] ${upd}`);
   await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+  // Audio-Test in den Einstellungen (simuliertes Mikrofon): Pegel muss sich bewegen
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+  await wait(500);
+  await clickText('.settings .btn', 'Mikrofon testen');
+  await wait(1200);
+  await js(win, `document.querySelector('.mic-test')?.scrollIntoView({block:'center'})`);
+  await wait(200);
+  await shoot(win, dir, '35-audio-test');
+  // Über 2 s messen (das simulierte Mikro piept nur in Abständen)
+  const micTest = await js(win, `new Promise((res) => { let max = 0, sendet = false, n = 0; const t = setInterval(() => { const v = parseFloat((document.querySelector('.mic-test .level i')?.style.transform || '').split('(')[1]) || 0; max = Math.max(max, v); sendet = sendet || (document.querySelector('.mic-test .small')?.textContent || '').includes('gesendet'); if (++n >= 20) { clearInterval(t); res(JSON.stringify({ maxPegel: max, sendetZwischendurch: sendet, hilfe: Boolean(document.querySelector('.voice-help')) })); } }, 100); })`);
+  console.log(`[audio-test] ${micTest}`);
+  await clickText('.settings .btn', 'Test beenden');
+  await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+  await wait(300);
   // Töne (Issue #12): Testton in den Einstellungen, dann löst eine Erwähnung den Erwähnungston aus
   await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
   await wait(500);

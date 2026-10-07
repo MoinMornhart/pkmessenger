@@ -4,6 +4,7 @@ import { prefs } from '../prefs';
 import AiSection from './AiSection.jsx';
 import UpdateSection from './UpdateSection.jsx';
 import NotificationSection from './NotificationSection.jsx';
+import VoiceFxSection from './VoiceFxSection.jsx';
 import { THEMES, ACCENTS, MOTIONS } from '../theme';
 
 function TokenSection({ toast }) {
@@ -383,6 +384,7 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
         <section>
           <h4>🎧 Audio (Sprachkanäle)</h4>
           <AudioSection />
+          <VoiceFxSection />
         </section>
         <section>
           <h4>🔄 Updates</h4>
