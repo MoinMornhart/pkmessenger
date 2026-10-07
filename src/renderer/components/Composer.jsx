@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { applyFormat, FORMAT_BUTTONS } from '../../shared/format-text';
+import { parseCommand, suggestCommands } from '../../shared/quick-commands';
 import { api } from '../api';
 import { applyMentionTokens, findMentionQuery } from '../../shared/mentions';
 import { MESSAGE_CONTENT_MAX, TYPING_THROTTLE_MS } from '../../shared/limits';
@@ -128,6 +129,8 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
 
   const updateSuggestions = useCallback(
     async (value, caret) => {
+      const cmds = editing ? null : suggestCommands(value, caret);
+      if (cmds) return setSuggest(cmds.length ? { trigger: '/', query: '', start: 0, items: cmds, sel: 0 } : null);
       const q = findMentionQuery(value, caret);
       if (!q || guild.isDM) return setSuggest(null); // Privatchat: keine Rollen/Kanäle/Mitgliedersuche
       const seq = ++searchSeq.current;
@@ -150,7 +153,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
       }
       return undefined;
     },
-    [allChannels, guild.id, guild.isDM],
+    [allChannels, guild.id, guild.isDM, editing],
   );
 
   const onChange = (e) => {
@@ -166,6 +169,16 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
 
   const pick = (item) => {
     if (!suggest) return;
+    if (item.kind === 'command') {
+      const next = `${item.display} `;
+      setText(next);
+      setSuggest(null);
+      requestAnimationFrame(() => {
+        taRef.current?.focus();
+        taRef.current?.setSelectionRange(next.length, next.length);
+      });
+      return;
+    }
     const ta = taRef.current;
     const caret = ta.selectionStart;
     let display;
@@ -209,6 +222,28 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
 
   const submit = () => {
     if (empty || tooLong || !channel.canSend) return;
+    // Schnellbefehle (/shrug, /me, /umfrage …) – laufen in der App, gesendet wird nur das Ergebnis
+    const cmd = editing ? null : parseCommand(text);
+    if (cmd) {
+      const r = cmd.command.run(cmd.args);
+      if (r.error) return setFileError(r.error);
+      if (r.action === 'poll' || r.action === 'embed') {
+        setText('');
+        (r.action === 'poll' ? setPollOpen : setEmbedOpen)(true);
+        return;
+      }
+      if (r.action === 'help') {
+        setText('/');
+        setSuggest({ trigger: '/', query: '', start: 0, items: suggestCommands('/', 1), sel: 0 });
+        taRef.current?.focus();
+        return;
+      }
+      const out = applyMentionTokens(r.content, inserted);
+      onSend({ content: out.content, mentions: { users: out.users, roles: out.roles, everyone: false }, files: [], embeds: [], poll: null, replyTo: replyTo?.id || null, pingReply });
+      onCancelReply();
+      reset();
+      return;
+    }
     if (final.massMention) {
       if (!channel.canMentionEveryone) {
         setConfirm({
@@ -286,7 +321,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
     <div className="composer">
       {suggest && (
         <div className="suggest" role="listbox">
-          <div className="suggest__title">{suggest.trigger === '#' ? 'Kanäle' : 'Mitglieder & Rollen'}</div>
+          <div className="suggest__title">{suggest.trigger === '/' ? 'Befehle' : suggest.trigger === '#' ? 'Kanäle' : 'Mitglieder & Rollen'}</div>
           {suggest.items.map((it, i) => (
             <button
               key={`${it.kind}-${it.id}`}
@@ -302,6 +337,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
                 (it.avatarUrl ? <img className="avatar avatar--xs" src={it.avatarUrl} alt="" /> : <span className="avatar avatar--xs avatar--placeholder" />)}
               {it.kind === 'role' && <span className="role-dot" style={it.color ? { background: it.color } : undefined} />}
               {it.kind === 'channel' && <span className="ch-icon">#</span>}
+              {it.kind === 'command' && <span className="ch-icon">/</span>}
               {(it.kind === 'everyone' || it.kind === 'here') && <span className="ch-icon">📣</span>}
               <span className="suggest__name">{it.kind === 'everyone' || it.kind === 'here' ? `@${it.display}` : it.display}</span>
               {it.sub && <span className="muted small">{it.sub}</span>}
