@@ -1,0 +1,105 @@
+# Automatischer Release-Bau (Wunsch JoniMoni, Issue #1):
+# Neuer Tag „vX.Y.Z“ oder neues GitHub-Release → prüfen → Windows-Installer bauen → ans Release hängen.
+# Installierte Apps finden das Update danach automatisch (update.electronjs.org).
+#
+# So veröffentlicht man ein Update:
+#   1. In package.json die Version erhöhen (z. B. 0.3.0 → 0.4.0), per Pull Request nach main
+#   2. Tag „v0.4.0“ auf main setzen (git tag v0.4.0 && git push origin v0.4.0)
+#      ODER auf GitHub „Draft a new release“ mit Tag v0.4.0 → „Publish release“
+#   3. Fertig – dieser Workflow baut und lädt hoch. Doppelte Auslöser schaden nicht (vorhandene Dateien werden übersprungen).
+name: Release bauen
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Vorhandenen Tag erneut bauen (z. B. v0.4.0)"
+        required: true
+
+permissions:
+  contents: read
+
+# Pro Tag nur ein Lauf gleichzeitig – Tag- und Release-Ereignis für dieselbe Version laufen nacheinander, nicht doppelt parallel
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    name: Tag prüfen
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Tag bestimmen
+        id: tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          TAG="${RELEASE_TAG:-${INPUT_TAG:-$REF_NAME}}"
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag „$TAG“ hat nicht das Format vX.Y.Z (z. B. v0.4.0)."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          persist-credentials: false
+      - name: Version in package.json passt zum Tag?
+        id: check
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "v$VERSION" != "$TAG" ]; then
+            echo "::error::package.json hat Version $VERSION, der Tag ist $TAG. Erst die Version in package.json auf ${TAG#v} setzen, dann taggen."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "✔ Tag $TAG passt zu package.json $VERSION"
+
+  build:
+    name: Windows-Installer bauen + hochladen
+    needs: analyze
+    runs-on: windows-latest
+    permissions:
+      contents: write # nur hier: Release anlegen bzw. Dateien hochladen
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.analyze.outputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Abhängigkeiten
+        run: npm ci
+      - name: Tests
+        run: npm test
+      - name: Oberfläche bauen
+        run: npm run build:renderer
+      - name: Bauen und ans Release hängen
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-forge publish
+      - name: Zusammenfassung
+        env:
+          TAG: ${{ needs.analyze.outputs.tag }}
+        shell: bash
+        run: |
+          {
+            echo "## ✔ PKMessenger $TAG veröffentlicht"
+            echo ""
+            echo "Installer und Update-Pakete hängen am Release **$TAG**."
+            echo "Installierte Apps holen sich das Update beim nächsten Start oder innerhalb von 6 Stunden."
+          } >> "$GITHUB_STEP_SUMMARY"
