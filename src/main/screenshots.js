@@ -593,7 +593,10 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await wait(500);
   await clickText('.settings .btn', 'nach Updates suchen');
   await wait(300);
-  const during = await js(win, `[...document.querySelectorAll('.settings .btn')].map(b=>b.textContent).find(t=>t.includes('Suche'))||null`);
+  // gerade beim Start geprüft → Rückfrage „Nochmal nachsehen?“ bestätigen
+  await js(win, `[...document.querySelectorAll('.modal.confirm .btn')].find(b=>b.textContent.includes('nochmal'))?.click()`);
+  await wait(100);
+  const during =await js(win, `[...document.querySelectorAll('.settings .btn')].map(b=>b.textContent).find(t=>t.includes('Suche'))||null`);
   await wait(1800);
   await js(win, `[...document.querySelectorAll('.settings h4')].find(h=>h.textContent.includes('Updates'))?.scrollIntoView({block:'center'})`);
   await wait(300);
@@ -601,6 +604,27 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   const updAfter = await js(win, `JSON.stringify({ status: [...document.querySelectorAll('.settings p')].map(p=>p.textContent).find(t=>t.includes('PKMessenger v'))?.slice(0,90), hinweis: [...document.querySelectorAll('.toast')].map(t=>t.textContent).find(t=>t.includes('Update'))?.slice(0,70) || null })`);
   const upd = JSON.stringify({ waehrend: during, ...JSON.parse(updAfter) });
   console.log(`[update] ${upd}`);
+  // Updates (Issue #1): nochmal drücken → Rückfrage; „Was ist neu?“ zeigt Releases; neu installieren
+  {
+    await clickText('.settings .btn', 'nach Updates suchen');
+    await wait(300);
+    const ask = await js(win, `document.querySelector('.modal.confirm h3')?.textContent || null`);
+    await shoot(win, dir, '52-update-nochmal');
+    await js(win, `[...document.querySelectorAll('.modal.confirm .btn')].find(b=>b.textContent.includes('nochmal'))?.click()`);
+    await wait(1500);
+    await clickText('.settings .btn', 'Was ist neu');
+    await wait(900);
+    await js(win, `document.querySelector('.update-changes')?.scrollIntoView({block:'center'})`);
+    await wait(300);
+    await shoot(win, dir, '53-was-ist-neu');
+    const news = await js(win, `JSON.stringify({ releases: document.querySelectorAll('.update-changes__release').length, notizen: document.querySelectorAll('.update-changes__release[open] li').length, neuInstallieren: [...document.querySelectorAll('.update-changes .btn')].some(b=>b.textContent.includes('neu installieren')) })`);
+    // Sicherheit: Hintergrund + Windows Hello
+    await js(win, `[...document.querySelectorAll('.settings h4')].find(h=>h.textContent.includes('Sicherheit'))?.scrollIntoView({block:'start'})`);
+    await wait(300);
+    const sec = await js(win, `JSON.stringify({ hintergrund: Boolean(document.querySelector('[data-setting="background"]')), adminHinweis: [...document.querySelectorAll('.settings p')].some(p=>p.textContent.includes('Administrator')) })`);
+    await shoot(win, dir, '54-sicherheit-hintergrund');
+    console.log(`[update-neu] Rückfrage: ${ask} · Was ist neu: ${news} · Sicherheit: ${sec}`);
+  }
   await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
   // App-Sperre (Issue #1): Passwort festlegen → sperren → falsch → richtig → wieder entfernen
   const setInput = (sel, v) => js(win, `(() => { const el=document.querySelector(${JSON.stringify(sel)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(v)}); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
@@ -613,9 +637,13 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await setInput('.lock-form input[aria-label="Neues Passwort wiederholen"]', 'demo1234');
   await clickB('.lock-form .btn', 'Speichern');
   await wait(500);
+  // Windows Hello einschalten (Issue #29) → Sperrbildschirm zeigt den Hello-Knopf
+  await js(win, `document.querySelector('[data-setting="hello"] input')?.click()`);
+  await wait(400);
   await clickB('.settings .btn', 'Jetzt sperren');
   await wait(600);
   await shoot(win, dir, '38-gesperrt');
+  console.log(`[hello] Knopf auf dem Sperrbildschirm: ${await js(win, `[...document.querySelectorAll('.lock-card .btn')].some(b=>b.textContent.includes('Windows Hello'))`)}`);
   const lockedUi = await js(win, `Boolean(document.querySelector('.lock-card')) && !document.querySelector('.chatlist')`);
   await setInput('.lock-card input', 'falsch');
   await js(win, `document.querySelector('.lock-card').requestSubmit()`);

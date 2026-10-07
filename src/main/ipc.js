@@ -9,7 +9,7 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background }) {
   const requireAi = () => {
     if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
     return ai;
@@ -118,6 +118,15 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:lock-idle': (p) => appLock.setIdle(validators.lockIdle(p)),
     'pk:lock-clear': (p) => appLock.clear({ current: validators.lockPassword(p).password }),
     'pk:lock-now': () => appLock.lock(),
+    // Windows Hello (Issue #29) – Ergebnis kommt NUR von Windows, die Oberfläche kann nichts vortäuschen
+    'pk:lock-hello': () => appLock.verifyHello(hello),
+    'pk:lock-set-hello': (p) => appLock.setHello(validators.lockHello(p)),
+    'pk:hello-status': async () => ({ availability: hello ? await hello.availability() : 'NotSupported' }),
+    // Im Hintergrund weiterlaufen (Symbol im Infobereich)
+    'pk:background-get': () => (background ? background.get() : { enabled: false }),
+    'pk:background-set': (p) => background.set(validators.backgroundSet(p).on),
+    // „Was ist neu?“ – Releases + Änderungen seit der eigenen Version
+    'pk:update-changes': () => (updater ? updater.changes() : null),
     // Mit Windows starten (nur installierte App)
     'pk:autostart-get': () => (autostart ? autostart.get() : { available: false, enabled: false }),
     'pk:autostart-set': (p) => {
@@ -158,7 +167,7 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
 }
 
 // Diese Kanäle gehen auch, wenn die App gesperrt ist (alles andere wird abgelehnt)
-const ALLOWED_WHILE_LOCKED = new Set(['pk:lock-status', 'pk:lock-verify', 'pk:get-status', 'pk:get-app-info']);
+const ALLOWED_WHILE_LOCKED = new Set(['pk:lock-status', 'pk:lock-verify', 'pk:lock-hello', 'pk:get-status', 'pk:get-app-info']);
 
 function wrap(handler, isTrustedSender, channel = '', isLocked = () => false) {
   return async (event, payload) => {

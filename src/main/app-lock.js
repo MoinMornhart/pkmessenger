@@ -27,7 +27,7 @@ function createAppLock({ store, now = () => Date.now(), emit = () => {} }) {
   let fails = 0;
   let blockedUntil = 0;
 
-  const status = () => ({ enabled: Boolean(cfg()), locked: !unlocked, idleMinutes: cfg()?.idleMinutes ?? 0, blockedUntil: blockedUntil > now() ? blockedUntil : null });
+  const status = () => ({ enabled: Boolean(cfg()), locked: !unlocked, idleMinutes: cfg()?.idleMinutes ?? 0, hello: cfg()?.hello === true, blockedUntil: blockedUntil > now() ? blockedUntil : null });
 
   function check(password) {
     const c = cfg();
@@ -60,7 +60,27 @@ function createAppLock({ store, now = () => Date.now(), emit = () => {} }) {
     if (typeof password !== 'string' || password.length < MIN_LENGTH || password.length > 200) throw lockError(`Das Passwort braucht mindestens ${MIN_LENGTH} Zeichen.`);
     if (!IDLE_CHOICES.includes(idleMinutes)) throw lockError('Ungültige Zeit für die automatische Sperre.');
     const salt = crypto.randomBytes(16).toString('hex');
-    store.set('appLock', { salt, hash: hash(password, salt), idleMinutes });
+    store.set('appLock', { salt, hash: hash(password, salt), idleMinutes, hello: cfg()?.hello === true });
+    unlocked = true;
+    emit('lock', status());
+    return status();
+  }
+
+  /** Windows Hello (Fingerabdruck/Gesicht/PIN) als schneller Weg zum Entsperren. Das Passwort bleibt immer gültig. */
+  function setHello({ on }) {
+    const c = cfg();
+    if (!c) throw lockError('Erst ein App-Passwort festlegen.', 'Windows Hello ist ein schnellerer Weg zum Entsperren, das Passwort bleibt als Ersatz.');
+    store.set('appLock', { ...c, hello: on === true });
+    return status();
+  }
+
+  async function verifyHello(helloImpl) {
+    const c = cfg();
+    if (!c) return status();
+    if (!c.hello) throw lockError('Windows Hello ist für PKMessenger nicht eingeschaltet.');
+    if (blockedUntil > now()) throw lockError('Zu viele Fehlversuche.', `Bitte ${Math.ceil((blockedUntil - now()) / 1000)} Sekunden warten.`);
+    if (!(await helloImpl.verify())) throw lockError('Windows Hello hat nicht bestätigt.', 'Nochmal versuchen oder das Passwort eingeben.');
+    fails = 0;
     unlocked = true;
     emit('lock', status());
     return status();
@@ -96,7 +116,7 @@ function createAppLock({ store, now = () => Date.now(), emit = () => {} }) {
     if (c && unlocked && c.idleMinutes > 0 && systemIdleSeconds >= c.idleMinutes * 60) lock();
   }
 
-  return { status, verify, set, setIdle, clear, lock, idleTick, isLocked: () => !unlocked };
+  return { status, verify, verifyHello, set, setHello, setIdle, clear, lock, idleTick, isLocked: () => !unlocked };
 }
 
 module.exports = { createAppLock, MIN_LENGTH, MAX_FAILS, COOLDOWN_MS, IDLE_CHOICES };

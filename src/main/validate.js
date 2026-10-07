@@ -449,6 +449,16 @@ const validators = {
     if (typeof query !== 'string' || query.length > 32) throw new ValidationError('Ungültige Suchanfrage.');
     return { guildId: snowflake(guildId, 'guildId'), query };
   },
+  lockHello(p) {
+    const { on } = obj(p);
+    if (typeof on !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
+    return { on };
+  },
+  backgroundSet(p) {
+    const { on } = obj(p);
+    if (typeof on !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
+    return { on };
+  },
   searchPeople(p) {
     const { query } = obj(p);
     if (typeof query !== 'string' || query.length > 32) throw new ValidationError('Ungültige Suchanfrage.');

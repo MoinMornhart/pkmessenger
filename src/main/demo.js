@@ -245,6 +245,19 @@ function createDemo() {
     if (/SEARCH: <short/.test(sys)) content = /<web_results/.test(user) ? '🌤 **Wetter heute:** sonnig, bis 21 °C – perfekt fürs Treffen um 19 Uhr! (Quelle: wetter.example)' : 'SEARCH: wetter heute berlin';
     return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content } }] }) };
   };
+  // Demo-GitHub (kein Netz): neueste Version = eigene Version, zwei Releases mit Notizen
+  const githubFetch = (url, version) =>
+    new Promise((resolve) =>
+      setTimeout(() => {
+        const [ma, mi, pa] = version.split('.').map(Number);
+        const prev = `${ma}.${mi}.${Math.max(0, pa - 1)}`;
+        const rel = (v, notes, d) => ({ tag_name: `v${v}`, name: `v${v}`, published_at: d, html_url: `https://github.com/Morni-Team/pkmessenger/releases/tag/v${v}`, body: notes.map((n, i) => `* ${n} by @MoinMornhart in https://github.com/Morni-Team/pkmessenger/pull/${40 + i}`).join('\n'), assets: [{ name: 'PKMessenger-Setup.exe', browser_download_url: `https://github.com/Morni-Team/pkmessenger/releases/download/v${v}/PKMessenger-Setup.exe` }] });
+        if (url.includes('/releases?'))
+          return resolve({ ok: true, json: async () => [rel(version, ['Updates: Was ist neu?, neu installieren', 'Im Hintergrund weiterlaufen', 'Windows Hello zum Entsperren'], new Date().toISOString()), rel(prev, ['Profile anklicken', '@ im Privatchat', 'Unscharfe Namenssuche'], new Date(Date.now() - 3600000).toISOString())] });
+        if (url.includes('/compare/')) return resolve({ ok: true, json: async () => ({ commits: [] }) });
+        return resolve({ ok: true, json: async () => ({ tag_name: `v${version}` }) });
+      }, 500),
+    );
   const aiSearch = async (query) => ({ source: 'DuckDuckGo', results: [{ title: `Wetter: ${query}`, url: 'https://wetter.example/berlin', snippet: 'Sonnig, bis 21 °C, kaum Wind.' }] });
   // Für den Screenshot-Lauf: Anna erwähnt den Bot in #allgemein (wie eine echte Nachricht über das Gateway)
   const simulate = {
@@ -265,7 +278,7 @@ function createDemo() {
     autoUpdater.emit('checking-for-update');
     setTimeout(() => autoUpdater.emit('update-not-available'), 1200);
   };
-  return { world, envPath, createClient: () => client, voiceLib, stats, aiSecret, aiFetch, aiSearch, simulate, autoUpdater };
+  return { world, envPath, createClient: () => client, voiceLib, stats, aiSecret, aiFetch, aiSearch, githubFetch, simulate, autoUpdater };
 }
 
 module.exports = { createDemo };
