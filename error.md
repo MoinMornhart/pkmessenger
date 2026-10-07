@@ -254,3 +254,14 @@ Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zwei
 4. **Lösung:** `Composer.jsx` merkt den Entwurf (Text + eingefügte Erwähnungen) beim Start des Bearbeitens und stellt ihn nach Abbrechen oder Speichern wieder her.
 5. **Testergebnis:** Demo: × / Esc / Speichern → Nachricht sichtbar, Feld = „Mein Entwurf“.
 6. **Prävention:** Der Screenshot-Lauf prüft das jetzt bei jedem Lauf (`[edit] …`).
+
+---
+
+## #21 – Endlosschleife beim Anzeigen von verschachteltem Markdown (vor Veröffentlichung gefunden)
+
+1. **Datum & Uhrzeit:** 07.10.2026, ca. 14:45 (nur im Branch, nie veröffentlicht)
+2. **Was passiert ist:** Nach dem Ausbau der Anzeige (Spoiler, Zitate, Fett mit Inhalt) hing der Demo-Lauf. Es gab keine Screenshot-Ausgabe mehr, nur „Render frame was disposed“.
+3. **Ursache (geprüft):** `renderInline` ruft sich für `**fett**`, `||spoiler||` usw. selbst auf. Alle Aufrufe nutzten **dieselbe globale Regex** (`/g`). Der innere Aufruf setzte `lastIndex` auf 0, der äußere fand denselben Treffer immer wieder: Endlosschleife, das Fenster fror ein.
+4. **Lösung:** Jeder Aufruf bekommt eine eigene Regex (`new RegExp(INLINE.source, 'g')`).
+5. **Testergebnis:** Demo-Lauf vollständig: `/shrug`, Spoiler und Zitat werden angezeigt, Layout ok.
+6. **Prävention:** Globale Regex (`/g`) nie in rekursiven Funktionen teilen. Der vollständige Demo-Lauf vor jedem PR hat das abgefangen.

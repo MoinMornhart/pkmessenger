@@ -70,6 +70,26 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   const afterItalic = await js(win, `document.querySelector('.composer textarea').value`);
   console.log(`[format] Knöpfe: ${bar} · nach F: ${JSON.stringify(afterBold)} · nach Strg+I: ${JSON.stringify(afterItalic)}`);
   await js(win, `(() => { const el=document.querySelector('.composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,''); el.dispatchEvent(new Event('input',{bubbles:true})); el.blur(); })()`);
+  // Schnellbefehle (Issue #1: „es funktionieren keine Befehle“)
+  const typeCmd = (t) => js(win, `(() => { const el=document.querySelector('.composer textarea'); el.focus(); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,${JSON.stringify(t)}); el.setSelectionRange(${t.length},${t.length}); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+  const enter = () => js(win, `document.querySelector('.composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+  await wait(400); // verzögertes Schließen vom vorigen Schritt abwarten
+  await typeCmd('/');
+  await wait(300);
+  await shoot(win, dir, '34-befehle');
+  const list = await js(win, `JSON.stringify({ titel: document.querySelector('.suggest__title')?.textContent, anzahl: document.querySelectorAll('.suggest__item').length })`);
+  await js(win, `document.querySelector('.composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);
+  await typeCmd('/shrug na gut');
+  await enter();
+  await wait(700);
+  await typeCmd('/spoiler Das Ende');
+  await enter();
+  await wait(700);
+  await typeCmd('/zitat Gute Idee!');
+  await enter();
+  await wait(900);
+  const shown = await js(win, `JSON.stringify({ shrug: [...document.querySelectorAll('.msg--out .msg__content')].some(e=>e.innerText.includes('na gut ¯\\\\_(ツ)_/¯')), spoiler: Boolean(document.querySelector('.msg--out .spoiler')), zitat: Boolean(document.querySelector('.msg--out .mdquote')) })`);
+  console.log(`[befehle] Liste: ${list} · angezeigt: ${shown}`);
   const sys = await js(win, `JSON.stringify([...document.querySelectorAll('.sysmsg')].map(e=>e.textContent.slice(0,60)))`);
   console.log(`[system] Systemnachrichten: ${sys}`);
   await js(win, `document.querySelector('.sysmsg')?.scrollIntoView({block:'center'})`);
