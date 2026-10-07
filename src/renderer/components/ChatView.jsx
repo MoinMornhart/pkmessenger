@@ -4,6 +4,8 @@ import { messageStore, randomNonce, useChannelMessages, MessageActionsContext } 
 import ConfirmDialog from './ConfirmDialog.jsx';
 import ContextMenu from './ContextMenu.jsx';
 import ModerationDialog from './ModerationDialog.jsx';
+import { prefs } from '../prefs';
+import { wallpaperFor } from '../../shared/wallpapers';
 import { PinsPanel, ThreadsPanel, NameDialog } from './SidePanels.jsx';
 import MessageList from './MessageList.jsx';
 import Composer from './Composer.jsx';
@@ -55,6 +57,8 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
   const [editing, setEditing] = useState(null); // F9
   const [confirmDelete, setConfirmDelete] = useState(null); // F9
   const [ctxMenu, setCtxMenu] = useState(null); // Rechtsklick-Menü { x, y, items }
+  const [walls, setWalls] = useState(() => prefs.get().wallpapers);
+  useEffect(() => prefs.subscribe((p) => setWalls(p.wallpapers)), []);
   const [modTarget, setModTarget] = useState(null); // Person verwalten { guildId, userId }
   const [threadFrom, setThreadFrom] = useState(null); // F12: Thread aus Nachricht starten
   const [panel, setPanel] = useState(null); // 'pins' | 'threads'
@@ -235,7 +239,7 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
   }
 
   return (
-    <main className="chat">
+    <main className="chat" data-wall={wallpaperFor(walls, { channelId: channel.id, guildId: channel.guildId || guild?.id })}>
       <header className="chat__head">
         {onBack && (
           <button className="icon-btn icon-btn--lg" onClick={onBack} title={`Zurück zu #${parentName || 'Kanal'}`} aria-label="Zurück">

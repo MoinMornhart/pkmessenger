@@ -126,6 +126,17 @@ function makeChannel(guild, { id, name, type = ChannelType.GuildText, parentId =
         return new Map(list.map((m) => [m.id, m]));
       },
     },
+    manageCalls: [],
+    async setName(n, reason) {
+      channel.manageCalls.push(['name', n, reason]);
+      channel.name = n;
+      return channel;
+    },
+    async setPosition(p, opts) {
+      channel.manageCalls.push(['position', p, opts]);
+      channel.position += opts?.relative ? p : p - channel.position;
+      return channel;
+    },
     async send(options) {
       channel.sent.push(options);
       // Wie bei Discord: zeitbasierte, monoton steigende Snowflake-ID (siehe error.md #3).

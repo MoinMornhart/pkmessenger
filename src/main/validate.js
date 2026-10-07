@@ -294,6 +294,16 @@ const validators = {
     if (!Number.isInteger(idleMinutes)) throw new ValidationError('Ungültige Zeit.');
     return { idleMinutes };
   },
+  channelRename(p) {
+    const { channelId, name } = obj(p);
+    if (typeof name !== 'string' || name.trim().length < 1 || name.length > 100) throw new ValidationError('Der Kanalname muss 1–100 Zeichen haben.');
+    return { channelId: snowflake(channelId, 'channelId'), name: name.trim() };
+  },
+  channelMove(p) {
+    const { channelId, direction } = obj(p);
+    if (direction !== 'up' && direction !== 'down') throw new ValidationError('Ungültige Richtung.');
+    return { channelId: snowflake(channelId, 'channelId'), direction };
+  },
   memberRef(p) {
     const { guildId, userId } = obj(p);
     return { guildId: snowflake(guildId, 'guildId'), userId: snowflake(userId, 'userId') };

@@ -191,7 +191,7 @@ function CategoryHeader({ group, collapsed, unread, onToggle }) {
   );
 }
 
-function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings, onOpenForum = () => {}, onNewDM = () => {} }) {
+function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings, onOpenForum = () => {}, onNewDM = () => {}, onChatContext = () => {} }) {
   const [filter, setFilter] = useState('');
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase().replace(/^#/, '');
@@ -223,7 +223,7 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
         const unread = isUnread(c);
         const count = unreadCounts[c.id] || 0;
         return (
-          <button key={c.id} className={`chatrow ${c.id === activeId ? 'is-active' : ''} ${unread ? 'is-unread' : ''}`} onClick={() => onSelect(c.id)} title={c.topic || c.name}>
+          <button key={c.id} className={`chatrow ${c.id === activeId ? 'is-active' : ''} ${unread ? 'is-unread' : ''}`} onClick={() => onSelect(c.id)} onContextMenu={(e) => onChatContext(e, c)} title={c.topic || c.name}>
             <ChannelAvatar channel={c} />
             <div className="chatrow__main">
               <div className="chatrow__top">

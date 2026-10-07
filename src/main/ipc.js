@@ -50,6 +50,8 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:commands-state': () => service.getCommandsState(),
     'pk:list-dms': () => service.listDMs(),
     // Moderation (nur mit Bot-Rechten; Kick/Bann fragt die Oberfläche vorher nach)
+    'pk:channel-rename': (p) => service.renameChannel(validators.channelRename(p)),
+    'pk:channel-move': (p) => service.moveChannel(validators.channelMove(p)),
     'pk:member-info': (p) => service.getMemberInfo(validators.memberRef(p)),
     'pk:member-role': (p) => service.setMemberRole(validators.memberRole(p)),
     'pk:member-timeout': (p) => service.timeoutMember(validators.memberTimeout(p)),

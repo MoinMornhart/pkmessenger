@@ -332,6 +332,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         canAttach: !other && can(ch, PermissionFlagsBits.AttachFiles),
         canEmbed: !other && can(ch, PermissionFlagsBits.EmbedLinks),
         canPoll: !other && can(ch, PermissionFlagsBits.SendPolls ?? PermissionFlagsBits.SendMessages),
+        canManage: can(ch, PermissionFlagsBits.ManageChannels), // umbenennen/verschieben (Rechtsklick)
       });
     }
     return [...groups.values()]
@@ -911,6 +912,29 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return { ...commandsState, commands: COMMANDS.map((c) => `/${c.name}`) };
   }
 
+  // ---------- Kanäle verwalten (Rechtsklick auf einen Chat, Issue #1) ----------
+  function requireManageableChannel(channelId) {
+    const ch = requireReady().channels.cache.get(channelId);
+    if (!ch || !ch.guild || !can(ch, PermissionFlagsBits.ViewChannel)) throw appError('NOT_FOUND', 'Kanal nicht gefunden.');
+    if (!can(ch, PermissionFlagsBits.ManageChannels)) throw appError('MISSING_PERMISSION', 'Der Bot darf diesen Kanal nicht bearbeiten.', 'Gib der Bot-Rolle das Recht „Kanäle verwalten“.');
+    return ch;
+  }
+
+  async function renameChannel({ channelId, name }) {
+    const ch = requireManageableChannel(channelId);
+    await ch.setName(name, 'PKMessenger');
+    emit('channels:changed', { guildId: ch.guild.id });
+    return { channelId, name: ch.name };
+  }
+
+  /** Eine Position nach oben/unten innerhalb der Kategorie (Discord sortiert die übrigen selbst nach). */
+  async function moveChannel({ channelId, direction }) {
+    const ch = requireManageableChannel(channelId);
+    await ch.setPosition(direction === 'up' ? -1 : 1, { relative: true, reason: 'PKMessenger' });
+    emit('channels:changed', { guildId: ch.guild.id });
+    return { channelId };
+  }
+
   // ---------- Moderation (Rechtsklick → Person verwalten, Issue #1) ----------
   // Nur was der Bot laut Discord-Rechten wirklich darf. discord.js prüft dabei Rollen-Reihenfolge, Besitzer und Admins
   // (member.manageable / moderatable / kickable / bannable). Mitglied wird per REST geladen – kein privilegiertes Intent nötig.
@@ -1190,6 +1214,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     updateProfile,
     listDMs,
     openDM,
+    renameChannel,
+    moveChannel,
     getMemberInfo,
     setMemberRole,
     timeoutMember,
