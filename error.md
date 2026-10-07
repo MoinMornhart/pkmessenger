@@ -243,3 +243,14 @@ Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zwei
 4. **Lösung:** `index.lock`, `HEAD` und `ORIG_HEAD` ins Scratchpad gesichert, die Sperre entfernt, `git reset` (baut nur den Index aus HEAD neu, Arbeitsdateien unverändert), dann `git pull --ff-only` und `git fsck` (keine Fehler).
 5. **Testergebnis:** Arbeitsordner sauber, Stand = origin/main, alle Tests grün.
 6. **Prävention:** Vor Git-Befehlen auf `index.lock` achten. **Dringende Empfehlung bleibt: Projekt aus iCloud Drive herausnehmen** (z. B. `C:\Projekte\PKMessenger`).
+
+---
+
+## #20 – „Nachricht bearbeiten → abbrechen → Nachricht weg“ (JoniMoni)
+
+1. **Datum & Uhrzeit:** 07.10.2026, gemeldet 11:56, behoben ca. 14:30
+2. **Was passiert ist:** Laut JoniMoni war nach Bearbeiten + Abbrechen „die Nachricht nicht mehr angezeigt“.
+3. **Ursache (geprüft):** Die Nachricht im Verlauf blieb erhalten. Das ist im Demo-Lauf mit × und Esc nachgewiesen. Verloren ging der **eigene Entwurf im Eingabefeld**: Beim Bearbeiten ersetzte der Text der alten Nachricht das Feld, beim Abbrechen/Speichern wurde das Feld geleert. Nachgestellt im Screenshot-Lauf: Feld nach Abbrechen leer statt „Mein Entwurf“.
+4. **Lösung:** `Composer.jsx` merkt den Entwurf (Text + eingefügte Erwähnungen) beim Start des Bearbeitens und stellt ihn nach Abbrechen oder Speichern wieder her.
+5. **Testergebnis:** Demo: × / Esc / Speichern → Nachricht sichtbar, Feld = „Mein Entwurf“.
+6. **Prävention:** Der Screenshot-Lauf prüft das jetzt bei jedem Lauf (`[edit] …`).

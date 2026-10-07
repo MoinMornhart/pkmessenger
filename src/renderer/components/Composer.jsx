@@ -17,6 +17,8 @@ const fmtSize = (b) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} 
 export default function Composer({ guild, channel, bot, allChannels, onSend, replyTo = null, onCancelReply = () => {}, editing = null, onCancelEdit = () => {}, onSaveEdit = () => {} }) {
   const [text, setText] = useState('');
   const [inserted, setInserted] = useState([]);
+  // Entwurf, der beim Start des Bearbeitens im Feld stand (Issue #1: ging beim Abbrechen verloren)
+  const draftRef = useRef(null);
   const [suggest, setSuggest] = useState(null); // { query, start, trigger, items, sel }
   const [confirm, setConfirm] = useState(null);
   const [files, setFiles] = useState([]); // F10: { name, size, data: Uint8Array, preview: dataURL|null }
@@ -52,11 +54,22 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
   }, [channel.id]);
 
   // F9: Bearbeiten – Text der eigenen Nachricht ins Feld übernehmen
+  const textRef = useRef(text);
+  textRef.current = text;
+  const insertedRef = useRef(inserted);
+  insertedRef.current = inserted;
   useEffect(() => {
     if (editing) {
+      if (!draftRef.current) draftRef.current = { text: textRef.current, inserted: insertedRef.current };
       setText(editing.content || '');
       setInserted([]);
       requestAnimationFrame(() => taRef.current?.focus());
+    } else if (draftRef.current) {
+      // Bearbeiten beendet (gespeichert oder abgebrochen) → eigenen Entwurf zurückholen
+      const d = draftRef.current;
+      draftRef.current = null;
+      setText(d.text);
+      setInserted(d.inserted);
     }
   }, [editing]);
 

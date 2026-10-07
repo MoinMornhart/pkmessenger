@@ -42,6 +42,21 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
   await wait(1200);
   await shoot(win, dir, '02-chat');
+  // Bug aus Issue #1: Nachricht bearbeiten → abbrechen → Nachricht darf NICHT verschwinden (× und Esc)
+  const editCheck = async (how) => {
+    const info = await js(win, `(() => { const m=[...document.querySelectorAll('.msg--out')].filter(x=>x.querySelector('.msg-actions button[aria-label="Bearbeiten"]') && !x.querySelector('.poll')).at(-1); if(!m) return null; const id=m.dataset.mid; m.classList.add('show-actions'); m.querySelector('.msg-actions button[aria-label="Bearbeiten"]').click(); m.classList.remove('show-actions'); return { id, text: m.querySelector('.bubble')?.innerText.slice(0,40) }; })()`);
+    if (!info) return 'keine eigene Nachricht';
+    await wait(300);
+    if (how === 'x') await js(win, `document.querySelector('.composer__bar--edit .icon-btn')?.click()`);
+    else if (how === 'speichern') await js(win, `(() => { const el=document.querySelector('.composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el, el.value + ' (bearbeitet)'); el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); })()`);
+    else await js(win, `document.querySelector('.composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);
+    await wait(500);
+    return js(win, `JSON.stringify({ wie: '${how}', sichtbar: Boolean(document.querySelector('[data-mid="${info.id}"] .bubble')), text: document.querySelector('[data-mid="${info.id}"] .bubble')?.innerText.slice(0,30) || null, feld: document.querySelector('.composer textarea')?.value.slice(0,20) })`);
+  };
+  // Entwurf im Feld darf beim Bearbeiten + Abbrechen nicht verloren gehen
+  await js(win, `(() => { const el=document.querySelector('.composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'Mein Entwurf'); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+  await wait(200);
+  console.log(`[edit] ${await editCheck('x')} | ${await editCheck('esc')} | ${await editCheck('speichern')}`);
   const sys = await js(win, `JSON.stringify([...document.querySelectorAll('.sysmsg')].map(e=>e.textContent.slice(0,60)))`);
   console.log(`[system] Systemnachrichten: ${sys}`);
   await js(win, `document.querySelector('.sysmsg')?.scrollIntoView({block:'center'})`);
