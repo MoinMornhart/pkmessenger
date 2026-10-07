@@ -3,6 +3,7 @@ import { api, onEvent } from '../api';
 import { bus, messageStore, NavContext } from '../state';
 import { compareSnowflakes, timestampOf } from '../../shared/snowflake';
 import { toPlainText } from '../../shared/mentions';
+import { maskSpoilers } from '../../shared/format-text';
 import { systemInfo } from '../../shared/system-messages';
 import ServerRail, { DM_ID } from './ServerRail.jsx';
 import NewDMDialog from './NewDMDialog.jsx';
@@ -238,7 +239,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
               const sys = p.system ? systemInfo(p) : null;
               if (sys) return `${sys.icon} ${sys.text}`.slice(0, 120);
               return (
-                toPlainText(p.content, p.mentions).slice(0, 120) ||
+                maskSpoilers(toPlainText(p.content, p.mentions)).slice(0, 120) ||
                 (p.poll ? `📊 ${p.poll.question}`.slice(0, 120) : p.attachments.length ? '📎 Anhang' : p.embedsCount ? `▤ ${p.embeds?.[0]?.title || 'Embed'}`.slice(0, 120) : '')
               );
             })(),

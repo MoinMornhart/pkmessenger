@@ -52,13 +52,19 @@ function applyFormat(text, start, end, kind) {
 }
 
 const FORMAT_BUTTONS = [
-  { kind: 'bold', label: 'F', title: 'Fett (Strg+B)' },
-  { kind: 'italic', label: 'K', title: 'Kursiv (Strg+I)' },
-  { kind: 'underline', label: 'U', title: 'Unterstrichen (Strg+U)' },
-  { kind: 'strike', label: 'S', title: 'Durchgestrichen' },
-  { kind: 'code', label: '</>', title: 'Code' },
-  { kind: 'spoiler', label: '👁', title: 'Spoiler (verdeckt)' },
-  { kind: 'quote', label: '❝', title: 'Zitat' },
+  // name: steht sichtbar unter dem Symbol (Issue #35: „in Textform, was es macht“)
+  { kind: 'bold', label: 'F', name: 'Fett', title: 'Fett (Strg+B)' },
+  { kind: 'italic', label: 'K', name: 'Kursiv', title: 'Kursiv (Strg+I)' },
+  { kind: 'underline', label: 'U', name: 'Unterstr.', title: 'Unterstrichen (Strg+U)' },
+  { kind: 'strike', label: 'S', name: 'Durchgestr.', title: 'Durchgestrichen' },
+  { kind: 'code', label: '</>', name: 'Code', title: 'Als Code (Festbreitenschrift)' },
+  { kind: 'spoiler', label: '👁', name: 'Spoiler', title: 'Spoiler: verdeckt, erst nach Klick lesbar' },
+  { kind: 'quote', label: '❝', name: 'Zitat', title: 'Als Zitat' },
 ];
 
-module.exports = { applyFormat, FORMAT_BUTTONS, MARKS };
+/** Spoiler-Inhalt in Vorschauen (Chatliste) nie im Klartext zeigen (Issue #35). */
+function maskSpoilers(text) {
+  return String(text ?? '').replace(/\|\|([\s\S]+?)\|\|/g, '▒▒▒▒');
+}
+
+module.exports = { applyFormat, FORMAT_BUTTONS, MARKS, maskSpoilers };

@@ -257,6 +257,41 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     await wait(300);
     console.log(`[einstellungen] Suche „passwrt“: ${found} · Knöpfe ohne Hinweis: ${hints}`);
   }
+  // #35: fremder Spoiler → Rückfrage; Vorschau verdeckt; Einstellungen „nur dieser Bereich“; @Name getippt → Erwähnung
+  {
+    const openChat = (name) => js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.querySelector('.chatrow__name')?.textContent===${JSON.stringify(name)})?.click()`);
+    await openChat('ankuendigungen');
+    await wait(700);
+    const preview = await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].map(r=>r.textContent).find(t=>t.includes('Film')) || null`);
+    await js(win, `document.querySelector('.spoiler:not(.is-open)')?.click()`);
+    await wait(300);
+    await shoot(win, dir, '61-spoiler-rueckfrage');
+    const ask = await js(win, `document.querySelector('.spoiler-ask h3')?.textContent || null`);
+    await js(win, `[...document.querySelectorAll('.spoiler-ask .btn')].find(b=>b.textContent.includes('Aufdecken'))?.click()`);
+    await wait(200);
+    const opened = await js(win, `Boolean(document.querySelector('.spoiler.is-open'))`);
+    console.log(`[spoiler] Vorschau: ${preview?.slice(0,60)} · Rückfrage: ${ask} · aufgedeckt: ${opened}`);
+    await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+    await wait(500);
+    await js(win, `document.querySelector('.settings__nav [data-nav="datenschutz"]')?.click()`);
+    await wait(300);
+    await shoot(win, dir, '62-einstellungen-nur-bereich');
+    const only = await js(win, `[...document.querySelectorAll('.settings__body section')].map(s=>s.dataset.section).join(',')`);
+    await js(win, `document.querySelector('.settings__nav [data-nav="alle"]')?.click()`);
+    await wait(200);
+    const all = await js(win, `document.querySelectorAll('.settings__body section').length`);
+    await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+    await wait(300);
+    await openChat('allgemein');
+    await wait(500);
+    await js(win, typeInto('.composer textarea', '@ann'));
+    await wait(700);
+    await js(win, typeInto('.composer textarea', '@ann' + 'a '));
+    await wait(300);
+    const typed = await js(win, `document.querySelector('.composer textarea')?.value`);
+    await js(win, typeInto('.composer textarea', ''));
+    console.log(`[einstellungen-filter] nur: ${only} · alle: ${all} · @anna getippt → „${typed}“`);
+  }
   // Smileys (Issue #1: „mehr Smileys“): 😀 im Eingabefeld, suchen, einfügen; ➕ bei Reaktionen
   await js(win, `document.querySelector('.tool-btn[aria-label="Smileys"]')?.click()`);
   await wait(300);

@@ -317,6 +317,9 @@ function MediaPrivacy() {
         </select>
         <p className="muted small">Geladen wird nur über Discords Server: Fremde Webseiten sehen deine IP-Adresse nicht, Discord schon (wie in der normalen App).</p>
       </div>
+      <label className="composer__ping" data-setting="spoiler">
+        <input type="checkbox" checked={p.spoilerAsk} onChange={(e) => prefs.set({ spoilerAsk: e.target.checked })} /> 👁 Vor dem Aufdecken fremder Spoiler fragen
+      </label>
       <label className="composer__ping" data-setting="links">
         <input type="checkbox" checked={p.linkWarn} onChange={(e) => prefs.set({ linkWarn: e.target.checked })} /> 🔗 Vor dem Öffnen von Links warnen
       </label>
@@ -416,7 +419,7 @@ const SECTIONS = [
   { id: 'aussehen', icon: '🎨', title: 'Aussehen', desc: 'Design, Farbe, Animationen, Chat-Hintergrund.', keywords: ['farbe', 'theme', 'hell', 'dunkel', 'hintergrund', 'kompakt', 'animation'] },
   { id: 'schreiben', icon: '✍️', title: 'Schreiben', desc: 'Wie Namensvorschläge beim Schreiben funktionieren.', keywords: ['erwähnen', 'mention', 'namen', 'vorschläge', '@'] },
   { id: 'toene', icon: '🔔', title: 'Benachrichtigungen', desc: 'Töne, eigener Ton, Nicht stören.', keywords: ['ton', 'sound', 'lautstärke', 'nicht stören', 'benachrichtigung'] },
-  { id: 'datenschutz', icon: '🔒', title: 'Datenschutz', desc: 'Bildschirmschutz, Bilder/GIFs/Videos laden, Warnung vor Links.', keywords: ['bilder', 'gif', 'video', 'medien', 'link', 'screenshot', 'ip'] },
+  { id: 'datenschutz', icon: '🔒', title: 'Datenschutz', desc: 'Bildschirmschutz, Bilder/GIFs/Videos laden, Warnung vor Links.', keywords: ['bilder', 'gif', 'video', 'medien', 'link', 'screenshot', 'ip', 'spoiler'] },
   { id: 'sicherheit', icon: '🛡', title: 'Sicherheit & Start', desc: 'App-Passwort, Windows Hello, mit Windows starten, im Hintergrund weiterlaufen.', keywords: ['passwort', 'sperre', 'hello', 'fingerabdruck', 'autostart', 'hintergrund', 'tray'] },
   { id: 'profil', icon: '🪪', title: 'Bot-Profil', desc: 'Name, Bild und Beschreibung deines Bots.', keywords: ['name', 'avatar', 'bild', 'über mich', 'spitzname'] },
   { id: 'token', icon: '🔑', title: 'Bot-Token', desc: 'Den geheimen Schlüssel deines Bots ersetzen oder entfernen.', keywords: ['token', 'schlüssel', 'anmelden'] },
@@ -467,6 +470,7 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
   // „Hier aktivieren“ (z. B. Medien) → direkt dorthin scrollen und kurz hervorheben
   useEffect(() => {
     if (!focus) return undefined;
+    setOnly(null);
     const t = setTimeout(() => {
       const el = document.querySelector(`.settings [data-setting="${focus}"]`);
       if (!el) return;
@@ -484,9 +488,10 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
 
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(SECTIONS[0].id);
+  const [only, setOnly] = useState(null); // Klick links → nur dieser Bereich (Issue #35); null = alle
   const bodyRef = useRef(null);
   const visible = query.trim() ? fuzzyFilter(SECTIONS, query, (x) => [x.title, x.desc, ...x.keywords]) : SECTIONS;
-  const shown = new Set(visible.map((x) => x.id));
+  const shown = new Set(only && !query.trim() ? [only] : visible.map((x) => x.id));
   // Welcher Bereich ist gerade sichtbar? (Markierung in der Navigation)
   const onScroll = () => {
     const body = bodyRef.current;
@@ -497,8 +502,14 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
     setActive(cur);
   };
   const jump = (id) => {
-    bodyRef.current?.querySelector(`section[data-section="${id}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    setQuery('');
+    setOnly(id);
     setActive(id);
+    bodyRef.current?.scrollTo({ top: 0 });
+  };
+  const showAll = () => {
+    setOnly(null);
+    setQuery('');
   };
   const render = {
     aussehen: () => <AppearanceSection />,
@@ -525,9 +536,12 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
         <nav className="settings__nav" aria-label="Bereiche">
           <h3>Einstellungen</h3>
           <input className="settings__search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="🔎 Einstellung suchen …" aria-label="Einstellung suchen" />
+          <button data-nav="alle" className={`settings__navitem ${!only && !query.trim() ? 'is-on' : ''}`} onClick={showAll} title="Alle Einstellungen untereinander">
+            <span>📋</span> Alle anzeigen
+          </button>
           {visible.length === 0 && <p className="muted small">Nichts gefunden.</p>}
           {visible.map((x) => (
-            <button key={x.id} data-nav={x.id} className={`settings__navitem ${active === x.id ? 'is-on' : ''}`} onClick={() => jump(x.id)} title={x.desc}>
+            <button key={x.id} data-nav={x.id} className={`settings__navitem ${(only ? only === x.id : !query.trim() && active === x.id) ? 'is-on' : ''}`} onClick={() => jump(x.id)} title={x.desc}>
               <span>{x.icon}</span> {x.title}
               {x.id === 'beta' && <span className="settings__beta">experimentell</span>}
             </button>

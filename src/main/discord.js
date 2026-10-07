@@ -8,6 +8,7 @@ const { compareSnowflakes, timestampOf } = require('../shared/snowflake');
 const { isSystemType, systemInfo } = require('../shared/system-messages');
 const { TYPING_THROTTLE_MS } = require('../shared/limits');
 const { fuzzyFilter } = require('../shared/fuzzy');
+const { maskSpoilers } = require('../shared/format-text');
 
 const LOGIN_TIMEOUT_MS = 45000;
 // Gateway-Close-Codes, bei denen ein Reconnect sinnlos ist (falscher Token, Intent nicht freigeschaltet, ...).
@@ -500,7 +501,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
 
   function previewOf(msg) {
     const raw = msg?.cleanContent ?? msg?.content ?? '';
-    const text = (typeof raw === 'string' ? raw : '').replace(/\s+/g, ' ').trim();
+    const text = maskSpoilers(typeof raw === 'string' ? raw : '').replace(/\s+/g, ' ').trim();
     // Systemnachricht (Beitritt, Boost …) → verständlicher Satz statt leerer Vorschau
     const sys = systemInfo({ type: msg?.type, author: { name: displayNameOf(msg?.author, msg?.member) }, content: text, embeds: (Array.isArray(msg?.embeds) ? msg.embeds : []).map(serializeEmbed) });
     const ts = Number.isFinite(msg?.createdTimestamp) ? msg.createdTimestamp : 0;
