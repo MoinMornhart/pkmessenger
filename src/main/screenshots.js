@@ -44,6 +44,12 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await shoot(win, dir, '02-chat');
   const sys = await js(win, `JSON.stringify([...document.querySelectorAll('.sysmsg')].map(e=>e.textContent.slice(0,60)))`);
   console.log(`[system] Systemnachrichten: ${sys}`);
+  await js(win, `document.querySelector('.sysmsg')?.scrollIntoView({block:'center'})`);
+  await wait(400);
+  await shoot(win, dir, '02b-systemnachricht');
+  const sysStyle = await js(win, `(() => { const e=document.querySelector('.msg--system'); return e ? getComputedStyle(e).justifyContent : null; })()`);
+  console.log(`[system] Ausrichtung: ${sysStyle}`);
+  await js(win, `document.querySelector('.msglist .msg:last-child')?.scrollIntoView()`);
   await js(win, typeInto('.composer textarea', 'Hey @an'));
   await wait(900);
   await shoot(win, dir, '03-mention-autocomplete');

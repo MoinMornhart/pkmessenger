@@ -194,3 +194,14 @@ Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zwei
 4. **Lösung:** `src/shared/system-messages.js` übersetzt alle Typen aus der Discord-Doku ins Deutsche (mit Fallback für künftige Typen). Systemnachrichten erscheinen mittig als Hinweis, trennen die Gruppierung und haben eine Vorschau. Umfragen zeigen in der Vorschau „📊 Frage“, Embeds „▤ Titel“.
 5. **Testergebnis:** `tests/test-system-messages.js` (6 Tests), insgesamt 162/162 grün. Demo: Beitritt und Boost sichtbar.
 6. **Prävention:** Neue Nachrichtenarten (Umfrage, Embed, System) immer auch in der Chat-Vorschau prüfen.
+
+---
+
+## #16 – Styles der Systemnachrichten beim Zusammenführen verloren
+
+1. **Datum & Uhrzeit:** 07.10.2026, ca. 12:40
+2. **Was passiert ist:** Nach dem Zusammenführen von PR #2, #3 und #4 fehlte in `main` der CSS-Block `.msg--system`/`.sysmsg`. Systemnachrichten erschienen ungestylt und linksbündig.
+3. **Ursache (geprüft):** Alle PRs hängten Styles **ans Ende** von `styles.css` an. Beim Lösen des Konflikts im Merge-Commit `fde896e` (PR #4, auf GitHub) blieb nur einer der beiden Blöcke übrig. Ähnlich beim Nachziehen von `main` in PR #5: Git behandelte eine schließende `}` als gemeinsame Zeile, sodass `@keyframes send-fly` offen blieb (esbuild-Warnung).
+4. **Lösung:** Block aus Commit `7e5c72e` wiederhergestellt (eigener PR, da #5 schon vor der Reparatur zusammengeführt wurde). Die Klammer hatte JoniMoni beim Zusammenführen bereits richtig gesetzt.
+5. **Testergebnis:** Build ohne Warnungen, 169/169 Tests grün, Demo: Systemnachrichten, KI-Antwort und Designs sichtbar.
+6. **Prävention:** Nach jedem Konflikt in `styles.css` den Build auf CSS-Warnungen prüfen und nach den Klassen aller beteiligten PRs suchen (`grep -c`). Neue Styles künftig thematisch einsortieren statt immer ans Dateiende.
