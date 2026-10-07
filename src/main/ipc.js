@@ -9,7 +9,7 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart }) {
   const requireAi = () => {
     if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
     return ai;
@@ -101,7 +101,23 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:send-message': (p) => service.sendMessage(validators.sendMessage(p)),
     'pk:send-typing': (p) => service.sendTyping(validators.channelRef(p)),
     'pk:search-mentionables': (p) => service.searchMentionables(validators.searchMentionables(p)),
-    'pk:get-settings': () => store.get(),
+    'pk:get-settings': () => {
+      const { appLock: _lock, ...rest } = store.get(); // Passwort-Hash nie an die Oberfläche
+      return rest;
+    },
+    // App-Sperre (nur Hash gespeichert; solange gesperrt, sind alle anderen Kanäle zu – siehe wrap())
+    'pk:lock-status': () => (appLock ? appLock.status() : { enabled: false, locked: false }),
+    'pk:lock-verify': (p) => appLock.verify(validators.lockPassword(p).password),
+    'pk:lock-set': (p) => appLock.set(validators.lockSet(p)),
+    'pk:lock-idle': (p) => appLock.setIdle(validators.lockIdle(p)),
+    'pk:lock-clear': (p) => appLock.clear({ current: validators.lockPassword(p).password }),
+    'pk:lock-now': () => appLock.lock(),
+    // Mit Windows starten (nur installierte App)
+    'pk:autostart-get': () => (autostart ? autostart.get() : { available: false, enabled: false }),
+    'pk:autostart-set': (p) => {
+      if (!autostart?.get().available) throw Object.assign(new Error('Autostart gibt es nur in der installierten App.'), { code: 'VALIDATION' });
+      return autostart.set(validators.flag(p));
+    },
     // Eigener Benachrichtigungston (liegt nur lokal im App-Ordner)
     'pk:sound-custom-info': () => ({ has: Boolean(soundFile?.has()) }),
     'pk:sound-custom-get': () => (soundFile ? soundFile.get() : null),
@@ -135,9 +151,13 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
   };
 }
 
-function wrap(handler, isTrustedSender) {
+// Diese Kanäle gehen auch, wenn die App gesperrt ist (alles andere wird abgelehnt)
+const ALLOWED_WHILE_LOCKED = new Set(['pk:lock-status', 'pk:lock-verify', 'pk:get-status', 'pk:get-app-info']);
+
+function wrap(handler, isTrustedSender, channel = '', isLocked = () => false) {
   return async (event, payload) => {
     if (!isTrustedSender(event)) return { ok: false, error: { code: 'FORBIDDEN', message: 'Anfrage aus unbekannter Quelle abgelehnt.', hint: '' } };
+    if (isLocked() && !ALLOWED_WHILE_LOCKED.has(channel)) return { ok: false, error: { code: 'LOCKED', message: 'PKMessenger ist gesperrt.', hint: 'Bitte mit dem Passwort entsperren.' } };
     try {
       return { ok: true, data: await handler(payload) };
     } catch (err) {
@@ -148,11 +168,12 @@ function wrap(handler, isTrustedSender) {
 
 function registerIpc(ipcMain, deps, isTrustedSender) {
   const handlers = buildHandlers(deps);
-  for (const [channel, handler] of Object.entries(handlers)) ipcMain.handle(channel, wrap(handler, isTrustedSender));
+  const isLocked = () => Boolean(deps.appLock?.isLocked());
+  for (const [channel, handler] of Object.entries(handlers)) ipcMain.handle(channel, wrap(handler, isTrustedSender, channel, isLocked));
   // Mikrofon-Pakete: ~50 pro Sekunde → "fire and forget" statt invoke. Prüfung auf Herkunft + Größe in voice.pushPacket().
   if (deps.voice) {
     ipcMain.on('pk:voice-packet', (event, data) => {
-      if (isTrustedSender(event)) deps.voice.pushPacket(data);
+      if (isTrustedSender(event) && !isLocked()) deps.voice.pushPacket(data);
     });
   }
   return Object.keys(handlers);

@@ -82,6 +82,7 @@ export function playPreset(preset, volume = prefs.get().sound.volume, event = 't
 
 /** Ereignis melden ('ai', 'error', …) → spielt höchstens einen Ton, wenn die Einstellungen es erlauben. */
 export function notify(event) {
+  if (prefs.get().dnd) return null; // Nicht stören: keine Töne
   const s = prefs.get().sound;
   const d = decideSound(event, s, { lastPlayedAt, now: Date.now() });
   if (!d) return null;
