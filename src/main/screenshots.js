@@ -93,6 +93,20 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await clickT('.moderation__confirm .btn', 'Abbrechen');
   await js(win, `document.querySelector('.moderation .icon-btn')?.click()`);
   await wait(300);
+  // Smileys (Issue #1: „mehr Smileys“): 😀 im Eingabefeld, suchen, einfügen; ➕ bei Reaktionen
+  await js(win, `document.querySelector('.tool-btn[aria-label="Smileys"]')?.click()`);
+  await wait(300);
+  const tabs = await js(win, `document.querySelectorAll('.emoji-panel__tabs button').length`);
+  await js(win, `(() => { const el=document.querySelector('.emoji-panel__search'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,'herz'); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+  await wait(200);
+  await shoot(win, dir, '39-smileys');
+  const emojiHits = await js(win, `document.querySelectorAll('.emoji-panel__item').length`);
+  await js(win, `document.querySelector('.emoji-panel__item')?.click()`);
+  await wait(200);
+  const inserted = await js(win, `document.querySelector('.composer textarea').value`);
+  await js(win, `document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})); window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));`);
+  await js(win, `(() => { const el=document.querySelector('.composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,''); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+  console.log(`[smileys] Kategorien: ${tabs} · Treffer „herz“: ${emojiHits} · eingefügt: ${JSON.stringify(inserted)}`);
   // Schnellbefehle (Issue #1: „es funktionieren keine Befehle“)
   const typeCmd = (t) => js(win, `(() => { const el=document.querySelector('.composer textarea'); el.focus(); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,${JSON.stringify(t)}); el.setSelectionRange(${t.length},${t.length}); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
   const enter = () => js(win, `document.querySelector('.composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);

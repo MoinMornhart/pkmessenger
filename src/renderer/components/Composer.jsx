@@ -2,11 +2,13 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { applyFormat, FORMAT_BUTTONS } from '../../shared/format-text';
 import { parseCommand, suggestCommands } from '../../shared/quick-commands';
 import { api } from '../api';
+import { prefs } from '../prefs';
 import { applyMentionTokens, findMentionQuery } from '../../shared/mentions';
 import { MESSAGE_CONTENT_MAX, TYPING_THROTTLE_MS } from '../../shared/limits';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import EmbedDialog from './EmbedDialog.jsx';
 import PollDialog from './PollDialog.jsx';
+import EmojiPicker from './EmojiPicker.jsx';
 import { UPLOAD_MAX_BYTES, FILES_PER_MESSAGE_MAX } from '../../shared/limits';
 
 const fmtSize = (b) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} MB`);
@@ -32,6 +34,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
   const [pingReply, setPingReply] = useState(false); // F7
   const fileInputRef = useRef(null);
   const taRef = useRef(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   // Text markiert? → Formatierungs-Leiste (Issue #1)
   const [hasSelection, setHasSelection] = useState(false);
   const checkSelection = (ta) => setHasSelection(Boolean(ta) && ta.selectionEnd > ta.selectionStart);
@@ -146,7 +149,17 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
       await new Promise((r) => setTimeout(r, 120));
       if (seq !== searchSeq.current) return undefined;
       try {
-        const items = await api.searchMentionables({ guildId: guild.id, query: q.query });
+        let items = await api.searchMentionables({ guildId: guild.id, query: q.query });
+        // Einstellung „Namensvorschläge: alle Server“ → auch Personen von den anderen Servern des Bots
+        if (prefs.get().mentionScope === 'alle' && q.query) {
+          const others = [...new Set(allChannels.map((c) => c.guildId))].filter((g) => g && g !== guild.id && g !== '@dm').slice(0, 4);
+          const seen = new Set(items.filter((i) => i.kind === 'user').map((i) => i.id));
+          for (const g of others) {
+            const more = await api.searchMentionables({ guildId: g, query: q.query }).catch(() => []);
+            for (const it of more) if (it.kind === 'user' && !seen.has(it.id)) seen.add(it.id), items.push({ ...it, sub: `${it.sub ? `${it.sub} · ` : ''}anderer Server` });
+          }
+          items = items.slice(0, 12);
+        }
         if (seq === searchSeq.current) setSuggest(items.length ? { ...q, items, sel: 0 } : null);
       } catch {
         if (seq === searchSeq.current) setSuggest(null);
@@ -431,6 +444,9 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
             <button className="tool-btn" onClick={() => setEmbedOpen(true)} title="Embed erstellen" aria-label="Embed erstellen">
               ▤
             </button>
+            <button className="tool-btn" onClick={() => setEmojiOpen((v) => !v)} title="Smileys" aria-label="Smileys">
+              😀
+            </button>
             {channel.canPoll !== false && (
               <button className="tool-btn" onClick={() => setPollOpen(true)} title="Umfrage erstellen" aria-label="Umfrage erstellen">
                 📊
@@ -485,6 +501,23 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
           {editing ? '✓' : '➤'}
         </button>
       </div>
+      {emojiOpen && (
+        <EmojiPicker
+          className="emoji-panel--composer"
+          onClose={() => setEmojiOpen(false)}
+          onPick={(e) => {
+            const ta = taRef.current;
+            const start = ta ? ta.selectionStart : text.length;
+            const end = ta ? ta.selectionEnd : text.length;
+            const next = text.slice(0, start) + e + text.slice(end);
+            setText(next);
+            requestAnimationFrame(() => {
+              ta?.focus();
+              ta?.setSelectionRange(start + e.length, start + e.length);
+            });
+          }}
+        />
+      )}
       {pollOpen && (
         <PollDialog
           onClose={() => setPollOpen(false)}

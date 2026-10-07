@@ -1,6 +1,7 @@
 import { memo, useContext, useEffect, useRef, useState } from 'react';
 import { MessageActionsContext, NavContext, QUICK_REACTIONS } from '../state';
 import MessageContent from './MessageContent.jsx';
+import EmojiPicker from './EmojiPicker.jsx';
 
 // F7: Zitat der Nachricht, auf die geantwortet wurde (Klick springt hin)
 export const ReplyQuote = memo(function ReplyQuote({ reference }) {
@@ -138,6 +139,7 @@ export const ThreadChip = memo(function ThreadChip({ thread }) {
 export function MessageActionBar({ message, out }) {
   const actions = useContext(MessageActionsContext);
   const [picker, setPicker] = useState(false);
+  const [more, setMore] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
     if (!picker) return undefined;
@@ -190,19 +192,21 @@ export function MessageActionBar({ message, out }) {
               {e}
             </button>
           ))}
-          {(actions.emojis || []).slice(0, 24).map((e) => (
-            <button
-              key={e.key}
-              title={`:${e.name}:`}
-              onClick={() => {
-                setPicker(false);
-                actions.react(message, e.key, true);
-              }}
-            >
-              {e.url ? <img src={e.url} alt={e.name} /> : e.name}
-            </button>
-          ))}
+          <button title="Mehr Smileys" aria-label="Mehr Smileys" onClick={() => (setPicker(false), setMore(true))}>
+            ➕
+          </button>
         </div>
+      )}
+      {more && (
+        <EmojiPicker
+          className="emoji-panel--reactions"
+          customEmojis={actions.emojis || []}
+          onClose={() => setMore(false)}
+          onPick={(key) => {
+            setMore(false);
+            actions.react(message, key, true);
+          }}
+        />
       )}
     </div>
   );
