@@ -9,7 +9,7 @@ const nacl = require('tweetnacl');
 const { createRemote, seal, unseal, isPrivateIp } = require('../src/main/remote');
 const { validators } = require('../src/main/validate');
 
-function setup({ approve = true, requireApproval = false } = {}) {
+function setup({ approve = true, requireApproval = false, hostName = null } = {}) {
   const data = { remote: { port: 0, requireApproval } };
   const store = { get: () => ({ ...data }), set: (k, v) => (data[k] = v) };
   let vaultRaw = null;
@@ -37,6 +37,7 @@ function setup({ approve = true, requireApproval = false } = {}) {
     webDir: path.join(__dirname, '..', 'src', 'remote-web'),
     naclPath: require.resolve('tweetnacl/nacl-fast.min.js'),
     lanAddresses: () => ['127.0.0.1'],
+    hostName,
   });
   return { remote, store, sent, events, vault: () => vaultRaw };
 }
@@ -181,4 +182,16 @@ test('Verschlüsselung: falscher Schlüssel oder veränderte Daten → nicht les
   assert.equal(unseal(s, k2), null);
   const broken = { ...s, c: Buffer.from(Buffer.from(s.c, 'base64').map((b, i) => (i === 3 ? b ^ 1 : b))).toString('base64') };
   assert.equal(unseal(broken, k1), null);
+});
+
+test('Issue #53: Link enthält den PC-Namen statt der IP-Adresse; IP nur im Ersatz-Link', async () => {
+  const ctx = setup({ hostName: 'morni.local' });
+  ctx.remote.setPassword({ password: 'geheim12345' });
+  await ctx.remote.setEnabled({ on: true });
+  const r = ctx.remote.createPairing();
+  assert.equal(new URL(r.url).hostname, 'morni.local');
+  assert.doesNotMatch(r.url.split('#')[0], /\d+\.\d+\.\d+\.\d+/);
+  assert.equal(new URL(r.fallbackUrl).hostname, '127.0.0.1');
+  assert.equal(ctx.remote.status().host, 'morni.local');
+  await ctx.remote.stop();
 });

@@ -376,8 +376,21 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
       await js(win, `document.querySelector('.remote__pair')?.scrollIntoView({block:'center'})`);
       await wait(300);
       await shoot(win, dir, '73-fernzugang-qr');
-      const url = await js(win, `document.querySelector('.remote__url')?.textContent || ''`);
+      // Link wie ein Nutzer über „Link kopieren“ holen (er steht absichtlich nicht als Text in der App)
+      await js(win, `[...document.querySelectorAll('.remote__pair .btn')].find(b=>b.textContent.includes('Link kopieren'))?.click()`);
+      let url = '';
+      for (let i = 0; i < 10 && !/^https?:/.test(url); i++) {
+        await wait(200);
+        url = String(await require('electron').clipboard.readText());
+      }
+      if (!/^https?:/.test(url)) {
+        console.log(`[fernzugang] Zwischenablage: ${String(url).slice(0, 60)} · QR da: ${await js(win, `Boolean(document.querySelector('.remote__pair'))`)} · Knöpfe: ${await js(win, `[...document.querySelectorAll('.remote__pair .btn')].map(b=>b.textContent).join('|')`)}`);
+        url = '';
+      }
+      const pageText = await js(win, `document.querySelector('.settings')?.textContent || ''`);
       let result = { url: Boolean(url) };
+      result.ipSichtbar = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(pageText);
+      result.linkHost = url ? new URL(url).hostname : null;
       if (url) {
         const h = new URLSearchParams(new URL(url).hash.slice(1));
         const key = new Uint8Array(Buffer.from(h.get('k'), 'base64url'));
@@ -411,8 +424,7 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
         const phone = new BrowserWindow({ width: 400, height: 760, show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
         const errs = [];
         phone.webContents.on('console-message', (e) => e.level === 'error' && errs.push(e.message));
-        const fresh = await js(win, `document.querySelector('.remote__url')?.textContent || ''`);
-        await phone.loadURL(fresh || url);
+        await phone.loadURL(url);
         await wait(800);
         const img = await phone.webContents.capturePage();
         require('fs').writeFileSync(require('path').join(dir, '76-fernzugang-handy.png'), img.toPNG());

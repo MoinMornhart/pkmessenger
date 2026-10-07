@@ -105,6 +105,7 @@ if (SHOTS_ARG) {
   store.set('dmChannels', []);
   store.set('screenProtection', false);
   store.set('appLock', null);
+  store.set('remote', null); // Fernzugang (Issue #53): jeder Lauf beginnt aus und ohne Passwort
 }
 const voice = createVoiceManager({
   voiceLib: demo ? demo.voiceLib : require('@discordjs/voice'),
@@ -176,6 +177,8 @@ const remote = createRemote({
   // Demo/Screenshot-Lauf: nur auf diesem PC lauschen (keine Firewall-Abfrage)
   lanAddresses: demo ? () => ['127.0.0.1'] : lanAddresses,
   bindHost: demo ? '127.0.0.1' : '0.0.0.0',
+  // Gerätename statt IP im Link (mDNS „name.local“, nur wenn der Name dafür taugt)
+  hostName: demo ? 'localhost' : /^[a-z0-9-]{1,63}$/i.test(os.hostname()) ? `${os.hostname().toLowerCase()}.local` : null,
 });
 /** Einmal-Code + QR-Code (als Bild) für die Oberfläche */
 remote.createPairingWithQr = () => {
