@@ -141,7 +141,6 @@ export default function SecuritySection({ toast }) {
           <p className="muted small">Gespeichert wird nur ein verschlüsselter Fingerabdruck (Hash), nie das Passwort selbst.</p>
         </div>
       )}
-      <p className="muted small">ℹ️ „Nur als Administrator starten“ gibt es bewusst nicht: Dann hätte die App bei jedem Start volle Rechte über den PC, und automatische Updates würden hängen. Für den Schutz der App sind App-Passwort und Windows Hello da.</p>
     </>
   );
 }
