@@ -339,9 +339,17 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
 // Harte Limits (gelten für alle KI-Anfragen zusammen)
 function LimitsRow({ cfg, onSave }) {
   const [l, setL] = useState(cfg.limits);
-  const dirty = l.perHour !== cfg.limits.perHour || l.perDay !== cfg.limits.perDay;
+  const dirty = l.mode !== cfg.limits.mode || l.perHour !== cfg.limits.perHour || l.perDay !== cfg.limits.perDay;
   return (
     <div className="settings__row ai-limits">
+      <label>
+        Limits
+        <select value={l.mode} onChange={(e) => setL({ ...l, mode: e.target.value })}>
+          <option value="auto">Automatisch (nur bei Cloud-Anbietern)</option>
+          <option value="an">Immer an</option>
+          <option value="aus">Aus</option>
+        </select>
+      </label>
       <label>
         Max. pro Stunde
         <input type="number" min="1" max="500" value={l.perHour} onChange={(e) => setL({ ...l, perHour: Math.round(Number(e.target.value)) || 1 })} />
@@ -450,9 +458,15 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
             <span>
               🤖 Aufträge aktiv: {cfg.jobs.filter((j) => j.enabled).length}/{cfg.jobs.length} · 💬 Antworten auf Erwähnungen: {cfg.responder.enabled ? 'an' : 'aus'}
             </span>
-            <span className={cfg.usage.hour >= cfg.limits.perHour || cfg.usage.day >= cfg.limits.perDay ? 'warn' : ''}>
-              📊 Verbrauch: {cfg.usage.hour}/{cfg.limits.perHour} pro Stunde · {cfg.usage.day}/{cfg.limits.perDay} pro Tag
-            </span>
+            {cfg.limitsActive ? (
+              <span className={cfg.usage.hour >= cfg.limits.perHour || cfg.usage.day >= cfg.limits.perDay ? 'warn' : ''}>
+                📊 Verbrauch: {cfg.usage.hour}/{cfg.limits.perHour} pro Stunde · {cfg.usage.day}/{cfg.limits.perDay} pro Tag
+              </span>
+            ) : (
+              <span>
+                📊 Verbrauch: {cfg.usage.hour} pro Stunde · {cfg.usage.day} pro Tag · ohne Limit ({cfg.limits.mode === 'aus' ? 'ausgeschaltet' : 'lokales Modell, kostet nichts'})
+              </span>
+            )}
             {cfg.running.length > 0 && (
               <button className="btn btn--danger btn--small" onClick={wrap('abort', () => api.aiAbort())}>
                 ⏹ Laufende KI-Anfragen stoppen

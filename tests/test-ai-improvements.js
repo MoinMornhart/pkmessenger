@@ -135,3 +135,15 @@ test('Alte gespeicherte Aufträge bekommen sinnvolle Standardwerte', () => {
   assert.throws(() => validators.aiJob({ ...JOB, contextSize: 99 }), /Kontextumfang/);
   assert.throws(() => validators.aiJob({ ...JOB, postAs: 'dm' }), /Nachricht oder Thread/);
 });
+
+test('Lokales Modell: Limits automatisch aus, mit „Immer an“ wieder aktiv (Issue #12)', async () => {
+  const { ai } = await setup();
+  ai.setConfig({ enabled: true, provider: 'openai', baseUrl: 'http://localhost:11434/v1', model: 'llama3' });
+  ai.setLimits(validators.aiLimits({ perHour: 1, perDay: 1 }));
+  await ai.test();
+  await ai.test(); // kein Limit: lokal kostet nichts
+  assert.equal(ai.getConfig().limitsActive, false);
+  ai.setLimits(validators.aiLimits({ mode: 'an', perHour: 1, perDay: 1 }));
+  assert.equal(ai.getConfig().limitsActive, true);
+  await assert.rejects(ai.test(), /1 Anfragen pro Stunde/);
+});
