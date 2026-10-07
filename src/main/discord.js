@@ -421,7 +421,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return [...users, ...roles, ...special];
   }
 
-  function getInviteUrl() {
+  /** Bot-Einladungslink. Mit guildId ist der Server vorausgewählt und fixiert (offizielle Parameter guild_id + disable_guild_select). */
+  function getInviteUrl({ guildId } = {}) {
     const appId = client?.application?.id || (() => {
       const t = getToken();
       return t.status === 'ok' ? botIdFromToken(t.token) : null;
@@ -429,7 +430,34 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     if (!appId) return null;
     const P = PermissionFlagsBits;
     const permissions = [P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AddReactions, P.AttachFiles, P.EmbedLinks, P.Connect, P.Speak].reduce((a, b) => a | b, 0n);
-    return `https://discord.com/oauth2/authorize?client_id=${appId}&scope=bot+applications.commands&permissions=${permissions}`;
+    const preselect = guildId ? `&guild_id=${guildId}&disable_guild_select=true` : '';
+    return `https://discord.com/oauth2/authorize?client_id=${appId}&scope=bot+applications.commands&permissions=${permissions}${preselect}`;
+  }
+
+  /**
+   * Vorschau einer Server-Einladung (offizieller Endpoint GET /invites/{code}). Der Bot tritt dabei NICHT bei –
+   * beitreten tut der Nutzer selbst in der offiziellen Discord-App mit seinem Account.
+   */
+  async function previewInvite({ code }) {
+    const c = requireReady();
+    const inv = await c.fetchInvite(code);
+    const g = inv?.guild ?? null;
+    if (!g?.id) throw appError('NOT_FOUND', 'Diese Einladung führt zu keinem Server (z. B. Gruppen-DM).', 'Nur Server-Einladungen werden unterstützt.');
+    let iconUrl = null;
+    try {
+      iconUrl = typeof g.iconURL === 'function' ? g.iconURL({ size: 128, extension: 'png' }) : null;
+    } catch {
+      iconUrl = null;
+    }
+    return {
+      code: inv.code ?? code,
+      guild: { id: g.id, name: g.name ?? 'Unbekannter Server', iconUrl, description: g.description ?? null },
+      memberCount: Number.isFinite(inv.memberCount) ? inv.memberCount : null,
+      onlineCount: Number.isFinite(inv.presenceCount) ? inv.presenceCount : null,
+      channelName: inv.channel?.name ?? null,
+      expiresAt: inv.expiresTimestamp ?? null,
+      botAlreadyThere: c.guilds.cache.has(g.id),
+    };
   }
 
   // ---------- Aktualisieren & Kanalzugriff (Issue #1) ----------
@@ -536,6 +564,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     getVoiceTarget,
     refresh,
     getChannelAccess,
+    previewInvite,
   };
 }
 

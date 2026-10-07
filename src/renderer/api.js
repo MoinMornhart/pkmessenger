@@ -38,6 +38,7 @@ export const api = Object.fromEntries(
     'tokenInfo',
     'tokenSave',
     'tokenClear',
+    'invitePreview',
     'refresh',
     'channelAccess',
     'listVoiceMembers',

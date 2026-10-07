@@ -6,6 +6,7 @@ const API_ERRORS = {
   10003: ['Kanal nicht gefunden.', 'Der Kanal wurde gelöscht. Lade die Kanalliste neu.'],
   10004: ['Server nicht gefunden.', 'Der Bot ist nicht mehr auf diesem Server. Lade ihn über den Einladungslink erneut ein.'],
   10008: ['Nachricht nicht gefunden.', 'Die Nachricht wurde inzwischen gelöscht.'],
+  10006: ['Einladung ungültig oder abgelaufen.', 'Lass dir einen neuen Einladungslink vom Server geben.'],
   50001: ['Kein Zugriff auf diesen Kanal.', 'Gib der Bot-Rolle in den Kanaleinstellungen "Kanal ansehen" und "Nachrichtenverlauf lesen".'],
   50013: ['Dem Bot fehlt eine Berechtigung.', 'Prüfe in Discord unter Servereinstellungen → Rollen → Bot-Rolle die Rechte für diesen Kanal (z. B. "Nachrichten senden").'],
   50035: ['Discord hat die Anfrage abgelehnt (ungültige Daten).', 'Prüfe Länge und Inhalt der Nachricht.'],

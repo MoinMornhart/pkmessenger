@@ -1,6 +1,7 @@
 'use strict';
 
 const { isSnowflake } = require('../shared/snowflake');
+const { parseInviteCode } = require('../shared/invites');
 const { MESSAGE_CONTENT_MAX, MESSAGES_PER_FETCH_MAX, ALLOWED_MENTIONS_IDS_MAX } = require('../shared/limits');
 
 // Jeder IPC-Payload aus dem Renderer wird hier geprüft, bevor er discord.js erreicht.
@@ -78,6 +79,12 @@ const validators = {
   lastLocation(p) {
     const { guildId, channelId } = obj(p);
     return { guildId: optionalSnowflake(guildId, 'guildId') ?? null, channelId: optionalSnowflake(channelId, 'channelId') ?? null };
+  },
+  inviteInput(p) {
+    const { invite } = obj(p);
+    const code = parseInviteCode(invite);
+    if (!code) throw new ValidationError('Das ist kein gültiger Discord-Einladungslink (z. B. discord.gg/abc123).');
+    return { code };
   },
   tokenInput(p) {
     const { token } = obj(p);

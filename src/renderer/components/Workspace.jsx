@@ -10,6 +10,7 @@ import QuickSwitcher from './QuickSwitcher.jsx';
 import CallView from './CallView.jsx';
 import AccessDialog from './AccessDialog.jsx';
 import SettingsDialog from './SettingsDialog.jsx';
+import JoinServerDialog from './JoinServerDialog.jsx';
 import { useVoice } from '../voice/useVoice';
 
 const TYPING_MS = 10000;
@@ -31,6 +32,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [accessByGuild, setAccessByGuild] = useState({});
   const [accessOpen, setAccessOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const lastRefresh = useRef(0);
   const activeRef = useRef(null);
@@ -336,7 +338,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
             )}
           </div>
         )}
-        <ServerRail guilds={guilds} activeId={guildId} unreadGuilds={unreadGuilds} onSelect={selectGuild} onInvite={invite} />
+        <ServerRail guilds={guilds} activeId={guildId} unreadGuilds={unreadGuilds} onSelect={selectGuild} onInvite={invite} onJoin={() => setJoinOpen(true)} />
         <ChatList
           guild={guild}
           chats={chats}
@@ -375,6 +377,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
             }}
           />
         )}
+        {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
         {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} />}
         {channel?.type === 'voice' ? (
           <CallView

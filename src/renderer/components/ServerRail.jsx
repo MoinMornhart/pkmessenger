@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import Logo from './Logo.jsx';
 
-function ServerRail({ guilds, activeId, unreadGuilds, onSelect, onInvite }) {
+function ServerRail({ guilds, activeId, unreadGuilds, onSelect, onInvite, onJoin }) {
   return (
     <nav className="rail" aria-label="Server">
       <div className="rail__logo" title="PKMessenger">
@@ -24,6 +24,9 @@ function ServerRail({ guilds, activeId, unreadGuilds, onSelect, onInvite }) {
           </button>
         ))}
       </div>
+      <button className="rail__item rail__add" title="Server beitreten (Einladungslink)" aria-label="Server beitreten" onClick={onJoin}>
+        🔗
+      </button>
       <button className="rail__item rail__add" title="Bot auf einen Server einladen" aria-label="Bot einladen" onClick={onInvite}>
         +
       </button>

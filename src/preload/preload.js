@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('api', {
   tokenInfo: call('pk:token-info'),
   tokenSave: call('pk:token-save'),
   tokenClear: call('pk:token-clear'),
+  invitePreview: call('pk:invite-preview'),
   refresh: call('pk:refresh'),
   channelAccess: call('pk:channel-access'),
   // Sprachkanäle

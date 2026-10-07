@@ -135,6 +135,16 @@ function createDemo() {
     return conn;
   };
 
+  // Demo-Einladung für „Server beitreten“ (simuliert den offiziellen Endpoint GET /invites/{code})
+  client.fetchInvite = async (code) => {
+    if (code === 'ungueltig') {
+      const e = new Error('Unknown Invite');
+      e.code = 10006;
+      throw e;
+    }
+    return { code, guild: { id: '888888888888888888', name: 'Moin Club', iconURL: () => null }, memberCount: 128, presenceCount: 37, channel: { name: 'willkommen' } };
+  };
+
   const envPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pk-demo-')), '.env');
   fs.writeFileSync(envPath, `DISCORD_TOKEN=${FAKE_TOKEN}\n`);
   return { world, envPath, createClient: () => client, voiceLib, stats };

@@ -1305,6 +1305,94 @@ a:hover {
     transform: rotate(360deg);
   }
 }
+/* Server beitreten */
+.join {
+  width: min(600px, 94vw);
+  padding: 22px;
+  max-height: 84vh;
+  overflow-y: auto;
+}
+.join__card {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  margin: 12px 0;
+  border-radius: 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+.join__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-ink);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.join__icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.join__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dot--ok {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.join__steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  counter-reset: j;
+}
+.join__steps li {
+  counter-increment: j;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 44px;
+  position: relative;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+.join__steps li::before {
+  content: counter(j);
+  position: absolute;
+  left: 12px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--mention);
+  color: var(--accent);
+}
+.join__steps li.is-done::before {
+  content: '✓';
+  background: var(--ok);
+  color: var(--accent-ink);
+}
+.join__steps li > div {
+  flex: 1;
+  min-width: 0;
+}
 .chatrow--disabled {
   cursor: default;
   opacity: 0.6;

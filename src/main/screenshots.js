@@ -101,6 +101,17 @@ async function runScreenshots(win, dir, { demo, stats }) {
   await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
   await wait(700);
   await shoot(win, dir, '13-einstellungen');
+  await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+
+  // ---- Server beitreten (Vorschau; "In Discord beitreten" wird im Test NICHT geklickt) ----
+  await js(win, `document.querySelector('.rail__add[aria-label="Server beitreten"]')?.click()`);
+  await wait(400);
+  await js(win, `(() => { const el = document.querySelector('#invite-input'); const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set; s.call(el,'https://discord.gg/moinclub'); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+  await js(win, `[...document.querySelectorAll('.join .btn')].find(b=>b.textContent.includes('Vorschau'))?.click()`);
+  await wait(800);
+  await shoot(win, dir, '14-server-beitreten');
+  const card = await js(win, `document.querySelector('.join__card')?.textContent || '(keine Vorschau)'`);
+  console.log(`[join] Vorschau: ${card}`);
 }
 
 module.exports = { runScreenshots };
