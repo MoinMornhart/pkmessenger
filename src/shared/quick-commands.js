@@ -8,21 +8,21 @@ const COMMANDS = [
   { name: 'shrug', args: '[Text]', desc: 'Hängt ¯\\_(ツ)_/¯ an', run: (a) => ({ content: `${a} ¯\\\\\\_(ツ)_/¯`.trim() }) },
   { name: 'tableflip', args: '[Text]', desc: 'Tisch umwerfen (╯°□°)╯︵ ┻━┻', run: (a) => ({ content: `${a} (╯°□°)╯︵ ┻━┻`.trim() }) },
   { name: 'unflip', args: '[Text]', desc: 'Tisch wieder hinstellen ┬─┬ノ( º _ ºノ)', run: (a) => ({ content: `${a} ┬─┬ノ( º _ ºノ)`.trim() }) },
-  { name: 'lenny', args: '', desc: '( ͡° ͜ʖ ͡°)', run: (a) => ({ content: `${a} ( ͡° ͜ʖ ͡°)`.trim() }) },
+  { name: 'lenny', instant: true, args: '', desc: '( ͡° ͜ʖ ͡°)', run: (a) => ({ content: `${a} ( ͡° ͜ʖ ͡°)`.trim() }) },
   { name: 'me', args: 'Text', desc: 'Text kursiv, wie eine Handlung', run: (a) => (a ? { content: `_${a}_` } : { error: 'Bitte einen Text angeben: /me winkt allen zu' }) },
   { name: 'spoiler', args: 'Text', desc: 'Text verdeckt (erst sichtbar nach Klick)', run: (a) => (a ? { content: `||${a}||` } : { error: 'Bitte einen Text angeben: /spoiler Das Ende ist …' }) },
   { name: 'fett', args: 'Text', desc: 'Text fett', run: (a) => (a ? { content: `**${a}**` } : { error: 'Bitte einen Text angeben.' }) },
   { name: 'code', args: 'Text', desc: 'Text als Code', run: (a) => (a ? { content: a.includes('\n') ? `\`\`\`\n${a}\n\`\`\`` : `\`${a}\`` } : { error: 'Bitte einen Text angeben.' }) },
   { name: 'zitat', args: 'Text', desc: 'Text als Zitat', run: (a) => (a ? { content: a.split('\n').map((l) => `> ${l}`).join('\n') } : { error: 'Bitte einen Text angeben.' }) },
-  { name: 'würfel', args: '[Seiten]', desc: 'Würfelt (Standard: 6 Seiten)', run: (a, rnd = Math.random) => {
+  { name: 'würfel', instant: true, args: '[Seiten]', desc: 'Würfelt (Standard: 6 Seiten)', run: (a, rnd = Math.random) => {
     const n = Number.parseInt(a, 10);
     const sides = Number.isInteger(n) && n >= 2 && n <= 1000 ? n : 6;
     return { content: `🎲 ${1 + Math.floor(rnd() * sides)} (W${sides})` };
   } },
-  { name: 'münze', args: '', desc: 'Kopf oder Zahl', run: (_a, rnd = Math.random) => ({ content: `🪙 ${rnd() < 0.5 ? 'Kopf' : 'Zahl'}` }) },
-  { name: 'umfrage', args: '', desc: 'Umfrage erstellen', run: () => ({ action: 'poll' }) },
-  { name: 'embed', args: '', desc: 'Embed-Baukasten öffnen', run: () => ({ action: 'embed' }) },
-  { name: 'hilfe', args: '', desc: 'Alle Befehle anzeigen', run: () => ({ action: 'help' }) },
+  { name: 'münze', instant: true, args: '', desc: 'Kopf oder Zahl', run: (_a, rnd = Math.random) => ({ content: `🪙 ${rnd() < 0.5 ? 'Kopf' : 'Zahl'}` }) },
+  { name: 'umfrage', instant: true, args: '', desc: 'Umfrage erstellen', run: () => ({ action: 'poll' }) },
+  { name: 'embed', instant: true, args: '', desc: 'Embed-Baukasten öffnen', run: () => ({ action: 'embed' }) },
+  { name: 'hilfe', instant: true, args: '', desc: 'Alle Befehle anzeigen', run: () => ({ action: 'help' }) },
 ];
 
 /** „/shrug hallo“ → { command, args } – nur für bekannte Befehle, sonst null (dann ganz normal als Text senden). */
@@ -39,7 +39,17 @@ function suggestCommands(text, caret) {
   const m = /^\/([\p{L}\d_-]*)$/u.exec(before);
   if (!m) return null;
   const q = m[1].toLowerCase();
-  return COMMANDS.filter((c) => c.name.startsWith(q)).map((c) => ({ kind: 'command', id: c.name, display: `/${c.name}`, sub: c.args ? `${c.args} – ${c.desc}` : c.desc }));
+  // Erst Befehle, die so anfangen, dann solche, die den Text im Namen oder in der Beschreibung enthalten (Issue #29)
+  const starts = COMMANDS.filter((c) => c.name.startsWith(q));
+  const contains = COMMANDS.filter((c) => !starts.includes(c) && (c.name.includes(q) || c.desc.toLowerCase().includes(q)));
+  return [...starts, ...contains].map((c) => ({ kind: 'command', id: c.name, instant: Boolean(c.instant), display: `/${c.name}`, sub: c.args ? `${c.args} – ${c.desc}` : c.desc }));
 }
 
-module.exports = { COMMANDS, parseCommand, suggestCommands };
+/** „/ping“, „/xyz“: sieht aus wie ein Befehl, ist aber keiner der App → Name zurückgeben (für die Rückfrage), sonst null. */
+function unknownCommand(text) {
+  const m = /^\/([\p{L}\d_-]{1,32})(?:\s|$)/u.exec(String(text ?? '').trim());
+  if (!m || COMMANDS.some((c) => c.name === m[1].toLowerCase())) return null;
+  return m[1];
+}
+
+module.exports = { COMMANDS, parseCommand, suggestCommands, unknownCommand };

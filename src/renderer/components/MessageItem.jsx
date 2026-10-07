@@ -5,6 +5,8 @@ import MessageContent from './MessageContent.jsx';
 import { ReplyQuote, Reactions, Embeds, ThreadChip, MessageActionBar, PollCard } from './MessageExtras.jsx';
 import { hueFor } from './ChatList.jsx';
 import { systemInfo } from '../../shared/system-messages';
+import MediaGate from './MediaGate.jsx';
+import { attachmentKind } from '../../shared/media';
 
 function Avatar({ author }) {
   const [broken, setBroken] = useState(false);
@@ -29,23 +31,25 @@ function Attachments({ items }) {
   if (!items?.length) return null;
   return (
     <div className="attachments">
-      {items.map((a) =>
-        a.contentType?.startsWith('image/') && /^https:\/\/(cdn|media)\.discordapp\.(com|net)\//.test(a.url) ? (
-          <img
-            key={a.id}
-            className="attachment-img"
-            src={a.url}
-            alt={a.name}
-            loading="lazy"
-            decoding="async"
-            style={a.width && a.height ? { aspectRatio: `${a.width} / ${a.height}` } : undefined}
-          />
+      {items.map((a) => {
+        const kind = attachmentKind(a);
+        const ratio = a.width && a.height ? { aspectRatio: `${a.width} / ${a.height}` } : undefined;
+        if (kind === 'video')
+          return (
+            <MediaGate key={a.id} kind="video" name={a.name}>
+              <video className="attachment-img" src={a.url} controls preload="metadata" playsInline style={ratio} />
+            </MediaGate>
+          );
+        return kind ? (
+          <MediaGate key={a.id} kind={kind} name={a.name}>
+            <img className="attachment-img" src={a.url} alt={a.name} loading="lazy" decoding="async" style={ratio} />
+          </MediaGate>
         ) : (
           <div key={a.id} className="attachment-file">
             📎 {a.name} <span className="muted small">({formatSize(a.size)})</span>
           </div>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }

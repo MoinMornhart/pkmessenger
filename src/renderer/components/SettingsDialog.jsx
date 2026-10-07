@@ -298,6 +298,30 @@ function ProfileSection({ toast, guildId }) {
 }
 
 // Bildschirmschutz: andere Programme (Screenshots, Aufnahmen, Bildschirm teilen) sehen nur ein schwarzes Fenster
+// Bilder/GIFs/Videos laden? Warnung vor Links? (Issue #1)
+function MediaPrivacy() {
+  const [p, setP] = useState(prefs.get());
+  useEffect(() => prefs.subscribe(setP), []);
+  return (
+    <>
+      <div className="settings__field" data-setting="media">
+        <label className="settings__label" htmlFor="set-media">
+          🖼 Bilder, GIFs und Videos in Nachrichten
+        </label>
+        <select id="set-media" value={p.media} onChange={(e) => prefs.set({ media: e.target.value })}>
+          <option value="fragen">Erst fragen</option>
+          <option value="immer">Immer laden</option>
+          <option value="nie">Nie laden (nur Name/Link zeigen)</option>
+        </select>
+        <p className="muted small">Geladen wird nur über Discords Server: Fremde Webseiten sehen deine IP-Adresse nicht, Discord schon (wie in der normalen App).</p>
+      </div>
+      <label className="composer__ping" data-setting="links">
+        <input type="checkbox" checked={p.linkWarn} onChange={(e) => prefs.set({ linkWarn: e.target.checked })} /> 🔗 Vor dem Öffnen von Links warnen
+      </label>
+    </>
+  );
+}
+
 function PrivacySection({ toast }) {
   const [on, setOn] = useState(null);
   useEffect(() => {
@@ -319,6 +343,7 @@ function PrivacySection({ toast }) {
         <input type="checkbox" checked={on === true} disabled={on === null} onChange={(e) => toggle(e.target.checked)} /> 🛡 Bildschirmschutz: Screenshots und Aufnahmen verbieten
       </label>
       <p className="muted small">Andere Programme (z. B. Snipping Tool, OBS, Bildschirm teilen) sehen dann nur ein schwarzes Fenster. Ein Foto mit dem Handy kann keine App verhindern.</p>
+      <MediaPrivacy />
       <p className="muted small">
         Keine Cloud, keine Telemetrie. Lokal gespeichert: verschlüsselter Token, zuletzt geöffneter Chat, Lese-Markierungen, diese Einstellungen. Sprachkanäle werden nie aufgezeichnet.
       </p>
@@ -384,7 +409,19 @@ function AudioSection() {
   );
 }
 
-export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTargets = [], guilds = [] }) {
+export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTargets = [], guilds = [], focus = null }) {
+  // „Hier aktivieren“ (z. B. Medien) → direkt dorthin scrollen und kurz hervorheben
+  useEffect(() => {
+    if (!focus) return undefined;
+    const t = setTimeout(() => {
+      const el = document.querySelector(`.settings [data-setting="${focus}"]`);
+      if (!el) return;
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.classList.add('is-focus');
+      setTimeout(() => el.classList.remove('is-focus'), 2500);
+    }, 150);
+    return () => clearTimeout(t);
+  }, [focus]);
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);

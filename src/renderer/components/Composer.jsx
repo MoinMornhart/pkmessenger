@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { applyFormat, FORMAT_BUTTONS } from '../../shared/format-text';
-import { parseCommand, suggestCommands } from '../../shared/quick-commands';
+import { parseCommand, suggestCommands, unknownCommand } from '../../shared/quick-commands';
 import { api } from '../api';
 import { prefs } from '../prefs';
 import { applyMentionTokens, findMentionQuery } from '../../shared/mentions';
@@ -183,6 +183,12 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
   const pick = (item) => {
     if (!suggest) return;
     if (item.kind === 'command') {
+      // Befehle ohne Zusatztext (/münze, /würfel, /umfrage …) sofort ausführen statt zweimal Enter (Issue #29)
+      if (item.instant) {
+        setSuggest(null);
+        submit(item.display);
+        return;
+      }
       const next = `${item.display} `;
       setText(next);
       setSuggest(null);
@@ -233,10 +239,11 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
     reset();
   };
 
-  const submit = () => {
-    if (empty || tooLong || !channel.canSend) return;
+  const submit = (commandText) => {
+    if (!commandText && (empty || tooLong || !channel.canSend)) return;
+    if (commandText && !channel.canSend) return;
     // Schnellbefehle (/shrug, /me, /umfrage …) – laufen in der App, gesendet wird nur das Ergebnis
-    const cmd = editing ? null : parseCommand(text);
+    const cmd = editing ? null : parseCommand(commandText ?? text);
     if (cmd) {
       const r = cmd.command.run(cmd.args);
       if (r.error) return setFileError(r.error);
@@ -257,6 +264,35 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
       reset();
       return;
     }
+    // „/ping“ & Co.: kein Befehl dieser App → nicht still als Text senden, sondern nachfragen (Issue #29)
+    const unknown = editing || files.length || embeds.length || poll ? null : unknownCommand(text);
+    if (unknown && !commandText) {
+      setConfirm({
+        title: `„/${unknown}“ ist kein Befehl von PKMessenger`,
+        body: 'Slash-Befehle von Discord oder anderen Bots kann ein Bot nicht auslösen – das erlaubt Discord nicht. Tippe nur „/“, um die Befehle dieser App zu sehen. Oder den Text ganz normal senden?',
+        actions: [
+          {
+            label: 'Befehle zeigen',
+            kind: 'primary',
+            autoFocus: true,
+            onClick: () => {
+              setConfirm(null);
+              setText('/');
+              setSuggest({ trigger: '/', query: '', start: 0, items: suggestCommands('/', 1), sel: 0 });
+              taRef.current?.focus();
+            },
+          },
+          { label: 'Als Text senden', kind: 'ghost', onClick: () => sendChecked() },
+          { label: 'Abbrechen', kind: 'ghost', onClick: () => setConfirm(null) },
+        ],
+      });
+      return;
+    }
+    sendChecked();
+  };
+
+  const sendChecked = () => {
+    setConfirm(null);
     if (final.massMention) {
       if (!channel.canMentionEveryone) {
         setConfirm({
