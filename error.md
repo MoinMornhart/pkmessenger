@@ -205,3 +205,14 @@ Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zwei
 4. **Lösung:** Block aus Commit `7e5c72e` wiederhergestellt (eigener PR, da #5 schon vor der Reparatur zusammengeführt wurde). Die Klammer hatte JoniMoni beim Zusammenführen bereits richtig gesetzt.
 5. **Testergebnis:** Build ohne Warnungen, 169/169 Tests grün, Demo: Systemnachrichten, KI-Antwort und Designs sichtbar.
 6. **Prävention:** Nach jedem Konflikt in `styles.css` den Build auf CSS-Warnungen prüfen und nach den Klassen aller beteiligten PRs suchen (`grep -c`). Neue Styles künftig thematisch einsortieren statt immer ans Dateiende.
+
+---
+
+## #17 – Styles des KI-Antwort-Agenten beim Zusammenführen verloren (zweiter Fall)
+
+1. **Datum & Uhrzeit:** 07.10.2026, ca. 13:20 (beim Vorbereiten von v0.4.0 gefunden)
+2. **Was passiert ist:** Der Block `.ai-channels`, `.ai-chip(s)`, `.ai-suggest`, `.ai-recent` fehlte in `main`. Kanal-Häkchen und Personen-Chips im Bereich „Auf Erwähnungen antworten“ waren dadurch ungestylt.
+3. **Ursache (geprüft):** Wie bei #16 war es eine Konfliktlösung am Ende von `styles.css`, diesmal im Merge-Commit `af838c3` (main → PR #5). Gefunden per `git show <commit>:src/renderer/styles.css | grep -c ai-channels` über die Merge-Kette.
+4. **Lösung:** Block aus `77776dc` wiederhergestellt. **Neu: `tests/test-css-classes.js`** prüft, dass jede feste CSS-Klasse der Komponenten in `styles.css` vorkommt. Gegenprobe: Ohne die Wiederherstellung meldet der Test genau die 6 fehlenden Klassen.
+5. **Testergebnis:** 170/170 Tests grün, kompletter Demo-Lauf ohne Fehler.
+6. **Prävention:** Der neue Test läuft bei `npm test` und damit auch im Release-Workflow. Verlorene Styles verhindern so ein Release.
