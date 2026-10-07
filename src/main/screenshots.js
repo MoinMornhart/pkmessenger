@@ -70,6 +70,29 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   const afterItalic = await js(win, `document.querySelector('.composer textarea').value`);
   console.log(`[format] Knöpfe: ${bar} · nach F: ${JSON.stringify(afterBold)} · nach Strg+I: ${JSON.stringify(afterItalic)}`);
   await js(win, `(() => { const el=document.querySelector('.composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,''); el.dispatchEvent(new Event('input',{bubbles:true})); el.blur(); })()`);
+  // Rechtsklick-Menü + Person verwalten (Issue #1)
+  await js(win, `[...document.querySelectorAll('.msg--in')].filter(x=>x.querySelector('.bubble__author')?.textContent.includes('Anna')).at(-1)?.scrollIntoView({block:'center'})`);
+  await wait(400);
+  const clickT = (sel, text) => js(win, `[...document.querySelectorAll('${sel}')].find(b=>b.textContent.includes('${text}'))?.click()`);
+  await js(win, `(() => { const m=[...document.querySelectorAll('.msg--in')].filter(x=>x.querySelector('.bubble__author')?.textContent.includes('Anna')).at(-1); const r=m.querySelector('.bubble').getBoundingClientRect(); m.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:r.left+40,clientY:r.top+20})); })()`);
+  await wait(300);
+  await shoot(win, dir, '36-rechtsklick');
+  const menu = await js(win, `JSON.stringify([...document.querySelectorAll('.ctx-menu__item')].map(b=>b.textContent.trim()))`);
+  await clickT('.ctx-menu__item', 'verwalten');
+  await wait(600);
+  const roleBefore = await js(win, `[...document.querySelectorAll('.moderation__role')].find(l=>l.textContent.includes('Moderatoren'))?.querySelector('input')?.checked`);
+  await js(win, `[...document.querySelectorAll('.moderation__role')].find(l=>l.textContent.includes('Moderatoren'))?.querySelector('input')?.click()`);
+  await wait(500);
+  await clickT('.moderation .btn', 'Timeout setzen');
+  await wait(500);
+  await clickT('.moderation .btn', 'Kicken');
+  await wait(300);
+  await shoot(win, dir, '37-person-verwalten');
+  const mod = await js(win, `JSON.stringify({ rolle: [...document.querySelectorAll('.moderation__role')].find(l=>l.textContent.includes('Moderatoren'))?.querySelector('input')?.checked, timeout: Boolean(document.querySelector('.moderation__who .warn')), kickRueckfrage: Boolean(document.querySelector('.moderation__confirm')), bannenGesperrt: [...document.querySelectorAll('.moderation .btn')].find(b=>b.textContent.includes('Bannen'))?.disabled })`);
+  console.log(`[moderation] Menü: ${menu} · Rolle vorher: ${roleBefore} · danach: ${mod}`);
+  await clickT('.moderation__confirm .btn', 'Abbrechen');
+  await js(win, `document.querySelector('.moderation .icon-btn')?.click()`);
+  await wait(300);
   // Schnellbefehle (Issue #1: „es funktionieren keine Befehle“)
   const typeCmd = (t) => js(win, `(() => { const el=document.querySelector('.composer textarea'); el.focus(); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,${JSON.stringify(t)}); el.setSelectionRange(${t.length},${t.length}); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
   const enter = () => js(win, `document.querySelector('.composer textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);

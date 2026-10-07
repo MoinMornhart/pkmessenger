@@ -167,6 +167,13 @@ function aiBaseUrl(value) {
 // Eigener Benachrichtigungston: nur WAV (RIFF/WAVE per Magic-Bytes), max. 2 MiB
 const SOUND_MAX_BYTES = 2 * 1024 * 1024;
 
+// Begründung fürs Audit-Log (Discord: max. 512 Zeichen; „PKMessenger: “ kommt davor)
+function modReason(reason) {
+  if (reason === undefined || reason === null || reason === '') return '';
+  if (typeof reason !== 'string' || reason.length > 400) throw new ValidationError('Die Begründung darf höchstens 400 Zeichen haben.');
+  return reason.trim();
+}
+
 const validators = {
   soundFile(p) {
     const { data } = obj(p);
@@ -269,6 +276,36 @@ const validators = {
     const { id } = obj(p);
     if (!(typeof id === 'string' && /^[0-9a-f-]{36}$/.test(id))) throw new ValidationError('Ungültige Auftrags-ID.');
     return { id };
+  },
+  memberRef(p) {
+    const { guildId, userId } = obj(p);
+    return { guildId: snowflake(guildId, 'guildId'), userId: snowflake(userId, 'userId') };
+  },
+  memberRole(p) {
+    const { guildId, userId, roleId, add, reason } = obj(p);
+    if (typeof add !== 'boolean') throw new ValidationError('Ungültiges Feld "add".');
+    return { guildId: snowflake(guildId, 'guildId'), userId: snowflake(userId, 'userId'), roleId: snowflake(roleId, 'roleId'), add, reason: modReason(reason) };
+  },
+  memberTimeout(p) {
+    const { guildId, userId, minutes, reason } = obj(p);
+    // 0 = Timeout aufheben; Discord erlaubt höchstens 28 Tage
+    if (!Number.isInteger(minutes) || minutes < 0 || minutes > 40320) throw new ValidationError('Timeout: 0 Minuten bis 28 Tage.');
+    return { guildId: snowflake(guildId, 'guildId'), userId: snowflake(userId, 'userId'), minutes, reason: modReason(reason) };
+  },
+  memberKick(p) {
+    const { guildId, userId, reason } = obj(p);
+    return { guildId: snowflake(guildId, 'guildId'), userId: snowflake(userId, 'userId'), reason: modReason(reason) };
+  },
+  memberBan(p) {
+    const { guildId, userId, reason, deleteMessageSeconds } = obj(p);
+    const del = deleteMessageSeconds === undefined ? 0 : deleteMessageSeconds;
+    if (!Number.isInteger(del) || del < 0 || del > 604800) throw new ValidationError('Nachrichten löschen: 0 bis 7 Tage.');
+    return { guildId: snowflake(guildId, 'guildId'), userId: snowflake(userId, 'userId'), reason: modReason(reason), deleteMessageSeconds: del };
+  },
+  copyText(p) {
+    const { text } = obj(p);
+    if (typeof text !== 'string' || text.length > 4000) throw new ValidationError('Ungültiger Text.');
+    return text;
   },
   userRef(p) {
     const { userId } = obj(p);

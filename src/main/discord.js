@@ -911,6 +911,89 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return { ...commandsState, commands: COMMANDS.map((c) => `/${c.name}`) };
   }
 
+  // ---------- Moderation (Rechtsklick → Person verwalten, Issue #1) ----------
+  // Nur was der Bot laut Discord-Rechten wirklich darf. discord.js prüft dabei Rollen-Reihenfolge, Besitzer und Admins
+  // (member.manageable / moderatable / kickable / bannable). Mitglied wird per REST geladen – kein privilegiertes Intent nötig.
+  const hasPerm = (guild, flag) => Boolean(guild.members.me?.permissions?.has?.(flag));
+  const botTopRole = (guild) => guild.members.me?.roles?.highest?.position ?? 0;
+  const auditReason = (reason) => (reason ? `PKMessenger: ${reason}` : 'PKMessenger');
+
+  async function requireMember(guild, userId) {
+    const m = guild.members.cache.get(userId) || (await Promise.resolve().then(() => guild.members.fetch(userId)).catch(() => null));
+    if (!m) throw appError('NOT_FOUND', 'Diese Person ist nicht (mehr) auf dem Server.');
+    return m;
+  }
+
+  function memberCan(guild, m) {
+    return {
+      roles: hasPerm(guild, PermissionFlagsBits.ManageRoles),
+      timeout: hasPerm(guild, PermissionFlagsBits.ModerateMembers) && Boolean(m.moderatable),
+      kick: hasPerm(guild, PermissionFlagsBits.KickMembers) && Boolean(m.kickable),
+      ban: hasPerm(guild, PermissionFlagsBits.BanMembers) && Boolean(m.bannable),
+    };
+  }
+
+  async function getMemberInfo({ guildId, userId }) {
+    const guild = requireGuild(guildId);
+    const m = await requireMember(guild, userId);
+    const can = memberCan(guild, m);
+    const top = botTopRole(guild);
+    const until = Number(m.communicationDisabledUntilTimestamp) || 0;
+    return {
+      guildId,
+      userId,
+      name: displayNameOf(m.user, m),
+      username: m.user?.username ?? '',
+      avatarUrl: avatarOf(m) || avatarOf(m.user),
+      isBot: Boolean(m.user?.bot),
+      isOwner: guild.ownerId === userId,
+      isSelf: userId === client.user.id,
+      timeoutUntil: until > Date.now() ? until : null,
+      can,
+      roles: valuesOf(guild.roles.cache)
+        .filter((r) => r.id !== guild.id)
+        .sort((a, b) => b.position - a.position)
+        .map((r) => ({ id: r.id, name: r.name ?? 'Rolle', color: hexOrNull(r.hexColor), has: Boolean(m.roles?.cache?.has?.(r.id)), editable: can.roles && !r.managed && r.position < top })),
+    };
+  }
+
+  async function setMemberRole({ guildId, userId, roleId, add, reason }) {
+    const guild = requireGuild(guildId);
+    const m = await requireMember(guild, userId);
+    const role = guild.roles.cache.get(roleId);
+    if (!role || role.id === guild.id) throw appError('NOT_FOUND', 'Rolle nicht gefunden.');
+    if (!hasPerm(guild, PermissionFlagsBits.ManageRoles)) throw appError('MISSING_PERMISSION', 'Der Bot darf keine Rollen vergeben.', 'Gib der Bot-Rolle das Recht „Rollen verwalten“.');
+    if (role.managed || role.position >= botTopRole(guild))
+      throw appError('MISSING_PERMISSION', `Die Rolle „${role.name}“ steht über der Bot-Rolle.`, 'Ziehe in den Servereinstellungen → Rollen die Bot-Rolle über diese Rolle.');
+    if (add) await m.roles.add(roleId, auditReason(reason));
+    else await m.roles.remove(roleId, auditReason(reason));
+    return getMemberInfo({ guildId, userId });
+  }
+
+  async function timeoutMember({ guildId, userId, minutes, reason }) {
+    const guild = requireGuild(guildId);
+    const m = await requireMember(guild, userId);
+    if (!memberCan(guild, m).timeout) throw appError('MISSING_PERMISSION', 'Der Bot darf diese Person nicht stummschalten (Timeout).', 'Bot-Rolle braucht „Mitglieder im Timeout“ und muss über der Rolle der Person stehen.');
+    await m.timeout(minutes > 0 ? minutes * 60000 : null, auditReason(reason));
+    return getMemberInfo({ guildId, userId });
+  }
+
+  async function kickMember({ guildId, userId, reason }) {
+    const guild = requireGuild(guildId);
+    const m = await requireMember(guild, userId);
+    if (!memberCan(guild, m).kick) throw appError('MISSING_PERMISSION', 'Der Bot darf diese Person nicht kicken.', 'Bot-Rolle braucht „Mitglieder kicken“ und muss über der Rolle der Person stehen.');
+    await m.kick(auditReason(reason));
+    return { userId, kicked: true };
+  }
+
+  async function banMember({ guildId, userId, reason, deleteMessageSeconds }) {
+    const guild = requireGuild(guildId);
+    const m = await requireMember(guild, userId);
+    if (!memberCan(guild, m).ban) throw appError('MISSING_PERMISSION', 'Der Bot darf diese Person nicht bannen.', 'Bot-Rolle braucht „Mitglieder bannen“ und muss über der Rolle der Person stehen.');
+    await guild.members.ban(userId, { reason: auditReason(reason), deleteMessageSeconds });
+    return { userId, banned: true };
+  }
+
   // ---------- Privatnachrichten (DMs) ----------
   // Discord bietet Bots keine Liste ihrer Privatchats → bekannte Chats (nur IDs) lokal merken.
   function rememberDM(channel, userId) {
@@ -1107,6 +1190,11 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     updateProfile,
     listDMs,
     openDM,
+    getMemberInfo,
+    setMemberRole,
+    timeoutMember,
+    kickMember,
+    banMember,
   };
 }
 

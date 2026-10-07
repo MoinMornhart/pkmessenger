@@ -226,7 +226,9 @@ function createFakeWorld({ loginBehavior = 'ready', withExtraTypes = false } = {
 
   const world = {};
   const guild = { id: GUILD_ID, name: 'Testserver', nameAcronym: 'T', client, iconURL: () => null };
-  const me = { id: BOT_ID, nickname: null, permissions: { has: (flag) => me.permFlags.has(flag) }, permFlags: new Set() };
+  const me = { id: BOT_ID, nickname: null, permissions: { has: (flag) => me.permFlags.has(flag) }, permFlags: new Set(), roles: { highest: { position: 3 } } };
+  guild.ownerId = '999999999999999999';
+  guild.bans = [];
   const members = new Map();
   guild.members = {
     me,
@@ -236,6 +238,15 @@ function createFakeWorld({ loginBehavior = 'ready', withExtraTypes = false } = {
       return me;
     },
     cache: members,
+    async fetch(id) {
+      const m = members.get(id);
+      if (!m) throw Object.assign(new Error('Unknown Member'), { code: 10007 });
+      return m;
+    },
+    async ban(id, opts) {
+      guild.bans.push({ id, ...opts });
+      members.delete(id);
+    },
     searchCalls: [],
     searchShouldFail: false,
     async search({ query, limit }) {
@@ -246,7 +257,34 @@ function createFakeWorld({ loginBehavior = 'ready', withExtraTypes = false } = {
   };
   const addMember = (id, name) => {
     const user = makeUser(id, name.toLowerCase());
-    members.set(id, { id, user, displayName: name, displayAvatarURL: avatar });
+    // Wie discord.js GuildMember: Rollen, Timeout, Kick; manageable/moderatable/kickable/bannable steuerbar für Tests
+    const roleIds = new Set();
+    const member = {
+      id,
+      user,
+      displayName: name,
+      displayAvatarURL: avatar,
+      manageable: true,
+      moderatable: true,
+      kickable: true,
+      bannable: true,
+      communicationDisabledUntilTimestamp: null,
+      modCalls: [],
+      roles: {
+        cache: { has: (r) => roleIds.has(r) },
+        add: async (r, reason) => (member.modCalls.push(['role+', r, reason]), roleIds.add(r)),
+        remove: async (r, reason) => (member.modCalls.push(['role-', r, reason]), roleIds.delete(r)),
+      },
+      async timeout(ms, reason) {
+        member.modCalls.push(['timeout', ms, reason]);
+        member.communicationDisabledUntilTimestamp = ms ? Date.now() + ms : null;
+      },
+      async kick(reason) {
+        member.modCalls.push(['kick', reason]);
+        members.delete(id);
+      },
+    };
+    members.set(id, member);
     user.createDM = async () => [...client.channels.cache.values()].find((c) => c.type === ChannelType.DM && c.recipientId === user.id) || world.makeDM(user);
     return user;
   };

@@ -9,7 +9,7 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText }) {
   const requireAi = () => {
     if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
     return ai;
@@ -49,6 +49,16 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:list-emojis': (p) => service.listEmojis(validators.guildRef(p)),
     'pk:commands-state': () => service.getCommandsState(),
     'pk:list-dms': () => service.listDMs(),
+    // Moderation (nur mit Bot-Rechten; Kick/Bann fragt die Oberfläche vorher nach)
+    'pk:member-info': (p) => service.getMemberInfo(validators.memberRef(p)),
+    'pk:member-role': (p) => service.setMemberRole(validators.memberRole(p)),
+    'pk:member-timeout': (p) => service.timeoutMember(validators.memberTimeout(p)),
+    'pk:member-kick': (p) => service.kickMember(validators.memberKick(p)),
+    'pk:member-ban': (p) => service.banMember(validators.memberBan(p)),
+    'pk:copy-text': (p) => {
+      copyText?.(validators.copyText(p));
+      return true;
+    },
     // KI-Agenten (Beta) – der API-Schlüssel geht nur hinein, nie heraus
     'pk:ai-get': () => requireAi().getConfig(),
     'pk:ai-set-config': (p) => requireAi().setConfig(validators.aiConfig(p)),
