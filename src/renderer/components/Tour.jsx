@@ -41,7 +41,7 @@ export function buildSteps() {
     steps.push(
       { target: '.rail [aria-label="Bot einladen"]', title: 'Erst mal: Bot einladen', text: 'Dein Bot ist noch auf keinem Server. Über diesen Knopf lädst du ihn auf deinen Server ein: Server wählen, „Autorisieren“, fertig.', task: 'Klick auf den Knopf.', click: '.rail [aria-label="Bot einladen"]' },
       { target: '.rail [aria-label="Server beitreten"]', title: 'Server per Einladungslink', text: 'Hast du einen Einladungslink zu einem fremden Server? Hier einfügen, die App zeigt dir den Weg.' },
-      { title: 'Danach geht\'s weiter', text: 'Sobald der Bot auf einem Server ist, erscheint er links. Dann starte die Tour nochmal unter Einstellungen → Hilfe & Tour, und ich zeige dir den Rest 🙂' },
+      { title: 'Ich helfe dir dabei', text: 'Der Einrichtungs-Assistent (Einstellungen → Hilfe & Tour → 🧭) zeigt dir jeden Klick: Bot anlegen, Server erstellen, Bot einladen. Er prüft automatisch mit. Danach starte die Tour nochmal 🙂' },
     );
     return steps;
   }
