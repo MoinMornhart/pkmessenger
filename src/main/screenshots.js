@@ -214,6 +214,49 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     await openChat('allgemein');
     await wait(400);
   }
+  // Tour (Issue #1): Spotlight, Mitmachen (Chat anklicken, „/“ tippen), Fortschritt gespeichert
+  {
+    const card = () => js(win, `document.querySelector('.tour__card h3')?.textContent || null`);
+    const next = () => js(win, `[...document.querySelectorAll('.tour__card .btn')].find(b=>b.classList.contains('btn--primary'))?.click()`);
+    await js(win, `window.dispatchEvent(new CustomEvent('pk:start-tour'))`);
+    await wait(500);
+    const t1 = await card();
+    await next();
+    await wait(400);
+    await shoot(win, dir, '55-tour-server');
+    await next();
+    await wait(400);
+    const t3 = await card();
+    await shoot(win, dir, '56-tour-chats');
+    // Mitmachen: Chat anklicken → Tour geht von selbst weiter
+    await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
+    await wait(1400);
+    const t4 = await card();
+    await js(win, typeInto('.composer textarea', '/'));
+    await wait(300);
+    await shoot(win, dir, '57-tour-mitmachen');
+    await wait(1100);
+    const t5 = await card();
+    await js(win, typeInto('.composer textarea', ''));
+    await js(win, `[...document.querySelectorAll('.tour__card .btn')].find(b=>b.textContent.includes('überspringen'))?.click()`);
+    await wait(300);
+    const saved = await js(win, `localStorage.getItem('pk.tour.v1')`);
+    console.log(`[tour] ${t1} → ${t3} → nach Klick: ${t4} → nach „/“: ${t5} · gespeichert: ${saved?.slice(0,40)} · Overlay weg: ${await js(win, `!document.querySelector('.tour')`)}`);
+    // Einstellungen: Navigation + Suche
+    await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+    await wait(500);
+    await shoot(win, dir, '58-einstellungen-neu');
+    await js(win, `(() => { const el=document.querySelector('.settings__search'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,'passwrt'); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    await wait(300);
+    const found = await js(win, `[...document.querySelectorAll('.settings__navitem')].map(b=>b.textContent.trim()).join(', ')`);
+    await shoot(win, dir, '59-einstellungen-suche');
+    await js(win, `(() => { const el=document.querySelector('.settings__search'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,''); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    await wait(200);
+    const hints = await js(win, `[...document.querySelectorAll('button[aria-label]')].filter(b=>!b.title).length`);
+    await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+    await wait(300);
+    console.log(`[einstellungen] Suche „passwrt“: ${found} · Knöpfe ohne Hinweis: ${hints}`);
+  }
   // Smileys (Issue #1: „mehr Smileys“): 😀 im Eingabefeld, suchen, einfügen; ➕ bei Reaktionen
   await js(win, `document.querySelector('.tool-btn[aria-label="Smileys"]')?.click()`);
   await wait(300);

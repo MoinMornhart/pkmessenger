@@ -17,6 +17,7 @@ import AccessDialog from './AccessDialog.jsx';
 import SettingsDialog from './SettingsDialog.jsx';
 import LinkWarnDialog from './LinkWarnDialog.jsx';
 import ProfileCard from './ProfileCard.jsx';
+import Tour from './Tour.jsx';
 import { prefs } from '../prefs';
 import JoinServerDialog from './JoinServerDialog.jsx';
 import { ThreadsPanel } from './SidePanels.jsx';
@@ -527,6 +528,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           />
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
+        <Tour />
         {profileOf && (
           <ProfileCard
             userId={profileOf.userId}
