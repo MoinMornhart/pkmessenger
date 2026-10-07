@@ -399,6 +399,23 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
           <label className="composer__ping">
             <input type="checkbox" checked={r.quietWhenOpen !== false} onChange={(e) => set({ quietWhenOpen: e.target.checked })} /> Nicht antworten, wenn ich den Chat gerade selbst offen habe
           </label>
+          <label className="composer__ping" data-setting="ai-memory">
+            <input type="checkbox" checked={Boolean(r.memory)} onChange={(e) => set({ memory: e.target.checked })} /> 🧠 Gedächtnis pro Person (verschlüsselt auf diesem PC)
+          </label>
+          {r.memory && (
+            <div className="settings__row ai-limits">
+              <label>
+                Größe pro Person
+                <select value={r.memoryBudget || 3000} onChange={(e) => set({ memoryBudget: Number(e.target.value) })}>
+                  <option value={1000}>klein (~1.000 Tokens)</option>
+                  <option value={3000}>mittel (~3.000 Tokens)</option>
+                  <option value={8000}>groß (~8.000 Tokens)</option>
+                  <option value={16000}>sehr groß (~16.000 Tokens)</option>
+                </select>
+              </label>
+            </div>
+          )}
+          {r.memory && <p className="muted small">Der Bot merkt sich, was jede Person ihm geschrieben hat. Wird es zu viel, fasst die KI das Alte zu wichtigen Fakten zusammen und löscht den Rest. Das Gedächtnis geht nur an deinen KI-Anbieter und liegt verschlüsselt auf diesem PC.</p>}
           <p className="muted small">💡 Als Erwähnung zählt: @Bot, die Bot-Rolle oder eine Antwort auf eine Nachricht des Bots.</p>
           <label className="composer__ping">
             <input type="checkbox" checked={r.notify} onChange={(e) => set({ notify: e.target.checked })} /> Hinweis in der App, wenn der Bot geantwortet hat
@@ -416,6 +433,7 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
           </button>
         </div>
       )}
+      <MemoryList toast={toast} />
       {cfg.skips?.length > 0 && (
         <div className="ai-recent">
           <span className="settings__label">Nicht geantwortet (warum?)</span>
@@ -433,6 +451,73 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
           {cfg.recent.map((e, i) => (
             <div key={i} className={`small ${e.ok ? '' : 'warn'}`}>
               {e.ok ? '✓' : '⚠'} {formatListTime(e.at, Date.now())} · {e.userName}: {e.answer}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Gedächtnis ansehen / vergessen (Inhalte werden erst beim Klick auf „Ansehen“ geladen)
+function MemoryList({ toast }) {
+  const [list, setList] = useState(null);
+  const [view, setView] = useState(null);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const load = () => api.aiMemoryList().then(setList).catch(() => setList([]));
+  useEffect(() => {
+    load();
+  }, []);
+  if (!list || list.length === 0) return null;
+  const run = (p) => p.then(setList).catch((e) => toast({ kind: 'error', title: e.message }));
+  return (
+    <div className="ai-recent" data-setting="ai-memory-list">
+      <span className="settings__label">🧠 Gedächtnis ({list.length} {list.length === 1 ? 'Person' : 'Personen'})</span>
+      {list.map((p) => (
+        <div key={p.userId} className="ai-memory-row small">
+          <span>
+            <b>{p.name || 'Unbekannt'}</b> · {p.turns} Wortwechsel · ~{p.tokens} Tokens{p.hasSummary ? ' · zusammengefasst ✓' : ''}
+          </span>
+          <button className="btn btn--ghost btn--small" onClick={() => api.aiMemoryView({ userId: p.userId }).then(setView)}>
+            Ansehen
+          </button>
+          <button className="btn btn--ghost btn--small" onClick={() => run(api.aiMemoryForget({ userId: p.userId }))}>
+            Vergessen
+          </button>
+        </div>
+      ))}
+      <button className="btn btn--ghost btn--small" onClick={() => setConfirmAll(true)}>
+        🗑 Alles vergessen
+      </button>
+      {confirmAll && (
+        <div className="settings__row">
+          <span className="warn small">Wirklich das ganze Gedächtnis löschen?</span>
+          <button
+            className="btn btn--danger btn--small"
+            onClick={() => {
+              setConfirmAll(false);
+              run(api.aiMemoryForgetAll());
+            }}
+          >
+            Ja, löschen
+          </button>
+          <button className="btn btn--ghost btn--small" onClick={() => setConfirmAll(false)}>
+            Abbrechen
+          </button>
+        </div>
+      )}
+      {view && (
+        <div className="ai-preview" role="region" aria-label={`Gedächtnis von ${view.name}`}>
+          <div className="muted small">
+            🧠 Gedächtnis von {view.name} · ~{view.tokens} Tokens ·{' '}
+            <button className="linklike" onClick={() => setView(null)}>
+              schließen
+            </button>
+          </div>
+          {view.summary && <div className="ai-preview__text">{view.summary}</div>}
+          {view.turns.map((t, i) => (
+            <div key={i} className="small">
+              <b>{t.role === 'user' ? view.name : '🤖 Bot'}:</b> {t.text}
             </div>
           ))}
         </div>
@@ -720,6 +805,10 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
             <input type="checkbox" checked={cfg.options.thinking} onChange={wrap('opt', async () => setCfg(await api.aiSetOptions({ thinking: !cfg.options.thinking })))} /> 🧠 Denkendes Modell (Thinking)
           </label>
           <p className="muted small">Für Modelle, die erst „nachdenken“ (z. B. Qwen3, DeepSeek-R1, …-thinking). Sie bekommen mehr Zeit und Platz, ihre Gedanken landen nie im Chat.</p>
+          <label className="composer__ping" data-setting="ai-vision">
+            <input type="checkbox" checked={cfg.options.vision} onChange={wrap('opt', async () => setCfg(await api.aiSetOptions({ vision: !cfg.options.vision })))} /> 👁 Modell kann Bilder sehen
+          </label>
+          <p className="muted small">Dann bekommt die KI Bilder aus Nachrichten (nur von Discords Servern, max. 5 MB). Ohne den Schalter, und bei Ton oder Video, sagt sie locker, dass sie das nicht kann.</p>
 
           <ResponderSection key={JSON.stringify(cfg.responder)} cfg={cfg} targets={targets} guilds={guilds} toast={toast} />
 

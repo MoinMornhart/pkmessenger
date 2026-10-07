@@ -4089,3 +4089,14 @@ kbd {
 .link {
   word-break: break-all;
 }
+
+/* ---------- KI-Gedächtnis (Issue #1) ---------- */
+.ai-memory-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ai-memory-row > span {
+  flex: 1 1 200px;
+}
