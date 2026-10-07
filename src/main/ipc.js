@@ -9,7 +9,7 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote }) {
   const requireAi = () => {
     if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
     return ai;
@@ -181,6 +181,15 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:error-report': (p) => (errorReport ? errorReport(validators.logError({ where: p?.where, message: p?.error })) : ''),
     'pk:open-log-folder': () => (openLogFolder ? openLogFolder() : false),
     'pk:setup-check': () => service.setupCheck(),
+    // Fernzugang im WLAN (Issue #46/#50) – nur vom eigenen Fenster steuerbar
+    'pk:remote-status': () => (remote ? remote.status() : null),
+    'pk:remote-set-password': (p) => remote.setPassword(validators.remotePassword(p)),
+    'pk:remote-enable': (p) => remote.setEnabled(validators.backgroundSet(p)),
+    'pk:remote-options': (p) => remote.setOptions(validators.remoteOptions(p)),
+    'pk:remote-pair': () => remote.createPairingWithQr(),
+    'pk:remote-cancel-pair': (p) => remote.cancelPairing(validators.remoteId(p)),
+    'pk:remote-decide': (p) => remote.decide(validators.remoteDecide(p)),
+    'pk:remote-remove-device': (p) => remote.removeDevice(validators.remoteId(p)),
     'pk:blocklist-get': () => (blocklist ? blocklist.get() : { danger: [], warn: [] }),
     'pk:blocklist-update': () => (blocklist ? blocklist.update({ force: true }) : null),
     'pk:set-presence': (p) => service.setPresence(validators.backgroundSet(p)),
