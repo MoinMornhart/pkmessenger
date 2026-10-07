@@ -164,7 +164,18 @@ function aiBaseUrl(value) {
   return u.toString().replace(/\/+$/, '');
 }
 
+// Eigener Benachrichtigungston: nur WAV (RIFF/WAVE per Magic-Bytes), max. 2 MiB
+const SOUND_MAX_BYTES = 2 * 1024 * 1024;
+
 const validators = {
+  soundFile(p) {
+    const { data } = obj(p);
+    if (!(data instanceof Uint8Array) || data.byteLength < 44) throw new ValidationError('Ungültige Audiodatei.');
+    if (data.byteLength > SOUND_MAX_BYTES) throw new ValidationError('Die Audiodatei ist größer als 2 MiB.');
+    const ascii = (a, b) => String.fromCharCode(...data.subarray(a, b));
+    if (ascii(0, 4) !== 'RIFF' || ascii(8, 12) !== 'WAVE') throw new ValidationError('Nur WAV-Dateien (.wav) sind erlaubt.');
+    return data;
+  },
   aiConfig(p) {
     const { enabled, provider, baseUrl, model } = obj(p);
     if (typeof enabled !== 'boolean') throw new ValidationError('Ungültiges Feld "enabled".');

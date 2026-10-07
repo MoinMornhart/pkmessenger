@@ -3069,3 +3069,28 @@ img.chat-avatar {
   margin-top: 8px;
   color: var(--text-2);
 }
+
+/* ---------- Benachrichtigungstöne (Einstellungen) ---------- */
+.sound-events {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+.sound-event {
+  display: grid;
+  grid-template-columns: 1fr 140px 34px;
+  gap: 8px;
+  align-items: center;
+}
+.sound-event__name {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13.5px;
+  min-width: 0;
+  cursor: pointer;
+}
+.sound-event select {
+  min-width: 0; /* allgemeine Regel .settings select hat min-width 220px → ragte aus dem Dialog */
+  width: 100%;
+}

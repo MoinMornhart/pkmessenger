@@ -3,6 +3,7 @@ import { api } from '../api';
 import { prefs } from '../prefs';
 import AiSection from './AiSection.jsx';
 import UpdateSection from './UpdateSection.jsx';
+import NotificationSection from './NotificationSection.jsx';
 import { THEMES, ACCENTS, MOTIONS } from '../theme';
 
 function TokenSection({ toast }) {
@@ -366,6 +367,10 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
         <section>
           <h4>🎨 Aussehen</h4>
           <AppearanceSection />
+        </section>
+        <section>
+          <h4>🔔 Benachrichtigungen</h4>
+          <NotificationSection toast={toast} />
         </section>
         <section>
           <h4>🪪 Bot-Profil</h4>
