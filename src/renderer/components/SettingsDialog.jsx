@@ -7,6 +7,7 @@ import NotificationSection from './NotificationSection.jsx';
 import VoiceFxSection from './VoiceFxSection.jsx';
 import SecuritySection from './SecuritySection.jsx';
 import { THEMES, ACCENTS, MOTIONS } from '../theme';
+import WallpaperDialog from './WallpaperDialog.jsx';
 
 function TokenSection({ toast }) {
   const [info, setInfo] = useState(null);
@@ -117,6 +118,19 @@ function WritingSection() {
   );
 }
 
+function WallpaperButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className="btn btn--small" onClick={() => setOpen(true)}>
+        🖼 Standard-Hintergrund wählen
+      </button>
+      <p className="muted small">Pro Chat oder Server: Rechtsklick auf einen Chat in der Liste → „Hintergrund …“.</p>
+      {open && <WallpaperDialog onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 // Aussehen: Design, Akzentfarbe, Animationen, Dichte – wirkt sofort, wird pro PC gemerkt
 function AppearanceSection() {
   const [p, setP] = useState(prefs.get());
@@ -158,6 +172,8 @@ function AppearanceSection() {
           </button>
         ))}
       </div>
+      <span className="settings__label">Chat-Hintergrund</span>
+      <WallpaperButton />
       <span className="settings__label">Ansicht</span>
       <div className="look-seg" role="radiogroup" aria-label="Ansicht">
         {[

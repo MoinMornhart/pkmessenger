@@ -36,6 +36,12 @@ function createDemo() {
   const [anna, bernd, chiara] = people;
   // Demo-Bot darf moderieren (Rollen, Timeout, Kick) – Bannen bewusst NICHT, damit der Hinweis sichtbar ist
   for (const p of [PF.ManageRoles, PF.ModerateMembers, PF.KickMembers]) guild.members.me.permFlags.add(p);
+  // #projekt-a darf der Demo-Bot verwalten (umbenennen/verschieben per Rechtsklick)
+  {
+    const pa = channels.projektA;
+    const before = pa.permissionsFor;
+    pa.permissionsFor = (me) => ({ has: (f) => f === PF.ManageChannels || before(me).has(f) });
+  }
   const mods = guild.roles.cache.get('333333333333333301');
 
   const now = Date.now();

@@ -78,6 +78,8 @@ contextBridge.exposeInMainWorld('api', {
   commandsState: call('pk:commands-state'),
   getProfile: call('pk:get-profile'),
   listDMs: call('pk:list-dms'),
+  channelRename: call('pk:channel-rename'),
+  channelMove: call('pk:channel-move'),
   memberInfo: call('pk:member-info'),
   memberRole: call('pk:member-role'),
   memberTimeout: call('pk:member-timeout'),

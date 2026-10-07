@@ -6,6 +6,9 @@ import { toPlainText } from '../../shared/mentions';
 import { systemInfo } from '../../shared/system-messages';
 import ServerRail, { DM_ID } from './ServerRail.jsx';
 import NewDMDialog from './NewDMDialog.jsx';
+import ContextMenu from './ContextMenu.jsx';
+import WallpaperDialog from './WallpaperDialog.jsx';
+import { NameDialog } from './SidePanels.jsx';
 import ChatList from './ChatList.jsx';
 import ChatView from './ChatView.jsx';
 import QuickSwitcher from './QuickSwitcher.jsx';
@@ -40,6 +43,9 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [newDmOpen, setNewDmOpen] = useState(false);
+  const [chatMenu, setChatMenu] = useState(null); // Rechtsklick auf einen Chat
+  const [wallFor, setWallFor] = useState(null); // Hintergrund-Dialog { channelId, guildId, chatName, guildName }
+  const [renameFor, setRenameFor] = useState(null); // Kanal umbenennen
   const [activeThread, setActiveThread] = useState(null); // F12: geöffneter Thread (als Chat)
   const [forum, setForum] = useState(null); // F12: geöffnetes Forum (Beitragsliste)
   const [refreshing, setRefreshing] = useState(false);
@@ -467,6 +473,21 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           onShowAccess={() => setAccessOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
           onNewDM={() => setNewDmOpen(true)}
+          onChatContext={(e, c) => {
+            e.preventDefault();
+            const guildPart = c.guildId === DM_ID ? '@me' : c.guildId;
+            const run = (p, ok) => p.then(() => ok && toast({ kind: 'info', title: ok, duration: 2000 })).catch((err) => toast({ kind: 'error', title: err.message, text: err.hint }));
+            const items = [
+              { icon: '✓', label: 'Als gelesen markieren', onClick: () => lastIds[c.id] && markRead(c.id, lastIds[c.id]) },
+              { icon: '🖼', label: 'Hintergrund …', onClick: () => setWallFor({ channelId: c.id, guildId: c.guildId, chatName: c.name, guildName: guild?.name }) },
+              { icon: '🔗', label: 'Link kopieren', onClick: () => run(api.copyText({ text: `https://discord.com/channels/${guildPart}/${c.id}` }), 'Link kopiert') },
+              c.canManage && { separator: true },
+              c.canManage && { icon: '✏️', label: 'Umbenennen …', onClick: () => setRenameFor(c) },
+              c.canManage && { icon: '⬆️', label: 'Nach oben verschieben', onClick: () => run(api.channelMove({ channelId: c.id, direction: 'up' }), 'Verschoben') },
+              c.canManage && { icon: '⬇️', label: 'Nach unten verschieben', onClick: () => run(api.channelMove({ channelId: c.id, direction: 'down' }), 'Verschoben') },
+            ].filter(Boolean);
+            setChatMenu({ x: e.clientX, y: e.clientY, items });
+          }}
         />
         {accessOpen && (
           <AccessDialog
@@ -481,6 +502,25 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         )}
         {joinOpen && <JoinServerDialog onClose={() => setJoinOpen(false)} onRefresh={() => refresh()} toast={toast} />}
         {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} toast={toast} appInfo={appInfo} guildId={guildId === DM_ID ? null : guildId} aiTargets={aiTargets} guilds={guilds || []} />}
+        {chatMenu && <ContextMenu x={chatMenu.x} y={chatMenu.y} items={chatMenu.items} onClose={() => setChatMenu(null)} />}
+        {wallFor && <WallpaperDialog {...wallFor} onClose={() => setWallFor(null)} />}
+        {renameFor && (
+          <NameDialog
+            title="Kanal umbenennen"
+            label="Neuer Name"
+            initial={renameFor.name}
+            confirmLabel="Umbenennen"
+            onClose={() => setRenameFor(null)}
+            onConfirm={(name) => {
+              const c = renameFor;
+              setRenameFor(null);
+              api
+                .channelRename({ channelId: c.id, name })
+                .then(() => toast({ kind: 'info', title: 'Umbenannt ✓', duration: 2000 }))
+                .catch((err) => toast({ kind: 'error', title: err.message, text: err.hint }));
+            }}
+          />
+        )}
         {newDmOpen && (
           <NewDMDialog
             guilds={guilds || []}

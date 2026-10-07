@@ -66,6 +66,8 @@ export const api = Object.fromEntries(
     'commandsState',
     'getProfile',
     'listDMs',
+    'channelRename',
+    'channelMove',
     'memberInfo',
     'memberRole',
     'memberTimeout',

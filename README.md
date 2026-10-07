@@ -287,6 +287,8 @@ Mehr Details: [AGENTS.md](AGENTS.md) (Architektur, Entscheidungen, Teststand) ·
 - [x] 🔔 Benachrichtigungstöne: 4 eingebaute Klänge oder eigene WAV-Datei, getrennt für anderen Chat, offenen Chat, Erwähnung, Privatchat, KI-Antwort und Verbindungsfehler; Lautstärke, Testton, Drosselung, auch bei minimiertem Fenster
 - [x] 🧪 Beta: KI antwortet, wenn der Bot erwähnt wird (Kanäle, Personen, Persönlichkeit einstellbar)
 - [x] 🎨 Aussehen: 5 Designs (Nacht, Ozean, Lila, AMOLED, Hell), Akzentfarbe, Animationen (voll/dezent/aus), kompakte Ansicht
+- [x] 🖼 Chat-Hintergründe (8 Vorlagen) pro Chat, pro Server oder überall
+- [x] Rechtsklick auf Chats: als gelesen markieren, Hintergrund, Link kopieren; mit „Kanäle verwalten“ auch umbenennen und verschieben
 - [x] 😀 354 Smileys in 8 Kategorien mit Suche (Eingabefeld und Reaktionen, dazu Server-Emojis)
 - [x] @-Namensvorschläge auf Wunsch über alle Server (Einstellungen → ✍️ Schreiben)
 - [x] 🛡 App-Passwort mit Sperrbildschirm (auch automatisch bei Inaktivität), 🚀 mit Windows starten, 🔕 Nicht-stören-Modus

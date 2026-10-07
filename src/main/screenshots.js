@@ -93,6 +93,31 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await clickT('.moderation__confirm .btn', 'Abbrechen');
   await js(win, `document.querySelector('.moderation .icon-btn')?.click()`);
   await wait(300);
+  // Rechtsklick auf einen Chat (Issue #1): Hintergrund nur für diesen Chat, Kanal umbenennen
+  const rowCtx = (name) => js(win, `(() => { const r=[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.querySelector('.chatrow__name')?.textContent===${JSON.stringify(name)}); const b=r.getBoundingClientRect(); r.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:b.left+60,clientY:b.top+20})); })()`);
+  await rowCtx('allgemein');
+  await wait(300);
+  const chatMenu = await js(win, `JSON.stringify([...document.querySelectorAll('.ctx-menu__item')].map(b=>b.textContent.trim()))`);
+  await js(win, `[...document.querySelectorAll('.ctx-menu__item')].find(b=>b.textContent.includes('Hintergrund'))?.click()`);
+  await wait(300);
+  await js(win, `[...document.querySelectorAll('.wallpaper-tile')].find(b=>b.textContent.includes('Aurora'))?.click()`);
+  await wait(200);
+  await shoot(win, dir, '40-hintergrund-waehlen');
+  await js(win, `[...document.querySelectorAll('.wallpaper-dialog .btn')].find(b=>b.textContent.includes('Übernehmen'))?.click()`);
+  await wait(400);
+  await shoot(win, dir, '41-hintergrund-aurora');
+  const wall = await js(win, `document.querySelector('main.chat')?.dataset.wall`);
+  await rowCtx('projekt-a');
+  await wait(300);
+  const manageMenu = await js(win, `[...document.querySelectorAll('.ctx-menu__item')].map(b=>b.textContent.trim()).filter(t=>/Umbenennen|verschieben/.test(t)).length`);
+  await js(win, `[...document.querySelectorAll('.ctx-menu__item')].find(b=>b.textContent.includes('Umbenennen'))?.click()`);
+  await wait(300);
+  await js(win, `(() => { const el=document.querySelector('#name-dialog-input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,'projekt-alpha'); el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); })()`);
+  await wait(1200);
+  const renamed = await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow__name')].some(e=>e.textContent==='projekt-alpha')`);
+  console.log(`[chat-rechtsklick] Menü: ${chatMenu} · Hintergrund: ${wall} · Verwalten-Einträge bei #projekt-a: ${manageMenu} · umbenannt: ${renamed}`);
+  await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
+  await wait(400);
   // Smileys (Issue #1: „mehr Smileys“): 😀 im Eingabefeld, suchen, einfügen; ➕ bei Reaktionen
   await js(win, `document.querySelector('.tool-btn[aria-label="Smileys"]')?.click()`);
   await wait(300);
