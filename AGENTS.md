@@ -133,7 +133,7 @@ Lokal geht weiterhin: `$env:GITHUB_TOKEN="…"; npm run publish`.
 
 | Paket | Version | Hinweis |
 |---|---|---|
-| electron | 44.5.1 | 44.6.0 (laut Prompt) existiert auf npm nicht; 44.5.1 = latest. Enthält Node 24.21.0 und Chromium 152.0.7977.130 |
+| electron | 44.6.0 | seit 07.10.2026 (Issue #44, VibeWorks): 44.6.0 erschien am 06.10.2026 22:31 (nur Fehlerkorrekturen: macOS-Start, usb, webview.findInPage). Vorher 44.5.1 |
 | discord.js | 14.27.0 | engines laut npm: node >= 18 (nicht >= 24.17) |
 | react / react-dom | 19.3.0 | |
 | react-window | 2.3.3 | v2-API: `List`, `useDynamicRowHeight` (MIT, kostenlos) |
