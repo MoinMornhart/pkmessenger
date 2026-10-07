@@ -241,6 +241,7 @@ function createDemo() {
     const user = body.messages?.at(-1)?.content || '';
     const sys = body.messages?.[0]?.content || '';
     let content = /Verbindung/.test(user) ? 'OK – Verbindung steht.' : / asks:/.test(user) ? 'Heute um **19 Uhr** in der Lounge 🎉 Bis später, Anna!' : '☀️ **Guten Morgen, Team!** Heute steht das Treffen um 19 Uhr an. Bringt eure Ideen mit 🚀';
+    if (/ asks:/.test(user)) await new Promise((r) => setTimeout(r, 1800)); // Demo: Antwort dauert kurz (Anzeige „KI schreibt …“)
     // Websuche: erst suchen, dann mit Quelle antworten
     if (/SEARCH: <short/.test(sys)) content = /<web_results/.test(user) ? '🌤 **Wetter heute:** sonnig, bis 21 °C – perfekt fürs Treffen um 19 Uhr! (Quelle: wetter.example)' : 'SEARCH: wetter heute berlin';
     return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content } }] }) };

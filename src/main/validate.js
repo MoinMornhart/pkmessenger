@@ -1,5 +1,7 @@
 'use strict';
 
+const { isLocalAddress } = require('../shared/ai-limits');
+
 const { isSnowflake } = require('../shared/snowflake');
 const { parseInviteCode } = require('../shared/invites');
 const { isValidSchedule } = require('../shared/schedule');
@@ -158,8 +160,9 @@ function aiBaseUrl(value) {
   } catch {
     throw new ValidationError('Ungültige Adresse des KI-Anbieters.');
   }
-  const local = u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
-  if (u.protocol !== 'https:' && !local) throw new ValidationError('Die Adresse muss mit https:// beginnen (lokal auch http://localhost).');
+  // http nur für diesen PC oder das eigene Heimnetz (z. B. LM Studio auf http://192.168.x.x:1234, Issue #1)
+  const local = u.protocol === 'http:' && isLocalAddress(u.toString());
+  if (u.protocol !== 'https:' && !local) throw new ValidationError('Die Adresse muss mit https:// beginnen (im eigenen Netz auch http://, z. B. http://localhost oder http://192.168.…).');
   if (u.username || u.password || u.search || u.hash) throw new ValidationError('Die Adresse darf keine Zugangsdaten oder Parameter enthalten.');
   return u.toString().replace(/\/+$/, '');
 }
@@ -235,14 +238,32 @@ const validators = {
       web: web === true,
     };
   },
+  aiOptions(p) {
+    const { thinking, autoConnect } = obj(p);
+    const out = {};
+    if (thinking !== undefined) {
+      if (typeof thinking !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
+      out.thinking = thinking;
+    }
+    if (autoConnect !== undefined) {
+      if (typeof autoConnect !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
+      out.autoConnect = autoConnect;
+    }
+    return out;
+  },
+  activeChat(p) {
+    const { channelId, focused } = obj(p);
+    if (typeof focused !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
+    return { channelId: channelId ? snowflake(channelId, 'channelId') : null, focused };
+  },
   aiModels(p) {
     const { provider, baseUrl } = obj(p);
     if (provider !== 'openai' && provider !== 'anthropic') throw new ValidationError('Unbekannter KI-Anbieter-Typ.');
     return { provider, baseUrl: aiBaseUrl(baseUrl) };
   },
   aiResponder(p) {
-    const { enabled, channelIds, dms, allowUsers, blockUsers, instructions, context, notify, web = false } = obj(p);
-    if (typeof web !== 'boolean') throw new ValidationError('Ungültiges Feld "web".');
+    const { enabled, channelIds, dms, allowUsers, blockUsers, instructions, context, notify, web = false, quietWhenOpen = true } = obj(p);
+    if (typeof web !== 'boolean' || typeof quietWhenOpen !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
     for (const [k, v] of Object.entries({ enabled, dms, context, notify })) if (typeof v !== 'boolean') throw new ValidationError(`Ungültiges Feld "${k}".`);
     if (!Array.isArray(channelIds) || channelIds.length > 500) throw new ValidationError('Ungültige Kanalliste.');
     const people = (list, field) => {
@@ -267,6 +288,7 @@ const validators = {
       context,
       notify,
       web,
+      quietWhenOpen,
     };
   },
   aiLimits(p) {

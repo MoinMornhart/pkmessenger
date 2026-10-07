@@ -49,7 +49,7 @@ test('Serialisierte Nachricht enthält nur benötigte Felder (Datensparsamkeit)'
   const ch = fill(world, 1);
   const [m] = (await service.getMessages({ channelId: ch.id, limit: 50 })).messages;
   // Felder seit F7–F15: reactions, embeds, pinned, thread, canEdit, canDelete; seit Umfragen: poll (alles für die Anzeige nötig, nichts gespeichert)
-  assert.deepEqual(Object.keys(m).sort(), ['attachments', 'author', 'canDelete', 'canEdit', 'channelId', 'content', 'createdTimestamp', 'editedTimestamp', 'embeds', 'embedsCount', 'guildId', 'id', 'isOwn', 'mentions', 'nonce', 'pinned', 'poll', 'reactions', 'reference', 'system', 'thread', 'type'].sort());
+  assert.deepEqual(Object.keys(m).sort(), ['attachments', 'author', 'canDelete', 'canEdit', 'channelId', 'content', 'createdTimestamp', 'editedTimestamp', 'embeds', 'embedsCount', 'guildId', 'id', 'isOwn', 'mentions', 'nonce', 'pinned', 'poll', 'reactions', 'reference', 'system', 'thread', 'toBot', 'type'].sort());
   assert.equal(m.author.name, 'anna');
   assert.equal(m.isOwn, false);
 });

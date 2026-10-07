@@ -18,12 +18,17 @@ const { webSearch, formatResults } = require('./web-search');
 
 const TICK_MS = 30000;
 const REQUEST_TIMEOUT_MS = 60000;
+const THINKING_TIMEOUT_MS = 180000; // denkende Modelle brauchen lokal oft deutlich länger
+const THINKING_EXTRA_TOKENS = 4000;
+const RECONNECT_MS = 5 * 60 * 1000; // Auto-Verbindung: bei Fehler alle 5 Minuten erneut
 const CONTEXT_MESSAGES = 20;
 const ANTHROPIC_VERSION = '2023-06-01';
-const DEFAULT_RESPONDER = Object.freeze({ enabled: false, channelIds: [], dms: false, allowUsers: [], blockUsers: [], instructions: '', context: false, notify: true, web: false });
+const DEFAULT_RESPONDER = Object.freeze({ enabled: false, channelIds: [], dms: false, allowUsers: [], blockUsers: [], instructions: '', context: false, notify: true, web: false, quietWhenOpen: true });
 // Harte Limits für ALLE KI-Anfragen (Aufträge, Antworten, Vorschau, Test) – Schutz vor Kosten und Spam (Issue #12)
 const DEFAULT_LIMITS = Object.freeze({ mode: 'auto', perHour: 60, perDay: 300 }); // mode: shared/ai-limits.js
-const DEFAULT_CONFIG = Object.freeze({ enabled: false, provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: '', jobs: [], responder: DEFAULT_RESPONDER, limits: DEFAULT_LIMITS, profiles: [] });
+// options.thinking: „denkende“ Modelle (Qwen3, DeepSeek-R1 …) brauchen mehr Platz/Zeit; options.autoConnect: beim Start verbinden
+const DEFAULT_OPTIONS = Object.freeze({ thinking: false, autoConnect: false });
+const DEFAULT_CONFIG = Object.freeze({ enabled: false, provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: '', jobs: [], responder: DEFAULT_RESPONDER, limits: DEFAULT_LIMITS, profiles: [], options: DEFAULT_OPTIONS });
 // Systemprompts sind englisch (verstehen alle Modelle am besten), geantwortet wird möglichst auf Deutsch (Issue #12)
 const LANGUAGE_HINT = {
   auto: 'Write in German, unless the task explicitly asks for another language.',
@@ -67,6 +72,16 @@ function jobDefaults(job) {
     ...job,
   };
 }
+// Warum nicht geantwortet? (für das Protokoll in der Oberfläche)
+const SKIP_TEXT = {
+  kanal: 'Kanal ist nicht ausgewählt (bzw. Privatchats sind aus)',
+  'kein-ping': 'Bot wurde nicht erwähnt',
+  ausgeschlossen: 'Person steht auf „ausschließen“',
+  'nicht-erlaubt': 'Person steht nicht auf „Nur diesen Personen antworten“',
+  wartezeit: 'Wartezeit (15 s pro Kanal)',
+  stundenlimit: 'Stundenlimit für Antworten erreicht',
+  'chat-offen': 'Du hattest den Chat gerade offen',
+};
 // Antwort-Agent: Schutz vor Spam und Endlosschleifen
 const REPLY_COOLDOWN_MS = 15000; // pro Kanal
 const REPLY_LIMIT_PER_HOUR = 30; // insgesamt
@@ -130,8 +145,21 @@ function describeProviderError(status, body) {
   return aiError(`Der KI-Anbieter hat die Anfrage abgelehnt (${status}).`, detail);
 }
 
+/** Gedanken denkender Modelle entfernen: <think>…</think>, <thinking>…</thinking>, auch ohne öffnendes Tag. */
+function stripThinking(text) {
+  return String(text || '')
+    .replace(/<(think|thinking|reasoning)>[\s\S]*?<\/\1>/gi, '')
+    .replace(/^[\s\S]*?<\/(think|thinking|reasoning)>/i, '')
+    .replace(/<(think|thinking|reasoning)>[\s\S]*$/i, '') // abgeschnittenes Denken ohne Ende
+    .trim();
+}
+
 /** Eine Anfrage an den Anbieter. provider: 'openai' (OpenAI-kompatibel: OpenAI, OpenRouter, Groq, Mistral, Ollama, LM Studio …) oder 'anthropic'. */
-async function callModel({ provider, baseUrl, model, key, system, user, maxTokens = 800, fetchImpl = fetch, timeoutMs = REQUEST_TIMEOUT_MS, signal }) {
+async function callModel({ provider, baseUrl, model, key, system, user, maxTokens = 800, fetchImpl = fetch, timeoutMs = REQUEST_TIMEOUT_MS, signal, thinking = false }) {
+  if (thinking) {
+    maxTokens += THINKING_EXTRA_TOKENS;
+    timeoutMs = Math.max(timeoutMs, THINKING_TIMEOUT_MS);
+  }
   const base = baseUrl.replace(/\/+$/, '');
   let url;
   let headers = { 'content-type': 'application/json' };
@@ -174,7 +202,10 @@ async function callModel({ provider, baseUrl, model, key, system, user, maxToken
     const c = json?.choices?.[0]?.message?.content;
     text = typeof c === 'string' ? c : Array.isArray(c) ? c.map((p) => p?.text || '').join('') : '';
   }
-  text = text.trim();
+  // Denkende Modelle schreiben ihre Gedanken in <think>…</think> – die gehören nie in den Chat (Issue #1)
+  const raw = text;
+  text = stripThinking(text);
+  if (!text && raw.trim()) throw aiError('Die KI hat nur nachgedacht, aber keine Antwort geschrieben.', thinking ? 'Kürzeren Auftrag geben oder anderes Modell wählen.' : 'KI-Einstellungen → „Denkendes Modell (Thinking)“ einschalten, dann bekommt sie mehr Platz.');
   if (!text) throw aiError('Die KI hat keine Antwort geliefert.', 'Auftrag genauer formulieren oder anderes Modell wählen.');
   return text;
 }
@@ -229,6 +260,11 @@ async function discoverLocal({ fetchImpl = fetch } = {}) {
 
 function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = (...a) => fetch(...a), now = () => Date.now(), tickMs = TICK_MS, searchImpl = webSearch }) {
   const searches = []; // letzte Websuchen für die Oberfläche (nur im Speicher)
+  const skips = []; // Warum wurde NICHT geantwortet? (nur Nachrichten an den Bot / Privatchats, nur im Speicher)
+  const busy = new Map(); // channelId → { userName, since } – KI schreibt gerade
+  let activeChat = { channelId: null, focused: false }; // welchen Chat hat der Mensch gerade offen?
+  let conn = null; // Auto-Verbindung: { ok, at, message, model }
+  let connTimer = null;
   const running = new Set();
   let timer = null;
   const lastReplyAt = new Map(); // channelId → Zeitpunkt
@@ -244,6 +280,7 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
     cfg.responder = { ...DEFAULT_RESPONDER, ...(cfg.responder && typeof cfg.responder === 'object' ? cfg.responder : {}) };
     cfg.limits = { ...DEFAULT_LIMITS, ...(cfg.limits && typeof cfg.limits === 'object' ? cfg.limits : {}) };
     cfg.profiles = Array.isArray(cfg.profiles) ? cfg.profiles : [];
+    cfg.options = { ...DEFAULT_OPTIONS, ...(cfg.options && typeof cfg.options === 'object' ? cfg.options : {}) };
     return cfg;
   };
 
@@ -271,7 +308,7 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
   /** Für die Oberfläche – NIE den Schlüssel, nur ob einer da ist. */
   function getConfig() {
     const cfg = read();
-    return { ...cfg, hasKey: secret.has(), running: [...running], recent: [...recent], usage: usage(), limitsActive: limitsActive(cfg.limits, cfg.baseUrl), searches: [...searches] };
+    return { ...cfg, hasKey: secret.has(), running: [...running], recent: [...recent], usage: usage(), limitsActive: limitsActive(cfg.limits, cfg.baseUrl), searches: [...searches], skips: [...skips], busy: [...busy].map(([channelId, b]) => ({ channelId, ...b })), conn };
   }
 
   function setConfig({ enabled, provider, baseUrl, model }) {
@@ -344,7 +381,7 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
     const ctrl = new AbortController();
     inflight.set(ctrl, kind);
     try {
-      return await callModel({ provider: cfg.provider, baseUrl: cfg.baseUrl, model: cfg.model, key: secret.get(), system, user, maxTokens, fetchImpl, signal: ctrl.signal });
+      return await callModel({ provider: cfg.provider, baseUrl: cfg.baseUrl, model: cfg.model, key: secret.get(), system, user, maxTokens, fetchImpl, signal: ctrl.signal, thinking: cfg.options.thinking });
     } finally {
       inflight.delete(ctrl);
     }
@@ -391,8 +428,17 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
   /** „Verbindung testen“: kleine Anfrage, Antwort wird nur angezeigt – NIE in Discord gepostet. */
   async function test() {
     const started = now();
-    const reply = await ask({ system: 'You are a connection test.', user: 'Reply only with: OK – Verbindung steht.', maxTokens: 20, kind: 'test' });
+    let reply;
+    try {
+      reply = await ask({ system: 'You are a connection test.', user: 'Reply only with: OK – Verbindung steht.', maxTokens: 20, kind: 'test' });
+    } catch (err) {
+      conn = { ok: false, at: now(), message: String(err?.message || 'Fehler').slice(0, 160), hint: err?.hint || '' };
+      emit('ai:changed', {});
+      throw err;
+    }
     const cfg = read();
+    conn = { ok: true, at: now(), message: reply.slice(0, 80), model: cfg.model };
+    emit('ai:changed', {});
     return { reply: reply.slice(0, 200), durationMs: now() - started, provider: cfg.provider, model: cfg.model };
   }
 
@@ -510,6 +556,38 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
     return done;
   }
 
+  /** Thinking + Auto-Verbindung (Issue #1) */
+  function setOptions(options) {
+    const cfg = read();
+    cfg.options = { ...cfg.options, ...options };
+    write(cfg);
+    if (options.autoConnect && cfg.enabled) connect();
+    if (options.autoConnect === false) clearTimeout(connTimer);
+    return getConfig();
+  }
+
+  /** Welchen Chat hat der Mensch gerade offen (und ist das Fenster aktiv)? Dann antwortet die KI dort nicht. */
+  function setActiveChat({ channelId, focused }) {
+    activeChat = { channelId: channelId || null, focused: Boolean(focused) };
+    return true;
+  }
+
+  /** Verbindung prüfen; schlägt sie fehl und ist Auto-Verbindung an, in 5 Minuten erneut. */
+  async function connect() {
+    clearTimeout(connTimer);
+    const cfg = read();
+    if (!cfg.enabled || !cfg.model) return conn;
+    try {
+      await test();
+    } catch {
+      if (read().options.autoConnect) {
+        connTimer = setTimeout(() => connect().catch(() => {}), RECONNECT_MS);
+        connTimer.unref?.();
+      }
+    }
+    return conn;
+  }
+
   function setResponder(responder) {
     const cfg = read();
     cfg.responder = responder;
@@ -527,7 +605,9 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
     if (m.system || !m.content?.trim()) return 'leer';
     const isDM = !m.guildId;
     if (isDM ? !r.dms : !r.channelIds.includes(m.channelId)) return 'kanal';
-    if (!isDM && !(m.mentions?.users || []).some((u) => u.id === botId)) return 'kein-ping';
+    // Erwähnt = @Bot, @Bot-Rolle oder Antwort auf eine Bot-Nachricht (Issue #1: „hört nur auf mich“)
+    if (!isDM && !(m.toBot ?? (m.mentions?.users || []).some((u) => u.id === botId))) return 'kein-ping';
+    if (r.quietWhenOpen && activeChat.focused && activeChat.channelId === m.channelId) return 'chat-offen';
     if (r.blockUsers.some((u) => u.id === m.author.id)) return 'ausgeschlossen';
     if (r.allowUsers.length && !r.allowUsers.some((u) => u.id === m.author.id)) return 'nicht-erlaubt';
     if (now() - (lastReplyAt.get(m.channelId) || 0) < REPLY_COOLDOWN_MS) return 'wartezeit';
@@ -542,12 +622,26 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
     const status = service.getStatus?.() || {};
     const botId = status.bot?.id;
     const reason = skipReason(m, cfg, botId);
-    if (reason) return { skipped: reason };
+    if (reason) {
+      // Protokoll für die Oberfläche: nur bei Nachrichten, die wirklich an den Bot gingen (sonst wäre es Rauschen)
+      if (cfg.enabled && cfg.responder.enabled && (m?.toBot || (m && !m.guildId)) && !['aus', 'eigene', 'bot', 'leer'].includes(reason)) {
+        skips.unshift({ at: now(), channelId: m.channelId, userName: m.author?.name || '', reason, text: SKIP_TEXT[reason] || reason });
+        skips.length = Math.min(skips.length, MAX_RECENT);
+        emit('ai:changed', {});
+      }
+      return { skipped: reason };
+    }
     lastReplyAt.set(m.channelId, now());
     replyTimes.push(now());
     const r = cfg.responder;
+    // „PK schreibt …“ hält bei Discord nur ~10 s → während die KI arbeitet alle 8 s erneuern (Issue #1)
+    const typing = () => service.sendTyping?.({ channelId: m.channelId })?.catch?.(() => {});
+    const keepTyping = setInterval(typing, 8000);
+    keepTyping.unref?.();
+    busy.set(m.channelId, { userName: m.author?.name || '', since: now() });
+    emit('ai:busy', { channelId: m.channelId, userName: m.author?.name || '', on: true });
     try {
-      service.sendTyping?.({ channelId: m.channelId })?.catch?.(() => {});
+      typing();
       let context = '';
       if (r.context) {
         const { messages } = await service.getMessages({ channelId: m.channelId, limit: CONTEXT_MESSAGES });
@@ -583,6 +677,10 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
       recent.length = Math.min(recent.length, MAX_RECENT);
       emit('ai:changed', {});
       return entry;
+    } finally {
+      clearInterval(keepTyping);
+      busy.delete(m.channelId);
+      emit('ai:busy', { channelId: m.channelId, on: false });
     }
   }
 
@@ -595,14 +693,20 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
     }
     timer = setInterval(() => tick().catch(() => {}), tickMs);
     timer.unref?.();
+    // Beim Start automatisch mit der KI verbinden (Issue #1) – kurz warten, bis Discord steht
+    if (cfg.enabled && cfg.options.autoConnect) {
+      connTimer = setTimeout(() => connect().catch(() => {}), 3000);
+      connTimer.unref?.();
+    }
   }
 
   function stop() {
     clearInterval(timer);
+    clearTimeout(connTimer);
     timer = null;
   }
 
-  return { getConfig, setConfig, setKey, clearKey, test, saveJob, deleteJob, runJob, tick, start, stop, setResponder, onMessage, setLimits, saveProfile, useProfile, deleteProfile, previewJob, abort, models, findLocal };
+  return { getConfig, setConfig, setKey, clearKey, test, saveJob, deleteJob, runJob, tick, start, stop, setResponder, onMessage, setLimits, saveProfile, useProfile, deleteProfile, previewJob, abort, models, findLocal, setOptions, setActiveChat, connect };
 }
 
-module.exports = { createAiManager, createSecretFile, callModel, describeProviderError, safeOutput, DEFAULT_LIMITS, listModels, discoverLocal, LOCAL_SERVERS };
+module.exports = { createAiManager, createSecretFile, callModel, stripThinking, describeProviderError, safeOutput, DEFAULT_LIMITS, listModels, discoverLocal, LOCAL_SERVERS };

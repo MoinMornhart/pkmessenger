@@ -276,3 +276,14 @@ Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zwei
 4. **Lösung:** `aiModels` und `aiFindLocal` in `api.js` ergänzt.
 5. **Testergebnis:** Demo-Lauf: „2 Modelle gefunden ✓“, „✅ Ollama · 3 Modelle“.
 6. **Prävention:** Neuer Test `tests/test-api-sync.js` vergleicht preload.js mit api.js und schlägt fehl, wenn etwas fehlt.
+
+---
+
+## #23 – Übersehene Kommentare + „KI schreibt …“ kam nie an (07.10.2026)
+
+1. **Datum & Uhrzeit:** 07.10.2026, ca. 18:30
+2. **Was passiert ist:** (a) Sieben Kommentare von Joni (14:44–15:38: KI-Gedächtnis pro Person, Thinking, Auto-Verbindung, Tippanzeige, Online-Status) wurden in langen Arbeitsläufen nicht gelesen, #29 wurde zu früh geschlossen. (b) Im Branch: Die neue Anzeige „🤖 KI schreibt gerade …“ erschien im Demo nicht.
+3. **Ursache (geprüft):** (a) Kommentare nur zu Beginn eines Laufs abgefragt; Joni zitiert oft meine Antwort und schreibt Neues darunter. (b) preload.js lässt nur Ereignisse aus `EVENT_TYPES` durch, `ai:busy` fehlte.
+4. **Lösung:** (a) Alle Kommentare seit 14:30 nachgelesen, vollständige Liste an Joni geschickt, Arbeitsregel gespeichert (vor jeder Antwort/jedem Schließen erneut abfragen). (b) `ai:busy` ergänzt.
+5. **Testergebnis:** Demo: „🤖 KI schreibt gerade an Anna in #allgemein …“ sichtbar (Bild 60).
+6. **Prävention:** Neuer Test in `tests/test-api-sync.js`: jedes `emit('…')` aus src/main muss in `EVENT_TYPES` stehen.

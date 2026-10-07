@@ -3980,3 +3980,40 @@ kbd {
   gap: 6px;
   margin-top: 6px;
 }
+
+/* ---------- „KI schreibt gerade …“ (Issue #1) ---------- */
+.ai-busy {
+  position: fixed;
+  left: 50%;
+  top: 74px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: grid;
+  gap: 6px;
+}
+.ai-busy__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line));
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.ai-busy__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: ai-busy-pulse 1s ease-in-out infinite;
+}
+@keyframes ai-busy-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
