@@ -106,7 +106,154 @@ function JobForm({ targets, initial, onSave, onCancel }) {
   );
 }
 
-export default function AiSection({ toast, targets = [] }) {
+// Personen aus der Mitgliederliste der Server suchen und hinzufügen
+function PeoplePicker({ label, people, onChange, guilds }) {
+  const [query, setQuery] = useState('');
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    if (!query.trim() || !guilds.length) {
+      setItems([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const found = new Map();
+      for (const g of guilds.slice(0, 5)) {
+        const res = await api.searchMentionables({ guildId: g.id, query: query.trim().slice(0, 32) }).catch(() => []);
+        for (const u of res) if (u.kind === 'user' && !found.has(u.id)) found.set(u.id, { id: u.id, name: u.display });
+      }
+      if (!cancelled) setItems([...found.values()].filter((u) => !people.some((p) => p.id === u.id)).slice(0, 6));
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query, guilds, people]);
+  return (
+    <div className="ai-people">
+      <span className="settings__label">{label}</span>
+      <div className="ai-chips">
+        {people.map((p) => (
+          <span key={p.id} className="ai-chip">
+            {p.name}
+            <button aria-label={`${p.name} entfernen`} onClick={() => onChange(people.filter((x) => x.id !== p.id))}>
+              ×
+            </button>
+          </span>
+        ))}
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name suchen …" aria-label={`${label}: Name suchen`} />
+      </div>
+      {items.length > 0 && (
+        <div className="ai-suggest">
+          {items.map((u) => (
+            <button
+              key={u.id}
+              onClick={() => {
+                onChange([...people, u]);
+                setQuery('');
+              }}
+            >
+              ＋ {u.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Antwort-Agent: antwortet als Bot, wenn er in zugewiesenen Kanälen erwähnt (oder privat angeschrieben) wird
+function ResponderSection({ cfg, targets, guilds, toast }) {
+  const [r, setR] = useState(cfg.responder);
+  const [busy, setBusy] = useState(false);
+  const channels = targets.filter((t) => !t.dm);
+  const dirty = JSON.stringify(r) !== JSON.stringify(cfg.responder);
+  const set = (patch) => setR((x) => ({ ...x, ...patch }));
+  const save = async () => {
+    setBusy(true);
+    try {
+      await api.aiSetResponder(r);
+      toast({ kind: 'info', title: 'Gespeichert ✓', text: r.enabled ? 'Der Bot antwortet jetzt, wenn er erwähnt wird.' : 'Automatische Antworten sind aus.', duration: 2500 });
+    } catch (e) {
+      toast({ kind: 'error', title: e.message, text: e.hint });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="ai-responder">
+      <h4 className="ai-jobs__title">💬 Auf Erwähnungen antworten</h4>
+      <label className="composer__ping">
+        <input type="checkbox" checked={r.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> Bot antwortet mit KI, wenn ihn jemand erwähnt
+      </label>
+      {r.enabled && (
+        <>
+          <span className="settings__label">In diesen Kanälen</span>
+          <div className="ai-channels">
+            {channels.length === 0 && <span className="muted small">Kein Kanal, in den der Bot schreiben darf.</span>}
+            {channels.map((c) => (
+              <label key={c.id} className="ai-channel" title={c.label}>
+                <input
+                  type="checkbox"
+                  checked={r.channelIds.includes(c.id)}
+                  onChange={(e) => set({ channelIds: e.target.checked ? [...r.channelIds, c.id] : r.channelIds.filter((x) => x !== c.id) })}
+                />{' '}
+                {c.label}
+              </label>
+            ))}
+          </div>
+          <label className="composer__ping">
+            <input type="checkbox" checked={r.dms} onChange={(e) => set({ dms: e.target.checked })} /> Auch in Privatchats antworten (dort ohne Erwähnung)
+          </label>
+          <PeoplePicker label="Nur diesen Personen antworten (leer = allen)" people={r.allowUsers} onChange={(allowUsers) => set({ allowUsers })} guilds={guilds} />
+          <PeoplePicker label="Diese Personen ausschließen" people={r.blockUsers} onChange={(blockUsers) => set({ blockUsers })} guilds={guilds} />
+          <label className="settings__label" htmlFor="ai-instr">
+            So soll der Bot sein <span className="muted small">{r.instructions.length}/1500</span>
+          </label>
+          <textarea
+            id="ai-instr"
+            className="profile__desc"
+            rows={3}
+            maxLength={1500}
+            value={r.instructions}
+            onChange={(e) => set({ instructions: e.target.value })}
+            placeholder="z. B. Du bist Claw, locker und hilfsbereit. Du kennst die Server-Regeln: …"
+          />
+          <label className="composer__ping">
+            <input type="checkbox" checked={r.context} onChange={(e) => set({ context: e.target.checked })} /> Letzte 20 Nachrichten als Kontext mitschicken
+          </label>
+          {r.context && <p className="muted small">⚠ Diese Nachrichten gehen dann an deinen KI-Anbieter.</p>}
+          <label className="composer__ping">
+            <input type="checkbox" checked={r.notify} onChange={(e) => set({ notify: e.target.checked })} /> Hinweis in der App, wenn der Bot geantwortet hat
+          </label>
+          <p className="muted small">🛑 Schutz: antwortet nie anderen Bots, höchstens alle 15 Sek. pro Kanal und 30× pro Stunde, pingt niemanden.</p>
+        </>
+      )}
+      {dirty && (
+        <div className="settings__row">
+          <button className="btn btn--primary btn--small" disabled={busy} onClick={save}>
+            Speichern
+          </button>
+          <button className="btn btn--ghost btn--small" onClick={() => setR(cfg.responder)}>
+            Verwerfen
+          </button>
+        </div>
+      )}
+      {cfg.recent?.length > 0 && (
+        <div className="ai-recent">
+          <span className="settings__label">Letzte Antworten</span>
+          {cfg.recent.map((e, i) => (
+            <div key={i} className={`small ${e.ok ? '' : 'warn'}`}>
+              {e.ok ? '✓' : '⚠'} {formatListTime(e.at, Date.now())} · {e.userName}: {e.answer}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AiSection({ toast, targets = [], guilds = [] }) {
   const [cfg, setCfg] = useState(null);
   const [draft, setDraft] = useState(null); // Anbieter-Einstellungen in Bearbeitung
   const [key, setKey] = useState('');
@@ -225,6 +372,8 @@ export default function AiSection({ toast, targets = [] }) {
               {busy === 'test' ? 'Teste …' : '🔌 Verbindung testen'}
             </button>
           </div>
+
+          <ResponderSection key={JSON.stringify(cfg.responder)} cfg={cfg} targets={targets} guilds={guilds} toast={toast} />
 
           <h4 className="ai-jobs__title">🤖 Aufträge</h4>
           {cfg.jobs.length === 0 && !editing && <p className="muted small">Noch keine Aufträge.</p>}

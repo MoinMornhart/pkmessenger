@@ -346,7 +346,7 @@ function AudioSection() {
   );
 }
 
-export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTargets = [] }) {
+export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTargets = [], guilds = [] }) {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -393,7 +393,7 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
         </section>
         <section>
           <h4>🧪 Beta</h4>
-          <AiSection toast={toast} targets={aiTargets} />
+          <AiSection toast={toast} targets={aiTargets} guilds={guilds} />
         </section>
         <section>
           <h4>🔒 Datenschutz</h4>

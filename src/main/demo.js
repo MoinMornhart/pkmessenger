@@ -214,10 +214,20 @@ function createDemo() {
   const aiFetch = async (_url, init) => {
     const body = JSON.parse(init.body);
     const user = body.messages?.at(-1)?.content || '';
-    const content = /Verbindung/.test(user) ? 'OK – Verbindung steht.' : '☀️ **Guten Morgen, Team!** Heute steht das Treffen um 19 Uhr an. Bringt eure Ideen mit 🚀';
+    const content = /Verbindung/.test(user) ? 'OK – Verbindung steht.' : /fragt:/.test(user) ? 'Heute um **19 Uhr** in der Lounge 🎉 Bis später, Anna!' : '☀️ **Guten Morgen, Team!** Heute steht das Treffen um 19 Uhr an. Bringt eure Ideen mit 🚀';
     return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content } }] }) };
   };
-  return { world, envPath, createClient: () => client, voiceLib, stats, aiSecret, aiFetch };
+  // Für den Screenshot-Lauf: Anna erwähnt den Bot in #allgemein (wie eine echte Nachricht über das Gateway)
+  const simulate = {
+    mention(text) {
+      const ch = channels.allgemein;
+      const m = makeMessage({ id: SnowflakeUtil.generate().toString(), channel: ch, author: anna, content: `<@${client.user.id}> ${text}`, createdTimestamp: Date.now(), mentions: { users: [client.user] } });
+      ch.store.push(m);
+      ch.lastMessageId = m.id;
+      client.emit(Events.MessageCreate, m);
+    },
+  };
+  return { world, envPath, createClient: () => client, voiceLib, stats, aiSecret, aiFetch, simulate };
 }
 
 module.exports = { createDemo };

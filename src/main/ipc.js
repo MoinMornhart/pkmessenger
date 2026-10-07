@@ -58,6 +58,7 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:ai-save-job': (p) => requireAi().saveJob(validators.aiJob(p)),
     'pk:ai-delete-job': (p) => requireAi().deleteJob(validators.aiJobRef(p)),
     'pk:ai-run-job': (p) => requireAi().runJob(validators.aiJobRef(p)),
+    'pk:ai-set-responder': (p) => requireAi().setResponder(validators.aiResponder(p)),
     'pk:open-dm': (p) => service.openDM(validators.userRef(p)),
     'pk:get-profile': (p) => service.getProfile(validators.profileRef(p)),
     'pk:update-profile': (p) => service.updateProfile(validators.profileUpdate(p)),
