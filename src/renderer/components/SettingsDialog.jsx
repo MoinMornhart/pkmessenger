@@ -300,6 +300,49 @@ function ProfileSection({ toast, guildId }) {
 }
 
 // Bildschirmschutz: andere Programme (Screenshots, Aufnahmen, Bildschirm teilen) sehen nur ein schwarzes Fenster
+// Eigene vertraute Seiten (Issue #38: „Trusted Links“)
+function TrustedDomains() {
+  const [p, setP] = useState(prefs.get());
+  const [add, setAdd] = useState('');
+  useEffect(() => prefs.subscribe(setP), []);
+  const save = () => {
+    const d = add.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) return;
+    prefs.set({ trustedDomains: [...new Set([...p.trustedDomains, d])] });
+    setAdd('');
+  };
+  return (
+    <div className="settings__field" data-setting="trusted">
+      <span className="settings__label">✅ Vertrauenswürdige Seiten (öffnen ohne Frage)</span>
+      <div className="ai-chips">
+        {p.trustedDomains.length === 0 && <span className="muted small">Noch keine eigenen. Bekannte Seiten wie discord.com, github.com, youtube.com sind schon vertraut.</span>}
+        {p.trustedDomains.map((d) => (
+          <span key={d} className="ai-chip">
+            {d}
+            <button aria-label={`${d} entfernen`} onClick={() => prefs.set({ trustedDomains: p.trustedDomains.filter((x) => x !== d) })}>
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="settings__row">
+        <input value={add} onChange={(e) => setAdd(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} placeholder="z. B. meine-seite.de" aria-label="Vertrauenswürdige Seite hinzufügen" />
+        <button className="btn btn--small" onClick={save}>
+          Hinzufügen
+        </button>
+      </div>
+      {p.hiddenMessages.length > 0 && (
+        <p className="muted small">
+          🙈 {p.hiddenMessages.length} Nachricht(en) mit gefährlichem Link ausgeblendet ·{' '}
+          <button className="linklike" onClick={() => prefs.set({ hiddenMessages: [] })}>
+            alle wieder zeigen
+          </button>
+        </p>
+      )}
+    </div>
+  );
+}
+
 // Bilder/GIFs/Videos laden? Warnung vor Links? (Issue #1)
 function MediaPrivacy() {
   const [p, setP] = useState(prefs.get());
@@ -323,6 +366,8 @@ function MediaPrivacy() {
       <label className="composer__ping" data-setting="links">
         <input type="checkbox" checked={p.linkWarn} onChange={(e) => prefs.set({ linkWarn: e.target.checked })} /> 🔗 Vor dem Öffnen von Links warnen
       </label>
+      <p className="muted small">🛡 Link-Schutz ist immer an: IP-Grabber, Betrugs-Links („gratis Nitro“) und nachgemachte Adressen werden erkannt, gesperrt und nicht kopierbar gemacht. Geprüft wird nur auf diesem PC, ohne fremde Dienste.</p>
+      <TrustedDomains />
     </>
   );
 }
@@ -419,7 +464,7 @@ const SECTIONS = [
   { id: 'aussehen', icon: '🎨', title: 'Aussehen', desc: 'Design, Farbe, Animationen, Chat-Hintergrund.', keywords: ['farbe', 'theme', 'hell', 'dunkel', 'hintergrund', 'kompakt', 'animation'] },
   { id: 'schreiben', icon: '✍️', title: 'Schreiben', desc: 'Wie Namensvorschläge beim Schreiben funktionieren.', keywords: ['erwähnen', 'mention', 'namen', 'vorschläge', '@'] },
   { id: 'toene', icon: '🔔', title: 'Benachrichtigungen', desc: 'Töne, eigener Ton, Nicht stören.', keywords: ['ton', 'sound', 'lautstärke', 'nicht stören', 'benachrichtigung'] },
-  { id: 'datenschutz', icon: '🔒', title: 'Datenschutz', desc: 'Bildschirmschutz, Bilder/GIFs/Videos laden, Warnung vor Links.', keywords: ['bilder', 'gif', 'video', 'medien', 'link', 'screenshot', 'ip', 'spoiler'] },
+  { id: 'datenschutz', icon: '🔒', title: 'Datenschutz', desc: 'Bildschirmschutz, Bilder/GIFs/Videos laden, Warnung vor Links.', keywords: ['bilder', 'gif', 'video', 'medien', 'link', 'screenshot', 'ip', 'spoiler', 'grabber', 'vertrauen', 'trusted', 'betrug'] },
   { id: 'sicherheit', icon: '🛡', title: 'Sicherheit & Start', desc: 'App-Passwort, Windows Hello, mit Windows starten, im Hintergrund weiterlaufen.', keywords: ['passwort', 'sperre', 'hello', 'fingerabdruck', 'autostart', 'hintergrund', 'tray'] },
   { id: 'profil', icon: '🪪', title: 'Bot-Profil', desc: 'Name, Bild und Beschreibung deines Bots.', keywords: ['name', 'avatar', 'bild', 'über mich', 'spitzname'] },
   { id: 'token', icon: '🔑', title: 'Bot-Token', desc: 'Den geheimen Schlüssel deines Bots ersetzen oder entfernen.', keywords: ['token', 'schlüssel', 'anmelden'] },

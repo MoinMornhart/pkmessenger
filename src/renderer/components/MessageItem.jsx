@@ -1,4 +1,4 @@
-import { memo, useContext, useState } from 'react';
+import { memo, useContext, useState, useEffect } from 'react';
 import { MessageActionsContext } from '../state';
 import { formatShortTime, formatFull, formatDayPill } from '../../shared/format';
 import MessageContent, { OwnMessageContext } from './MessageContent.jsx';
@@ -7,6 +7,8 @@ import { hueFor } from './ChatList.jsx';
 import { systemInfo } from '../../shared/system-messages';
 import MediaGate from './MediaGate.jsx';
 import { openProfile } from './ProfileCard.jsx';
+import { prefs } from '../prefs';
+import { checkMessageLinks } from '../../shared/link-safety';
 import { attachmentKind } from '../../shared/media';
 
 function Avatar({ author }) {
@@ -87,9 +89,55 @@ function SystemRow({ m, highlighted }) {
   );
 }
 
+// Warnung bei gefährlichen Links in fremden Nachrichten (Issue #38); „Für mich ausblenden“ wird empfohlen
+function LinkAlarm({ m, actions }) {
+  const danger = checkMessageLinks(m.content, prefs.get().trustedDomains).filter((x) => x.level === 'danger');
+  if (!danger.length) return null;
+  return (
+    <div className="link-alarm" role="alert">
+      <b>⛔ Achtung: gefährlicher Link</b>
+      <span>{danger[0].reasons[0]}</span>
+      <span className="muted small">Bitte nicht anklicken. Der Link ist hier gesperrt und lässt sich nicht kopieren.</span>
+      <span className="link-alarm__actions">
+        <button className="btn btn--primary btn--small" onClick={() => hideMessage(m.id)}>
+          🙈 Für mich ausblenden (empfohlen)
+        </button>
+        {m.canDelete && (
+          <button className="btn btn--danger btn--small" onClick={() => actions?.remove?.(m)}>
+            🗑 Für alle löschen
+          </button>
+        )}
+      </span>
+    </div>
+  );
+}
+
+function hideMessage(id) {
+  prefs.set({ hiddenMessages: [...prefs.get().hiddenMessages.filter((x) => x !== id), id].slice(-500) });
+}
+
+function useHidden(id) {
+  const [hidden, setHidden] = useState(() => prefs.get().hiddenMessages.includes(id));
+  useEffect(() => prefs.subscribe((p) => setHidden(p.hiddenMessages.includes(id))), [id]);
+  return hidden;
+}
+
 function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
   const actions = useContext(MessageActionsContext);
+  const hidden = useHidden(m.id);
   if (m.system && !m.pending) return <SystemRow m={m} highlighted={highlighted} />;
+  if (hidden)
+    return (
+      <div className="msg msg--in msg--hidden" data-mid={m.id}>
+        <span className="avatar-spacer" />
+        <div className="msg-hidden">
+          🙈 Ausgeblendete Nachricht von {m.author.name} (gefährlicher Link) ·{' '}
+          <button className="linklike" onClick={() => prefs.set({ hiddenMessages: prefs.get().hiddenMessages.filter((x) => x !== m.id) })}>
+            wieder zeigen
+          </button>
+        </div>
+      </div>
+    );
   const out = m.isOwn || m.pending || m.failed;
   const cls = ['msg', out ? 'msg--out' : 'msg--in', grouped && 'msg--grouped', m.pending && 'msg--pending', m.failed && 'msg--failed', highlighted && 'msg--highlight', m.mentions?.everyone && 'msg--mass']
     .filter(Boolean)
@@ -118,6 +166,7 @@ function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
         <OwnMessageContext.Provider value={Boolean(out)}>
           <MessageContent content={m.content} mentions={m.mentions} />
         </OwnMessageContext.Provider>
+        {!out && <LinkAlarm m={m} actions={actions} />}
         <Attachments items={m.attachments} />
         <PollCard message={m} />
         <Embeds embeds={m.embeds} />

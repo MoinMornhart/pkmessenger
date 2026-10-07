@@ -124,6 +124,9 @@ function createDemo() {
   // Issue #1: GIF (Tenor kommt als „gifv“-Video über Discords Proxy) + Link mit Warnung
   const gif = add(channels.ankuendigungen, chiara, 'Wenn das Update endlich da ist 😂 https://tenor.com/view/katze-tanzt', 60);
   gif.embeds = [{ type: 'gifv', url: 'https://tenor.com/view/katze-tanzt', provider: { name: 'Tenor' }, video: { proxyURL: 'https://images-ext-1.discordapp.net/external/demo/https/media.tenor.com/katze.mp4' }, thumbnail: { proxyURL: 'https://images-ext-1.discordapp.net/external/demo/https/media.tenor.com/katze.png' } }];
+  // Issue #38: Link-Schutz – normaler unbekannter Link und ein IP-Grabber
+  add(channels.ankuendigungen, anna, 'Neuer Shop für Merch: https://beispiel-shop.de/angebot', 40);
+  add(channels.ankuendigungen, chiara, 'Krass, guck mal 😱 https://grabify.link/K4TZE7', 20);
   add(channels.ankuendigungen, bernd, 'Hab den Film gesehen. Das Ende: ||Der Butler war es!|| 🍿', 30);
   add(channels.projektA, chiara, 'Projekt A startet nächste Woche!', 300);
   add(channels.nurLesen, bernd, 'Dieser Kanal ist für den Bot nur lesbar.', 500);
