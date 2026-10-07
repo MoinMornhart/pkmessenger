@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { prefs } from '../prefs';
 import AiSection from './AiSection.jsx';
+import { THEMES, ACCENTS, MOTIONS } from '../theme';
 
 function TokenSection({ toast }) {
   const [info, setInfo] = useState(null);
@@ -90,6 +91,62 @@ function TokenSection({ toast }) {
             Token entfernen
           </button>
         ))}
+    </>
+  );
+}
+
+// Aussehen: Design, Akzentfarbe, Animationen, Dichte – wirkt sofort, wird pro PC gemerkt
+function AppearanceSection() {
+  const [p, setP] = useState(prefs.get());
+  useEffect(() => prefs.subscribe(setP), []);
+  return (
+    <>
+      <span className="settings__label">Design</span>
+      <div className="look-themes" role="radiogroup" aria-label="Design">
+        {THEMES.map((t) => (
+          <button key={t.id} role="radio" aria-checked={p.theme === t.id} className={`look-theme ${p.theme === t.id ? 'is-on' : ''}`} onClick={() => prefs.set({ theme: t.id })}>
+            <span className="look-theme__preview" style={{ '--dot': t.swatch[2] }}>
+              <i style={{ background: t.swatch[0] }} />
+              <i style={{ background: t.swatch[1] }} />
+            </span>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <span className="settings__label">Akzentfarbe</span>
+      <div className="look-accents" role="radiogroup" aria-label="Akzentfarbe">
+        {ACCENTS.map((a) => (
+          <button
+            key={a || 'auto'}
+            role="radio"
+            aria-checked={p.accent === a}
+            aria-label={a ? `Farbe ${a}` : 'Passend zum Design'}
+            title={a ? a : 'Passend zum Design'}
+            className={`look-accent ${a ? '' : 'look-accent--auto'} ${p.accent === a ? 'is-on' : ''}`}
+            style={a ? { background: a } : undefined}
+            onClick={() => prefs.set({ accent: a })}
+          />
+        ))}
+      </div>
+      <span className="settings__label">Animationen</span>
+      <div className="look-seg" role="radiogroup" aria-label="Animationen">
+        {MOTIONS.map((m) => (
+          <button key={m.id} role="radio" aria-checked={p.motion === m.id} className={p.motion === m.id ? 'is-on' : ''} title={m.hint} onClick={() => prefs.set({ motion: m.id })}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <span className="settings__label">Ansicht</span>
+      <div className="look-seg" role="radiogroup" aria-label="Ansicht">
+        {[
+          ['normal', 'Normal'],
+          ['kompakt', 'Kompakt'],
+        ].map(([id, label]) => (
+          <button key={id} role="radio" aria-checked={p.density === id} className={p.density === id ? 'is-on' : ''} onClick={() => prefs.set({ density: id })}>
+            {label}
+          </button>
+        ))}
+      </div>
     </>
   );
 }
@@ -306,6 +363,10 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
             ×
           </button>
         </div>
+        <section>
+          <h4>🎨 Aussehen</h4>
+          <AppearanceSection />
+        </section>
         <section>
           <h4>🪪 Bot-Profil</h4>
           <ProfileSection toast={toast} guildId={guildId} />

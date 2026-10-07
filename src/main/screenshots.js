@@ -32,6 +32,12 @@ async function runScreenshots(win, dir, { demo, stats }) {
     await shoot(win, dir, '01-setup');
     return;
   }
+  // Gleicher Ausgangszustand wie beim ersten Start (Aussehen, Sortierung): Auswahl früherer Läufe verwerfen
+  const hadPrefs = await js(win, `(() => { const had = localStorage.getItem('pk.prefs.v1') !== null; localStorage.removeItem('pk.prefs.v1'); return had; })()`);
+  if (hadPrefs) {
+    win.webContents.reload();
+    await wait(3500);
+  }
   // Die App merkt sich den letzten Chat – für reproduzierbare Bilder immer bei #allgemein starten.
   await js(win, `[...document.querySelectorAll('.chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
   await wait(1200);
@@ -271,6 +277,29 @@ async function runScreenshots(win, dir, { demo, stats }) {
   await wait(800);
   const posted = await js(win, `[...document.querySelectorAll('.msg--out')].some(m=>m.textContent.includes('Guten Morgen, Team'))`);
   console.log(`[ki] Nachricht im Kanal sichtbar: ${posted}`);
+  // Aussehen: Einstellungen zeigen, dann Designs „Hell“ und „Lila + Pink“ im Chat
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+  await wait(600);
+  await shoot(win, dir, '26-aussehen');
+  const look = await js(win, `JSON.stringify({ designs: document.querySelectorAll('.look-theme').length, farben: document.querySelectorAll('.look-accent').length })`);
+  await clickText('.look-theme', 'Hell');
+  await wait(200);
+  await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+  await wait(500);
+  await shoot(win, dir, '27-design-hell');
+  const hell = await js(win, `JSON.stringify({ theme: document.documentElement.dataset.theme, hintergrund: getComputedStyle(document.body).backgroundColor })`);
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+  await wait(400);
+  await clickText('.look-theme', 'Lila');
+  await js(win, `document.querySelector('.look-accent[aria-label="Farbe #f472b6"]')?.click()`);
+  await clickText('.look-seg button', 'Kompakt');
+  await wait(200);
+  await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+  await wait(500);
+  await shoot(win, dir, '28-design-lila');
+  const lila = await js(win, `JSON.stringify({ theme: document.documentElement.dataset.theme, akzent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(), dichte: document.documentElement.dataset.density })`);
+  console.log(`[look] ${look} · Hell: ${hell} · Lila: ${lila}`);
+  await js(win, `localStorage.removeItem('pk.prefs.v1')`);
 }
 
 module.exports = { runScreenshots };

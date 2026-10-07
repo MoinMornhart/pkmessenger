@@ -79,7 +79,7 @@ function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
         <MessageActionBar message={m} out={out} />
         <ReplyQuote reference={m.reference} />
         {!out && !grouped && (
-          <div className="bubble__author" style={{ color: m.author.color || `hsl(${hueFor(m.author.id)} 70% 68%)` }}>
+          <div className="bubble__author" style={{ color: m.author.color || `hsl(${hueFor(m.author.id)} 70% var(--author-l, 68%))` }}>
             {m.author.name}
             {m.author.bot && <span className="bot-tag">BOT</span>}
           </div>

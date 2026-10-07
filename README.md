@@ -91,6 +91,10 @@ PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau
     <td><img src="docs/images/kategorien.png" alt="Chatliste nach Kategorien"><br><sub><b>Kategorien einklappen</b> und Bildschirmschutz.</sub></td>
   </tr>
   <tr>
+    <td><img src="docs/images/aussehen.png" alt="Aussehen: Designs, Akzentfarbe, Animationen"><br><sub><b>🎨 Aussehen:</b> 5 Designs, eigene Akzentfarbe, Animationen, kompakte Ansicht.</sub></td>
+    <td><img src="docs/images/design-hell.png" alt="Helles Design"><br><sub><b>Helles Design</b> – umschaltbar in den Einstellungen.</sub></td>
+  </tr>
+  <tr>
     <td colspan="2"><img src="docs/images/ki-agenten.png" alt="KI-Agenten (Beta) in den Einstellungen"><br><sub><b>🧪 KI-Agenten (Beta):</b> Aufträge wie „jeden Werktag um 8 Uhr einen Morgengruß posten“ – mit OpenAI, Claude, Gemini, OpenRouter, Ollama u. v. m. Dein Schlüssel bleibt verschlüsselt auf deinem PC.</sub></td>
   </tr>
 </table>
@@ -250,10 +254,9 @@ Mehr Details: [AGENTS.md](AGENTS.md) (Architektur, Entscheidungen, Teststand) ·
 - [x] Bildschirmschutz: Screenshots und Aufnahmen anderer Programme verbieten (Einstellungen → Datenschutz)
 - [x] Privatnachrichten mit dem Bot (💬 in der Leiste links)
 - [x] 🧪 Beta: KI-Agenten – eine KI postet zu festen Zeiten (beliebiger Anbieter, eigener API-Schlüssel)
-- [ ] Designs und Animationen zum Umschalten
+- [x] 🎨 Aussehen: 5 Designs (Nacht, Ozean, Lila, AMOLED, Hell), Akzentfarbe, Animationen (voll/dezent/aus), kompakte Ansicht
 - [ ] Moderation per Rechtsklick (Rollen, Timeout, Kick, Bann)
 - [ ] Live-Test aller Funktionen auf einem echten Server
-- [ ] Helles Design und eigene Akzentfarben
 
 ---
 
