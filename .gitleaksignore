@@ -1,0 +1,7 @@
+# Bekannte Fehlalarme für Gitleaks (Repo-Check von VibeWorks, Issue #18).
+# Format: <commit>:<datei>:<regel>:<zeile>
+#
+# Erfundener Testschlüssel „sk-test-GEHEIM-1234567890“ aus tests/test-ai.js (Commit 4af26ea, KI-Agenten-Tests).
+# Kein echter Zugangsschlüssel – er wurde nie bei einem Anbieter verwendet. Seit Commit f1a187d wird der
+# Testwert zur Laufzeit zusammengesetzt; dieser Eintrag betrifft nur noch die alte Git-Historie.
+4af26eadc45cf3b052ccd93a4dcdda57c37215cb:tests/test-ai.js:generic-api-key:13
