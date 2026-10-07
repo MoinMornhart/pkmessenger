@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { applyFormat, FORMAT_BUTTONS } from '../../shared/format-text';
 import { api } from '../api';
 import { applyMentionTokens, findMentionQuery } from '../../shared/mentions';
 import { MESSAGE_CONTENT_MAX, TYPING_THROTTLE_MS } from '../../shared/limits';
@@ -30,6 +31,26 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
   const [pingReply, setPingReply] = useState(false); // F7
   const fileInputRef = useRef(null);
   const taRef = useRef(null);
+  // Text markiert? → Formatierungs-Leiste (Issue #1)
+  const [hasSelection, setHasSelection] = useState(false);
+  const checkSelection = (ta) => setHasSelection(Boolean(ta) && ta.selectionEnd > ta.selectionStart);
+  // Markieren per Maus, Tastatur oder Doppelklick zuverlässig erkennen
+  useEffect(() => {
+    const onSel = () => document.activeElement === taRef.current && checkSelection(taRef.current);
+    document.addEventListener('selectionchange', onSel);
+    return () => document.removeEventListener('selectionchange', onSel);
+  }, []);
+  const format = (kind) => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const r = applyFormat(text, ta.selectionStart, ta.selectionEnd, kind);
+    setText(r.text);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(r.start, r.end);
+      checkSelection(ta);
+    });
+  };
   const lastTypingRef = useRef(0);
   const searchSeq = useRef(0);
 
@@ -215,6 +236,11 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
   };
 
   const onKeyDown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && ['b', 'i', 'u'].includes(e.key.toLowerCase())) {
+      e.preventDefault();
+      format({ b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()]);
+      return;
+    }
     if (suggest) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
@@ -386,6 +412,15 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
             />
           </>
         )}
+        {hasSelection && (
+          <div className="format-bar" role="toolbar" aria-label="Text formatieren">
+            {FORMAT_BUTTONS.map((b) => (
+              <button key={b.kind} className={`format-bar__btn format-bar__btn--${b.kind}`} title={b.title} aria-label={b.title} onMouseDown={(e) => e.preventDefault()} onClick={() => format(b.kind)}>
+                {b.label}
+              </button>
+            ))}
+          </div>
+        )}
         <textarea
           ref={taRef}
           rows={1}
@@ -399,7 +434,13 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
             }
           }}
           onClick={(e) => updateSuggestions(text, e.currentTarget.selectionStart)}
-          onBlur={() => setTimeout(() => setSuggest(null), 150)}
+          onSelect={(e) => checkSelection(e.currentTarget)}
+          onMouseUp={(e) => checkSelection(e.currentTarget)}
+          onKeyUp={(e) => checkSelection(e.currentTarget)}
+          onBlur={() => setTimeout(() => {
+            setSuggest(null);
+            setHasSelection(false);
+          }, 150)}
           placeholder={editing ? 'Nachricht bearbeiten' : `Nachricht an ${channel.type === 'dm' ? '' : '#'}${channel.name}`}
           aria-label={`Nachricht an ${channel.type === 'dm' ? '' : '#'}${channel.name}`}
           spellCheck

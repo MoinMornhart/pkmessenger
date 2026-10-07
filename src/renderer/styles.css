@@ -3145,3 +3145,51 @@ img.chat-avatar {
   white-space: pre-wrap;
   font-size: 13.5px;
 }
+
+/* ---------- Formatierungs-Leiste beim Markieren (Issue #1) ---------- */
+.composer__box {
+  position: relative; /* Bezug für die Formatierungs-Leiste */
+}
+.format-bar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--elev);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 5;
+  animation: pop 0.15s var(--ease);
+}
+.format-bar__btn {
+  min-width: 32px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+}
+.format-bar__btn:hover,
+.format-bar__btn:focus-visible {
+  background: var(--panel-2);
+}
+.format-bar__btn--bold {
+  font-weight: 800;
+}
+.format-bar__btn--italic {
+  font-style: italic;
+}
+.format-bar__btn--underline {
+  text-decoration: underline;
+}
+.format-bar__btn--strike {
+  text-decoration: line-through;
+}
+.format-bar__btn--code {
+  font-family: Consolas, monospace;
+  font-size: 12.5px;
+}

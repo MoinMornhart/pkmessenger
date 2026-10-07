@@ -57,6 +57,19 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await js(win, `(() => { const el=document.querySelector('.composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'Mein Entwurf'); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
   await wait(200);
   console.log(`[edit] ${await editCheck('x')} | ${await editCheck('esc')} | ${await editCheck('speichern')}`);
+  // Text markieren → Formatierungs-Leiste (Issue #1)
+  await js(win, `(() => { const el=document.querySelector('.composer textarea'); el.focus(); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'Das ist wichtig heute'); el.dispatchEvent(new Event('input',{bubbles:true})); const s=el.value.indexOf('wichtig'); el.setSelectionRange(s, s+7); el.dispatchEvent(new Event('select',{bubbles:true})); })()`);
+  await wait(300);
+  await shoot(win, dir, '33-formatieren');
+  const bar = await js(win, `document.querySelectorAll('.format-bar button').length`);
+  await js(win, `document.querySelector('.format-bar__btn--bold')?.click()`);
+  await wait(200);
+  const afterBold = await js(win, `document.querySelector('.composer textarea').value`);
+  await js(win, `(() => { const el=document.querySelector('.composer textarea'); const s=el.value.indexOf('heute'); el.setSelectionRange(s, s+5); el.dispatchEvent(new KeyboardEvent('keydown',{key:'i',ctrlKey:true,bubbles:true})); })()`);
+  await wait(200);
+  const afterItalic = await js(win, `document.querySelector('.composer textarea').value`);
+  console.log(`[format] Knöpfe: ${bar} · nach F: ${JSON.stringify(afterBold)} · nach Strg+I: ${JSON.stringify(afterItalic)}`);
+  await js(win, `(() => { const el=document.querySelector('.composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,''); el.dispatchEvent(new Event('input',{bubbles:true})); el.blur(); })()`);
   const sys = await js(win, `JSON.stringify([...document.querySelectorAll('.sysmsg')].map(e=>e.textContent.slice(0,60)))`);
   console.log(`[system] Systemnachrichten: ${sys}`);
   await js(win, `document.querySelector('.sysmsg')?.scrollIntoView({block:'center'})`);
