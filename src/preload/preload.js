@@ -43,6 +43,8 @@ contextBridge.exposeInMainWorld('api', {
   sendMessage: call('pk:send-message'),
   sendTyping: call('pk:send-typing'),
   searchMentionables: call('pk:search-mentionables'),
+  searchPeople: call('pk:search-people'),
+  userProfile: call('pk:user-profile'),
   getSettings: call('pk:get-settings'),
   lockStatus: call('pk:lock-status'),
   lockVerify: call('pk:lock-verify'),

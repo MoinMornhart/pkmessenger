@@ -4,9 +4,10 @@
 const { loadToken, botIdFromToken } = require('./env');
 const { describeError, appError } = require('./errors');
 const { buildAllowedMentions } = require('../shared/mentions');
-const { compareSnowflakes } = require('../shared/snowflake');
+const { compareSnowflakes, timestampOf } = require('../shared/snowflake');
 const { isSystemType, systemInfo } = require('../shared/system-messages');
 const { TYPING_THROTTLE_MS } = require('../shared/limits');
+const { fuzzyFilter } = require('../shared/fuzzy');
 
 const LOGIN_TIMEOUT_MS = 45000;
 // Gateway-Close-Codes, bei denen ein Reconnect sinnlos ist (falscher Token, Intent nicht freigeschaltet, ...).
@@ -574,17 +575,16 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     if (q.length === 0) {
       members = [...guild.members.cache.values()].slice(0, 8);
     } else {
-      // Bekannte Personen, deren Name den Text IRGENDWO enthält („o“ findet „MoinMornhart“) …
-      const known = [...guild.members.cache.values()].filter((m) => m.displayName.toLowerCase().includes(q) || m.user.username.toLowerCase().includes(q));
       let searched = [];
       try {
-        // … plus Discords Mitgliedersuche (findet nur Namen, die SO ANFANGEN). Braucht laut Doku kein GuildMembers-Intent.
+        // Discords Mitgliedersuche (findet nur Namen, die SO ANFANGEN). Braucht laut Doku kein GuildMembers-Intent.
         searched = [...(await guild.members.search({ query, limit: 8 })).values()];
       } catch {
         searched = [];
       }
+      // … plus unscharfe Suche in bekannten Personen: irgendwo im Namen, Abkürzungen, kleine Tippfehler (Issue #1)
       const seen = new Set();
-      members = [...searched, ...known].filter((m) => !seen.has(m.id) && seen.add(m.id)).slice(0, 8);
+      members = fuzzyFilter([...searched, ...guild.members.cache.values()].filter((m) => !seen.has(m.id) && seen.add(m.id)), query, memberNames, 8);
     }
     const users = members.map((m) => ({
       kind: 'user',
@@ -594,13 +594,106 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       avatarUrl: m.displayAvatarURL({ size: 32, extension: 'png' }),
       bot: Boolean(m.user.bot),
     }));
-    const roles = [...guild.roles.cache.values()]
-      .filter((r) => r.id !== guild.id && r.name.toLowerCase().includes(q))
-      .sort((a, b) => b.position - a.position)
-      .slice(0, 5)
+    const roles = fuzzyFilter(
+      [...guild.roles.cache.values()].filter((r) => r.id !== guild.id).sort((a, b) => b.position - a.position),
+      query,
+      (r) => [r.name],
+      5,
+    )
       .map((r) => ({ kind: 'role', id: r.id, display: r.name, color: r.hexColor !== '#000000' ? r.hexColor : null, pingable: r.mentionable || canEveryoneSomewhere }));
     const special = ['everyone', 'here'].filter((s) => s.startsWith(q)).map((s) => ({ kind: s, id: s, display: s }));
     return [...users, ...roles, ...special];
+  }
+
+  const memberNames = (m) => [m.displayName, m.user?.globalName, m.user?.username];
+
+  /**
+   * Personen über ALLE Server des Bots + bekannte Privatchat-Partner suchen (Issue #1: „überall sollen Namen kommen“,
+   * auch @ im Privatchat). Unscharf, ohne Duplikate, Bots zuletzt. Nur Mitglieder, die Discord dem Bot ohnehin zeigt.
+   */
+  async function searchPeople({ query, limit = 10 }) {
+    const c = requireReady();
+    const found = new Map(); // userId → { user, member, guilds }
+    const add = (user, member, guildName) => {
+      if (!user?.id || user.id === c.user.id) return;
+      const e = found.get(user.id) || { user, member, guilds: [] };
+      if (guildName && !e.guilds.includes(guildName)) e.guilds.push(guildName);
+      if (!e.member && member) e.member = member;
+      found.set(user.id, e);
+    };
+    const guilds = [...c.guilds.cache.values()].slice(0, 25);
+    await Promise.all(
+      guilds.map(async (g) => {
+        for (const m of g.members.cache.values()) add(m.user, m, g.name);
+        if (!query) return;
+        try {
+          for (const m of (await g.members.search({ query, limit: 8 })).values()) add(m.user, m, g.name);
+        } catch {
+          /* Suche nicht erlaubt → nur Cache */
+        }
+      }),
+    );
+    for (const ch of c.channels.cache.values()) if (isDM(ch) && ch.recipient) add(ch.recipient, null, null);
+    const list = [...found.values()];
+    const names = (e) => [e.member?.displayName, e.user.globalName, e.user.username];
+    const ranked = query ? fuzzyFilter(list, query, names) : list.sort((a, b) => names(a)[0]?.localeCompare?.(names(b)[0] || '') || 0);
+    return ranked
+      .sort((a, b) => Number(Boolean(a.user.bot)) - Number(Boolean(b.user.bot)))
+      .slice(0, limit)
+      .map((e) => ({
+        kind: 'user',
+        id: e.user.id,
+        display: e.member?.displayName || e.user.globalName || e.user.username,
+        sub: e.user.username,
+        avatarUrl: (e.member || e.user).displayAvatarURL?.({ size: 32, extension: 'png' }) || null,
+        bot: Boolean(e.user.bot),
+        guilds: e.guilds.slice(0, 3),
+      }));
+  }
+
+  /** Profil einer Person (Issue #1: „Profile aufrufen“). Mit guildId: Server-Infos (Rollen, beigetreten). */
+  async function getUserProfile({ userId, guildId }) {
+    const c = requireReady();
+    let member = null;
+    const guild = guildId ? c.guilds.cache.get(guildId) : null;
+    if (guild) {
+      try {
+        member = guild.members.cache.get(userId) || (await guild.members.fetch(userId));
+      } catch {
+        member = null;
+      }
+    }
+    let user = c.users?.cache?.get?.(userId) || member?.user || null;
+    if (!user) {
+      try {
+        user = await c.users.fetch(userId);
+      } catch {
+        user = null;
+      }
+    }
+    if (!user) user = [...c.guilds.cache.values()].map((g) => g.members.cache.get(userId)?.user).find(Boolean) || null;
+    if (!user) throw appError('NOT_FOUND', 'Person nicht gefunden.');
+    const mutual = [...c.guilds.cache.values()].filter((g) => g.members.cache.has(userId)).map((g) => g.name).slice(0, 10);
+    return {
+      id: user.id,
+      name: member?.displayName || user.globalName || user.username,
+      username: user.username,
+      avatarUrl: (member || user).displayAvatarURL?.({ size: 128, extension: 'png' }) || null,
+      bannerColor: user.hexAccentColor || null,
+      bot: Boolean(user.bot),
+      isSelf: user.id === c.user.id,
+      createdAt: user.createdTimestamp || timestampOf(user.id) || null, // Discord-ID enthält das Erstellungsdatum
+      joinedAt: member?.joinedTimestamp || null,
+      guildName: guild?.name || null,
+      roles: member
+        ? valuesOf(member.roles?.cache)
+            .filter((r) => r.id !== guild.id)
+            .sort((a, b) => b.position - a.position)
+            .slice(0, 20)
+            .map((r) => ({ id: r.id, name: r.name, color: r.hexColor && r.hexColor !== '#000000' ? r.hexColor : null }))
+        : [],
+      mutualGuilds: mutual,
+    };
   }
 
   /** Bot-Einladungslink. Mit guildId ist der Server vorausgewählt und fixiert (offizielle Parameter guild_id + disable_guild_select). */
@@ -1199,6 +1292,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     sendMessage,
     sendTyping,
     searchMentionables,
+    searchPeople,
+    getUserProfile,
     getInviteUrl,
     serializeMessage,
     listVoiceMembers,

@@ -31,6 +31,8 @@ export const api = Object.fromEntries(
     'sendMessage',
     'sendTyping',
     'searchMentionables',
+    'searchPeople',
+    'userProfile',
     'getSettings',
     'lockStatus',
     'lockVerify',

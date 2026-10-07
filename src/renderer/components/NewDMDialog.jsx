@@ -4,7 +4,7 @@ import { api } from '../api';
 // Neuer Privatchat: Person auf einem Server des Bots suchen → Bot schreibt ihr privat.
 // Geht nur mit Personen, die einen Server mit dem Bot teilen (Discord-Regel).
 export default function NewDMDialog({ guilds, onClose, onOpened, toast }) {
-  const [guildId, setGuildId] = useState(guilds[0]?.id || '');
+  const [guildId, setGuildId] = useState('alle');
   const [query, setQuery] = useState('');
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -19,12 +19,14 @@ export default function NewDMDialog({ guilds, onClose, onOpened, toast }) {
 
   // Suche mit kleiner Verzögerung; nur Personen (keine Rollen)
   useEffect(() => {
-    if (!guildId) return undefined;
     let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        const res = await api.searchMentionables({ guildId, query: query.trim().slice(0, 32) });
-        if (!cancelled) setItems(res.filter((i) => i.kind === 'user'));
+        // Alle Server auf einmal, unscharf (Issue #1); die Server-Auswahl schränkt nur ein
+        const res = await api.searchPeople({ query: query.trim().slice(0, 32) });
+        const gName = guilds.find((g) => g.id === guildId)?.name;
+        const inGuild = res.filter((i) => !i.bot && (!gName || guildId === 'alle' || i.guilds?.includes(gName)));
+        if (!cancelled) setItems(inGuild);
       } catch {
         if (!cancelled) setItems([]);
       }
@@ -66,6 +68,7 @@ export default function NewDMDialog({ guilds, onClose, onOpened, toast }) {
                   Server
                 </label>
                 <select id="newdm-guild" value={guildId} onChange={(e) => setGuildId(e.target.value)}>
+                  <option value="alle">Alle Server</option>
                   {guilds.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}

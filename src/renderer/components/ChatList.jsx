@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { formatListTime, formatShortTime } from '../../shared/format';
 import { api } from '../api';
 import { prefs } from '../prefs';
+import { fuzzyFilter } from '../../shared/fuzzy';
 
 const UPDATE_TEXT = {
   idle: 'Updates: –',
@@ -195,7 +196,7 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
   const [filter, setFilter] = useState('');
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase().replace(/^#/, '');
-    return q ? chats.filter((c) => c.name.toLowerCase().includes(q) || (previews[c.id]?.text || '').toLowerCase().includes(q)) : chats;
+    return q ? fuzzyFilter(chats, q, (c) => [c.name, previews[c.id]?.text]) : chats; // unscharf (Issue #1)
   }, [chats, filter, previews]);
 
   // Sortierung „Neueste zuerst“ oder „Nach Kategorien“ (einklappbar) – wird pro PC gemerkt

@@ -176,6 +176,44 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     const coin = await js(win, `JSON.stringify({ neu: document.querySelectorAll('.msg--out').length - ${sentBefore}, text: [...document.querySelectorAll('.msg--out')].at(-1)?.textContent.slice(0,30) || null, feld: document.querySelector('.composer textarea')?.value })`);
     console.log(`[befehle] /ping: ${unknown} · /mü + Enter: ${coin}`);
   }
+  // Profile + unscharfe Suche + @ im Privatchat (Issue #1)
+  {
+    const openChat = (name) => js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.querySelector('.chatrow__name')?.textContent===${JSON.stringify(name)})?.click()`);
+    await openChat('allgemein');
+    await wait(500);
+    await js(win, `[...document.querySelectorAll('.bubble__author-btn')].find(b=>b.textContent.includes('Anna'))?.click()`);
+    await wait(700);
+    await shoot(win, dir, '50-profil');
+    const profile = await js(win, `JSON.stringify({ name: document.querySelector('.profile-card__name')?.textContent.trim() || null, knoepfe: [...document.querySelectorAll('.profile-card__actions .btn')].map(b=>b.textContent.trim()) })`);
+    await js(win, `[...document.querySelectorAll('.profile-card__actions .btn')].find(b=>b.textContent.includes('Erwähnen'))?.click()`);
+    await wait(300);
+    const field = await js(win, `document.querySelector('.composer textarea')?.value || null`);
+    await js(win, typeInto('.composer textarea', ''));
+    console.log(`[profil] ${profile} · nach „Erwähnen“ im Feld: ${field}`);
+    // Schnellsuche mit Tippfehler: „allgmein“ findet #allgemein
+    await js(win, key('k', { ctrlKey: true }));
+    await wait(300);
+    await js(win, `(() => { const el=document.querySelector('.quick__input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,'allgmein'); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    await wait(300);
+    const quick = await js(win, `[...document.querySelectorAll('.quick__item, .quick li, .quick button')].map(b=>b.textContent.trim()).filter(Boolean).slice(0,3).join(' | ') || null`);
+    await js(win, `document.querySelector('.quick__input')?.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);
+    await wait(200);
+    // Privatchat: @ schlägt Personen von allen Servern vor
+    await js(win, `document.querySelector('.rail__dm')?.click()`);
+    await wait(700);
+    await js(win, `document.querySelector('.chatlist__items .chatrow')?.click()`);
+    await wait(700);
+    await js(win, typeInto('.composer textarea', '@bnd'));
+    await wait(700);
+    await shoot(win, dir, '51-at-im-privatchat');
+    const dmAt = await js(win, `[...document.querySelectorAll('.suggest__item, .suggest li, .suggest button')].map(b=>b.textContent.trim()).slice(0,4).join(' | ') || null`);
+    await js(win, typeInto('.composer textarea', ''));
+    console.log(`[suche] Strg+K „allgmein“: ${quick} · Privatchat „@bnd“: ${dmAt}`);
+    await js(win, `document.querySelector('.rail__item:not(.rail__dm):not(.rail__add)')?.click()`);
+    await wait(500);
+    await openChat('allgemein');
+    await wait(400);
+  }
   // Smileys (Issue #1: „mehr Smileys“): 😀 im Eingabefeld, suchen, einfügen; ➕ bei Reaktionen
   await js(win, `document.querySelector('.tool-btn[aria-label="Smileys"]')?.click()`);
   await wait(300);

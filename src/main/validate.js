@@ -449,6 +449,15 @@ const validators = {
     if (typeof query !== 'string' || query.length > 32) throw new ValidationError('Ungültige Suchanfrage.');
     return { guildId: snowflake(guildId, 'guildId'), query };
   },
+  searchPeople(p) {
+    const { query } = obj(p);
+    if (typeof query !== 'string' || query.length > 32) throw new ValidationError('Ungültige Suchanfrage.');
+    return { query: query.trim() };
+  },
+  userProfile(p) {
+    const { userId, guildId } = obj(p);
+    return { userId: snowflake(userId, 'userId'), guildId: guildId ? snowflake(guildId, 'guildId') : null };
+  },
   readMarker(p) {
     const { channelId, messageId } = obj(p);
     return { channelId: snowflake(channelId, 'channelId'), messageId: snowflake(messageId, 'messageId') };

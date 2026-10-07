@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { applyFormat, FORMAT_BUTTONS } from '../../shared/format-text';
 import { parseCommand, suggestCommands, unknownCommand } from '../../shared/quick-commands';
+import { fuzzyFilter } from '../../shared/fuzzy';
 import { api } from '../api';
 import { prefs } from '../prefs';
 import { applyMentionTokens, findMentionQuery } from '../../shared/mentions';
@@ -21,6 +22,19 @@ const fmtSize = (b) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} 
 export default function Composer({ guild, channel, bot, allChannels, onSend, replyTo = null, onCancelReply = () => {}, editing = null, onCancelEdit = () => {}, onSaveEdit = () => {} }) {
   const [text, setText] = useState('');
   const [inserted, setInserted] = useState([]);
+  // „@ Erwähnen“ aus einem Profil (Issue #1): Namen ans Ende setzen, als echte Erwähnung merken
+  useEffect(() => {
+    const onInsert = (e) => {
+      const { id, name } = e.detail || {};
+      if (!id || !name) return;
+      const display = `@${name}`;
+      setText((t) => `${t && !t.endsWith(' ') ? `${t} ` : t}${display} `);
+      setInserted((list) => [...list.filter((x) => x.display !== display), { display, kind: 'user', id }]);
+      requestAnimationFrame(() => taRef.current?.focus());
+    };
+    window.addEventListener('pk:insert-mention', onInsert);
+    return () => window.removeEventListener('pk:insert-mention', onInsert);
+  }, []);
   // Entwurf, der beim Start des Bearbeitens im Feld stand (Issue #1: ging beim Abbrechen verloren)
   const draftRef = useRef(null);
   const [suggest, setSuggest] = useState(null); // { query, start, trigger, items, sel }
@@ -135,20 +149,27 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
       const cmds = editing ? null : suggestCommands(value, caret);
       if (cmds) return setSuggest(cmds.length ? { trigger: '/', query: '', start: 0, items: cmds, sel: 0 } : null);
       const q = findMentionQuery(value, caret);
-      if (!q || guild.isDM) return setSuggest(null); // Privatchat: keine Rollen/Kanäle/Mitgliedersuche
+      if (!q || (guild.isDM && q.trigger !== '@')) return setSuggest(null); // Privatchat: keine Rollen/Kanäle
       const seq = ++searchSeq.current;
       if (q.trigger === '#') {
-        const needle = q.query.toLowerCase();
-        const items = allChannels
-          .filter((c) => c.guildId === guild.id && c.name.toLowerCase().includes(needle))
-          .slice(0, 8)
-          .map((c) => ({ kind: 'channel', id: c.id, display: c.name }));
+        const items = fuzzyFilter(
+          allChannels.filter((c) => c.guildId === guild.id),
+          q.query,
+          (c) => [c.name],
+          8,
+        ).map((c) => ({ kind: 'channel', id: c.id, display: c.name }));
         return setSuggest(items.length ? { ...q, items, sel: 0 } : null);
       }
       // kleine Verzögerung, damit nicht jeder Tastendruck eine Anfrage auslöst
       await new Promise((r) => setTimeout(r, 120));
       if (seq !== searchSeq.current) return undefined;
       try {
+        // Privatchat (Issue #1): Personen von allen Servern des Bots + bekannte Privatchats
+        if (guild.isDM) {
+          const people = await api.searchPeople({ query: q.query });
+          if (seq === searchSeq.current) setSuggest(people.length ? { ...q, items: people.map((p) => ({ ...p, sub: p.guilds?.length ? `${p.sub} · ${p.guilds[0]}` : p.sub })), sel: 0 } : null);
+          return undefined;
+        }
         let items = await api.searchMentionables({ guildId: guild.id, query: q.query });
         // Einstellung „Namensvorschläge: alle Server“ → auch Personen von den anderen Servern des Bots
         if (prefs.get().mentionScope === 'alle' && q.query) {

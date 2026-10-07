@@ -257,10 +257,10 @@ function PeoplePicker({ label, people, onChange, guilds }) {
     let cancelled = false;
     const t = setTimeout(async () => {
       const q = query.trim().slice(0, 32);
-      // Alle Server gleichzeitig fragen (höchstens 10) – Treffer auch mitten im Namen
-      const lists = await Promise.all(guilds.slice(0, 10).map((g) => api.searchMentionables({ guildId: g.id, query: q }).catch(() => [])));
+      // Alle Server auf einmal, unscharf (Groß/klein egal, Teile, Tippfehler) – Issue #1
+      const res = await api.searchPeople({ query: q }).catch(() => []);
       const found = new Map();
-      for (const res of lists) for (const u of res) if (u.kind === 'user' && !u.bot && !found.has(u.id)) found.set(u.id, { id: u.id, name: u.display, sub: u.sub });
+      for (const u of res) if (!u.bot && !found.has(u.id)) found.set(u.id, { id: u.id, name: u.display, sub: u.sub });
       if (!cancelled) setItems([...found.values()].filter((u) => !people.some((p) => p.id === u.id)).slice(0, 8));
     }, 200);
     return () => {

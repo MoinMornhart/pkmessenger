@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { fuzzyFilter } from '../../shared/fuzzy';
 
 export default function QuickSwitcher({ channels, guilds, isUnread, onSelect, onClose }) {
   const [q, setQ] = useState('');
@@ -9,17 +10,10 @@ export default function QuickSwitcher({ channels, guilds, isUnread, onSelect, on
   useEffect(() => inputRef.current?.focus(), []);
 
   const results = useMemo(() => {
-    const needle = q.trim().toLowerCase().replace(/^#/, '');
-    const scored = channels
-      .map((c) => {
-        const name = c.name.toLowerCase();
-        const score = !needle ? (isUnread(c) ? 0 : 1) : name.startsWith(needle) ? 0 : name.includes(needle) ? 1 : -1;
-        return { c, score };
-      })
-      .filter((x) => x.score >= 0)
-      .sort((a, b) => a.score - b.score || a.c.name.localeCompare(b.c.name, 'de'));
-    return scored.slice(0, 30).map((x) => x.c);
-  }, [q, channels, isUnread]);
+    const needle = q.trim().replace(/^#/, '');
+    if (needle) return fuzzyFilter(channels, needle, (c) => [c.name, guildName.get(c.guildId)], 30); // unscharf (Issue #1)
+    return [...channels].sort((a, b) => Number(!isUnread(a)) - Number(!isUnread(b)) || a.name.localeCompare(b.name, 'de')).slice(0, 30);
+  }, [q, channels, isUnread, guildName]);
 
   useEffect(() => setSel(0), [q]);
 
