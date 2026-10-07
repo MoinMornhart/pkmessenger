@@ -231,12 +231,19 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     // Mitmachen: Chat anklicken → Tour geht von selbst weiter
     await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.textContent.includes('allgemein'))?.click()`);
     await wait(1400);
-    const t4 = await card();
+    const t4 = await card(); // „Rechtsklick auf einen Chat“
+    await next();
+    await wait(300);
+    await next(); // „Oben in der Liste“ → „Schreiben“
+    await wait(400);
     await js(win, typeInto('.composer textarea', '/'));
     await wait(300);
     await shoot(win, dir, '57-tour-mitmachen');
     await wait(1100);
-    const t5 = await card();
+    const t5 = await card(); // „Die Knöpfe unten“
+    await js(win, typeInto('.composer textarea', ''));
+    await wait(300);
+    await shoot(win, dir, '57b-tour-knoepfe-unten');
     await js(win, typeInto('.composer textarea', ''));
     await js(win, `[...document.querySelectorAll('.tour__card .btn')].find(b=>b.textContent.includes('überspringen'))?.click()`);
     await wait(300);
@@ -306,6 +313,24 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     const typed = await js(win, `document.querySelector('.composer textarea')?.value`);
     await js(win, typeInto('.composer textarea', ''));
     console.log(`[einstellungen-filter] nur: ${only} · alle: ${all} · @anna getippt → „${typed}“`);
+    // Hilfe & Tour: Einrichtungs-Check + „Ups …“-Fehlerbericht (Issue #1)
+    await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+    await wait(500);
+    await js(win, `document.querySelector('.settings__nav [data-nav="hilfe"]')?.click()`);
+    await wait(800);
+    await shoot(win, dir, '66-einrichtungs-check');
+    const check = await js(win, `[...document.querySelectorAll('.setup-check__item')].map(i=>i.textContent.trim().slice(0,40)).join(' | ')`);
+    await js(win, `[...document.querySelectorAll('.settings .btn')].find(b=>b.textContent.includes('Fehlerbericht erstellen'))?.click()`);
+    await wait(700);
+    await js(win, `[...document.querySelectorAll('.oops .btn')].find(b=>b.textContent.includes('Kopieren'))?.click()`);
+    await wait(300);
+    await shoot(win, dir, '65-ups-fehlerbericht');
+    const oops = await js(win, `JSON.stringify({ titel: document.querySelector('.oops h3')?.textContent || null, bericht: document.querySelector('.oops__report')?.value.split(String.fromCharCode(10))[0] || null, githubAktiv: ![...document.querySelectorAll('.oops .btn')].find(b=>b.textContent.includes('GitHub'))?.disabled })`);
+    await js(win, `[...document.querySelectorAll('.oops .btn')].find(b=>b.textContent.includes('Schließen'))?.click()`);
+    await js(win, `document.querySelector('.settings__nav [data-nav="alle"]')?.click()`);
+    await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+    await wait(300);
+    console.log(`[hilfe] Check: ${check} · Ups: ${oops}`);
   }
   // Smileys (Issue #1: „mehr Smileys“): 😀 im Eingabefeld, suchen, einfügen; ➕ bei Reaktionen
   await js(win, `document.querySelector('.tool-btn[aria-label="Smileys"]')?.click()`);

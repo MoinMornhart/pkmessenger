@@ -4100,3 +4100,50 @@ kbd {
 .ai-memory-row > span {
   flex: 1 1 200px;
 }
+
+/* ---------- „Ups …“-Fenster + Einrichtungs-Check (Issue #1) ---------- */
+.oops-backdrop {
+  z-index: 10000;
+}
+.oops {
+  max-width: 560px;
+}
+.oops__steps {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+  font-size: 13.5px;
+}
+.oops__steps li.is-done {
+  color: #22c55e;
+}
+.oops__report {
+  width: 100%;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11.5px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
+}
+.setup-check {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+.setup-check__item {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  align-items: baseline;
+}
+.setup-check__item.is-bad {
+  color: #f87171;
+}
+.setup-check__item.is-optional {
+  color: var(--text-2);
+}
+.setup-check__item.is-ok {
+  color: var(--text);
+}
