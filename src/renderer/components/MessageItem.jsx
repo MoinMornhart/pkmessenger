@@ -1,4 +1,5 @@
-import { memo, useState } from 'react';
+import { memo, useContext, useState } from 'react';
+import { MessageActionsContext } from '../state';
 import { formatShortTime, formatFull, formatDayPill } from '../../shared/format';
 import MessageContent from './MessageContent.jsx';
 import { ReplyQuote, Reactions, Embeds, ThreadChip, MessageActionBar, PollCard } from './MessageExtras.jsx';
@@ -82,13 +83,14 @@ function SystemRow({ m, highlighted }) {
 }
 
 function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
+  const actions = useContext(MessageActionsContext);
   if (m.system && !m.pending) return <SystemRow m={m} highlighted={highlighted} />;
   const out = m.isOwn || m.pending || m.failed;
   const cls = ['msg', out ? 'msg--out' : 'msg--in', grouped && 'msg--grouped', m.pending && 'msg--pending', m.failed && 'msg--failed', highlighted && 'msg--highlight', m.mentions?.everyone && 'msg--mass']
     .filter(Boolean)
     .join(' ');
   return (
-    <div className={cls} data-mid={m.id}>
+    <div className={cls} data-mid={m.id} onContextMenu={(e) => actions?.contextMenu?.(e, m)}>
       {!out && (grouped ? <span className="avatar-spacer" /> : <Avatar author={m.author} />)}
       <div className={`bubble ${grouped ? '' : 'bubble--tail'}`}>
         <MessageActionBar message={m} out={out} />

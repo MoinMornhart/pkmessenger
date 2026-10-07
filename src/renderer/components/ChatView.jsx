@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { messageStore, randomNonce, useChannelMessages, MessageActionsContext } from '../state';
 import ConfirmDialog from './ConfirmDialog.jsx';
+import ContextMenu from './ContextMenu.jsx';
+import ModerationDialog from './ModerationDialog.jsx';
 import { PinsPanel, ThreadsPanel, NameDialog } from './SidePanels.jsx';
 import MessageList from './MessageList.jsx';
 import Composer from './Composer.jsx';
@@ -52,6 +54,8 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
   const [replyTo, setReplyTo] = useState(null); // F7
   const [editing, setEditing] = useState(null); // F9
   const [confirmDelete, setConfirmDelete] = useState(null); // F9
+  const [ctxMenu, setCtxMenu] = useState(null); // Rechtsklick-Menü { x, y, items }
+  const [modTarget, setModTarget] = useState(null); // Person verwalten { guildId, userId }
   const [threadFrom, setThreadFrom] = useState(null); // F12: Thread aus Nachricht starten
   const [panel, setPanel] = useState(null); // 'pins' | 'threads'
   const [emojis, setEmojis] = useState([]); // F8 Server-Emojis
@@ -175,9 +179,35 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
           })
           .catch(fail),
       openThread: (id) => onOpenThread?.(id),
+      // Rechtsklick auf eine Nachricht (Issue #1): alle Aktionen an einem Ort + Person verwalten
+      contextMenu: (e, m) => {
+        e.preventDefault();
+        if (m.pending || m.failed) return;
+        const a = actionsRef.current;
+        const caps = a.caps;
+        const guildPart = guild?.isDM ? '@me' : guild?.id;
+        const items = [
+          caps.canSend && { icon: '↩', label: 'Antworten', onClick: () => a.reply(m) },
+          { icon: '👍', label: 'Daumen hoch', onClick: () => a.react(m, '👍', true) },
+          { icon: '❤️', label: 'Herz', onClick: () => a.react(m, '❤️', true) },
+          m.content && { icon: '📋', label: 'Text kopieren', onClick: () => api.copyText({ text: m.content.slice(0, 4000) }).then(() => toast({ kind: 'info', title: 'Text kopiert', duration: 1500 })) },
+          guildPart && { icon: '🔗', label: 'Link zur Nachricht kopieren', onClick: () => api.copyText({ text: `https://discord.com/channels/${guildPart}/${m.channelId}/${m.id}` }).then(() => toast({ kind: 'info', title: 'Link kopiert', duration: 1500 })) },
+          caps.canThread && !m.thread && { icon: '🧵', label: 'Thread starten', onClick: () => a.startThread(m) },
+          caps.canPin && { icon: '📌', label: m.pinned ? 'Lösen' : 'Anheften', onClick: () => a.pin(m, !m.pinned) },
+          m.canEdit && { icon: '✏️', label: 'Bearbeiten', onClick: () => a.edit(m) },
+          m.canDelete && { icon: '🗑', label: 'Löschen', danger: true, onClick: () => a.remove(m) },
+          guild && !guild.isDM && !m.isOwn && !m.system && { separator: true },
+          guild && !guild.isDM && !m.isOwn && !m.system && { icon: '👤', label: `${m.author.name} verwalten …`, onClick: () => setModTarget({ guildId: guild.id, userId: m.author.id }) },
+        ].filter(Boolean);
+        setCtxMenu({ x: e.clientX, y: e.clientY, items });
+      },
     }),
-    [channel, emojis, jump, fail, toast, onOpenThread],
+    [channel, emojis, jump, fail, toast, onOpenThread, guild],
   );
+
+  // Für das Rechtsklick-Menü: aktuelle Aktionen (das Menü wird innerhalb von „actions“ gebaut)
+  const actionsRef = useRef(null);
+  actionsRef.current = actions;
 
   const saveEdit = useCallback(
     async ({ content, mentions }) => {
@@ -289,6 +319,8 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
         {!searchOpen && panel === 'threads' && <ThreadsPanel channel={channel} onOpen={(id) => onOpenThread?.(id)} onClose={() => setPanel(null)} toast={toast} />}
       </div>
       </MessageActionsContext.Provider>
+      {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />}
+      {modTarget && <ModerationDialog guildId={modTarget.guildId} userId={modTarget.userId} onClose={() => setModTarget(null)} toast={toast} />}
       {confirmDelete && (
         <ConfirmDialog
           title="Nachricht löschen?"
