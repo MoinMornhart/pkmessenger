@@ -77,6 +77,8 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:ai-delete-profile': (p) => requireAi().deleteProfile(validators.aiJobRef(p)),
     'pk:ai-abort': () => ({ aborted: requireAi().abort() }),
     'pk:ai-set-responder': (p) => requireAi().setResponder(validators.aiResponder(p)),
+    'pk:ai-models': (p) => requireAi().models(validators.aiModels(p)),
+    'pk:ai-find-local': () => requireAi().findLocal(),
     'pk:open-dm': (p) => service.openDM(validators.userRef(p)),
     'pk:get-profile': (p) => service.getProfile(validators.profileRef(p)),
     'pk:update-profile': (p) => service.updateProfile(validators.profileUpdate(p)),

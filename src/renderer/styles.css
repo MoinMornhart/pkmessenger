@@ -3586,3 +3586,28 @@ img.chat-avatar {
   color: var(--text);
   font: inherit;
 }
+
+/* ---------- KI: Server/Kanal-Auswahl, lokale KI (Issue #12) ---------- */
+.ai-target {
+  flex-wrap: wrap;
+}
+.settings .ai-target select {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.ai-local {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0;
+}
+.ai-local__item {
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--text);
+}
+.ai-local__item:hover {
+  border-color: var(--accent);
+}

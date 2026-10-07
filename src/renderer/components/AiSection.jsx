@@ -12,6 +12,8 @@ const PRESETS = [
   { id: 'groq', label: 'Groq', provider: 'openai', baseUrl: 'https://api.groq.com/openai/v1', model: '' },
   { id: 'mistral', label: 'Mistral', provider: 'openai', baseUrl: 'https://api.mistral.ai/v1', model: '' },
   { id: 'ollama', label: 'Ollama (lokal, ohne Schlüssel)', provider: 'openai', baseUrl: 'http://localhost:11434/v1', model: '' },
+  { id: 'lmstudio', label: 'LM Studio (lokal, ohne Schlüssel)', provider: 'openai', baseUrl: 'http://localhost:1234/v1', model: '' },
+  { id: 'llamacpp', label: 'llama.cpp-Server (lokal, ohne Schlüssel)', provider: 'openai', baseUrl: 'http://localhost:8080/v1', model: '' },
 ];
 const presetOf = (cfg) => PRESETS.find((p) => p.provider === cfg.provider && p.baseUrl === cfg.baseUrl)?.id || 'custom';
 
@@ -19,7 +21,7 @@ const INTERVALS = [15, 30, 60, 120, 240, 720, 1440];
 const intervalLabel = (m) => describeSchedule({ kind: 'interval', minutes: m });
 const WEEK = [1, 2, 3, 4, 5, 6, 0];
 
-const JOB_DEFAULTS = { maxLength: 1800, language: 'auto', persona: '', contextSize: 0, postAs: 'message', notify: true };
+const JOB_DEFAULTS = { maxLength: 1800, language: 'auto', persona: '', contextSize: 0, postAs: 'message', notify: true, web: false };
 // Nur die Felder, die der Validator kennt (keine lastRun/nextRun usw. zurückschicken)
 const jobPayload = (j) => ({
   ...(j.id ? { id: j.id } : {}),
@@ -36,7 +38,53 @@ const jobPayload = (j) => ({
   contextSize: j.contextSize,
   postAs: j.postAs,
   notify: j.notify,
+  web: j.web,
 });
+
+/** Ziele nach Server gruppieren: [{ id, name, items }] – Privatchats zuletzt. */
+function groupByServer(targets) {
+  const map = new Map();
+  for (const t of targets) {
+    const id = t.guildId || '@dm';
+    if (!map.has(id)) map.set(id, { id, name: t.guildName || 'Server', items: [] });
+    map.get(id).items.push(t);
+  }
+  return [...map.values()].sort((a, b) => (a.id === '@dm') - (b.id === '@dm') || a.name.localeCompare(b.name));
+}
+
+// Erst Server wählen, dann Kanal (übersichtlich bei vielen Servern)
+function ServerChannelPicker({ targets, value, onChange }) {
+  const groups = groupByServer(targets);
+  const current = targets.find((t) => t.id === value);
+  const [serverId, setServerId] = useState(current?.guildId || groups[0]?.id || '');
+  const group = groups.find((g) => g.id === serverId) || groups[0];
+  return (
+    <div className="settings__row ai-target">
+      <select
+        aria-label="Server"
+        value={group?.id || ''}
+        onChange={(e) => {
+          setServerId(e.target.value);
+          const first = groups.find((g) => g.id === e.target.value)?.items[0];
+          if (first) onChange(first.id);
+        }}
+      >
+        {groups.map((g) => (
+          <option key={g.id} value={g.id}>
+            {g.id === '@dm' ? '💬' : '🖥'} {g.name}
+          </option>
+        ))}
+      </select>
+      <select id="ai-job-target" aria-label="Kanal" value={value} onChange={(e) => onChange(e.target.value)}>
+        {(group?.items || []).map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.dm ? `💬 ${t.name}` : `#${t.name}`}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 function JobForm({ targets, initial, onSave, onCancel, toast }) {
   const [job, setJob] = useState({
@@ -81,13 +129,7 @@ function JobForm({ targets, initial, onSave, onCancel, toast }) {
       <label className="settings__label" htmlFor="ai-job-target">
         Wohin posten?
       </label>
-      <select id="ai-job-target" value={job.channelId} onChange={(e) => set({ channelId: e.target.value })}>
-        {targets.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.label}
-          </option>
-        ))}
-      </select>
+      <ServerChannelPicker targets={targets} value={job.channelId} onChange={(channelId) => set({ channelId })} />
       <label className="settings__label">Wann?</label>
       <div className="settings__row">
         <select value={daily ? 'daily' : 'interval'} onChange={(e) => setSchedule(e.target.value === 'daily' ? { kind: 'daily', time: '08:00', days: [1, 2, 3, 4, 5], minutes: undefined } : { kind: 'interval', minutes: 60, time: undefined, days: undefined })}>
@@ -134,7 +176,7 @@ function JobForm({ targets, initial, onSave, onCancel, toast }) {
         <label>
           Sprache
           <select value={job.language} onChange={(e) => set({ language: e.target.value })}>
-            <option value="auto">wie der Auftrag</option>
+            <option value="auto">Deutsch (außer der Auftrag sagt was anderes)</option>
             <option value="de">Deutsch</option>
             <option value="en">Englisch</option>
           </select>
@@ -166,6 +208,7 @@ function JobForm({ targets, initial, onSave, onCancel, toast }) {
       <label className="composer__ping">
         <input type="checkbox" checked={job.notify} onChange={(e) => set({ notify: e.target.checked })} /> Hinweis in der App bei Erfolg oder Fehler
       </label>
+      <WebToggle checked={job.web} onChange={(web) => set({ web })} />
       {preview && preview !== 'busy' && (
         <div className="ai-preview" role="status">
           <div className="muted small">
@@ -186,6 +229,18 @@ function JobForm({ targets, initial, onSave, onCancel, toast }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// Werkzeug „Websuche“ (kostenlos, ohne Schlüssel)
+function WebToggle({ checked, onChange }) {
+  return (
+    <>
+      <label className="composer__ping">
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /> 🌐 Websuche erlauben (kostenlos, ohne Schlüssel)
+      </label>
+      {checked && <p className="muted small">Die KI darf bis zu 2× im Web suchen (DuckDuckGo, sonst Wikipedia). Dorthin geht nur der Suchbegriff. Jede Runde zählt zum KI-Verbrauch.</p>}
+    </>
   );
 }
 
@@ -249,7 +304,11 @@ function PeoplePicker({ label, people, onChange, guilds }) {
 function ResponderSection({ cfg, targets, guilds, toast }) {
   const [r, setR] = useState(cfg.responder);
   const [busy, setBusy] = useState(false);
-  const channels = targets.filter((t) => !t.dm);
+  const groups = groupByServer(targets.filter((t) => !t.dm));
+  const [serverId, setServerId] = useState(() => groups.find((g) => g.items.some((t) => cfg.responder.channelIds.includes(t.id)))?.id || groups[0]?.id || '');
+  const group = groups.find((g) => g.id === serverId) || groups[0];
+  const activeIn = (g) => g.items.filter((t) => r.channelIds.includes(t.id)).length;
+  const setGroup = (g, on) => set({ channelIds: on ? [...new Set([...r.channelIds, ...g.items.map((t) => t.id)])] : r.channelIds.filter((id) => !g.items.some((t) => t.id === id)) });
   const dirty = JSON.stringify(r) !== JSON.stringify(cfg.responder);
   const set = (patch) => setR((x) => ({ ...x, ...patch }));
   const save = async () => {
@@ -272,16 +331,33 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
       {r.enabled && (
         <>
           <span className="settings__label">In diesen Kanälen</span>
+          {groups.length === 0 && <span className="muted small">Kein Kanal, in den der Bot schreiben darf.</span>}
+          {groups.length > 0 && (
+            <div className="settings__row ai-target">
+              <select aria-label="Server" value={group?.id} onChange={(e) => setServerId(e.target.value)}>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    🖥 {g.name} ({activeIn(g)}/{g.items.length} an)
+                  </option>
+                ))}
+              </select>
+              <button className="btn btn--small" onClick={() => setGroup(group, true)}>
+                Alle an
+              </button>
+              <button className="btn btn--ghost btn--small" onClick={() => setGroup(group, false)}>
+                Alle aus
+              </button>
+            </div>
+          )}
           <div className="ai-channels">
-            {channels.length === 0 && <span className="muted small">Kein Kanal, in den der Bot schreiben darf.</span>}
-            {channels.map((c) => (
+            {(group?.items || []).map((c) => (
               <label key={c.id} className="ai-channel" title={c.label}>
                 <input
                   type="checkbox"
                   checked={r.channelIds.includes(c.id)}
                   onChange={(e) => set({ channelIds: e.target.checked ? [...r.channelIds, c.id] : r.channelIds.filter((x) => x !== c.id) })}
                 />{' '}
-                {c.label}
+                #{c.name}
               </label>
             ))}
           </div>
@@ -306,6 +382,7 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
             <input type="checkbox" checked={r.context} onChange={(e) => set({ context: e.target.checked })} /> Letzte 20 Nachrichten als Kontext mitschicken
           </label>
           {r.context && <p className="muted small">⚠ Diese Nachrichten gehen dann an deinen KI-Anbieter.</p>}
+          <WebToggle checked={r.web} onChange={(web) => set({ web })} />
           <label className="composer__ping">
             <input type="checkbox" checked={r.notify} onChange={(e) => set({ notify: e.target.checked })} /> Hinweis in der App, wenn der Bot geantwortet hat
           </label>
@@ -408,6 +485,9 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
   const [busy, setBusy] = useState('');
   const [editing, setEditing] = useState(null); // null | 'new' | job
   const [error, setError] = useState('');
+  const [modelList, setModelList] = useState([]); // automatisch erkannte Modelle
+  const [localFound, setLocalFound] = useState(null); // gefundene lokale KI-Programme
+  const [jobServer, setJobServer] = useState('alle'); // Filter der Auftragsliste
 
   const load = useCallback(
     () =>
@@ -442,6 +522,9 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
   const saveConfig = (enabled) => api.aiSetConfig({ enabled, ...draft }).then(setCfg);
   const toggleBeta = wrap('beta', () => saveConfig(!cfg.enabled));
   const dirty = draft.provider !== cfg.provider || draft.baseUrl !== cfg.baseUrl || draft.model !== cfg.model;
+  const targetById = new Map(targets.map((t) => [t.id, t]));
+  const serverOfJob = (j) => targetById.get(j.channelId)?.guildId || '?';
+  const jobServers = groupByServer(targets).filter((g) => cfg.jobs.some((j) => serverOfJob(j) === g.id));
 
   return (
     <>
@@ -465,6 +548,11 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
             ) : (
               <span>
                 📊 Verbrauch: {cfg.usage.hour} pro Stunde · {cfg.usage.day} pro Tag · ohne Limit ({cfg.limits.mode === 'aus' ? 'ausgeschaltet' : 'lokales Modell, kostet nichts'})
+              </span>
+            )}
+            {cfg.searches?.length > 0 && (
+              <span>
+                🌐 Letzte Websuche: „{cfg.searches[0].query}“ · {cfg.searches[0].source} · {cfg.searches[0].count} Treffer
               </span>
             )}
             {cfg.running.length > 0 && (
@@ -494,6 +582,35 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
             ))}
             <option value="custom">Eigene Adresse (OpenAI-kompatibel)</option>
           </select>
+          <div className="settings__row">
+            <button
+              className="btn btn--small"
+              disabled={busy === 'local'}
+              title="Sucht Ollama, LM Studio, llama.cpp & Co. auf diesem PC"
+              onClick={wrap('local', async () => setLocalFound(await api.aiFindLocal()))}
+            >
+              {busy === 'local' ? 'Suche …' : '🔎 Lokale KI auf diesem PC suchen'}
+            </button>
+          </div>
+          {localFound && (
+            <div className="ai-local" role="status">
+              {localFound.length === 0 && <span className="muted small">Nichts gefunden. Läuft Ollama, LM Studio oder llama.cpp?</span>}
+              {localFound.map((s) => (
+                <button
+                  key={s.id}
+                  className="ai-local__item"
+                  onClick={() => {
+                    setDraft({ provider: 'openai', baseUrl: s.baseUrl, model: s.models[0] || '' });
+                    setModelList(s.models);
+                    setLocalFound(null);
+                  }}
+                >
+                  ✅ <b>{s.label}</b> · {s.models.length} {s.models.length === 1 ? 'Modell' : 'Modelle'}
+                  {s.models.length > 0 && <span className="muted small"> ({s.models.slice(0, 3).join(', ')}{s.models.length > 3 ? ' …' : ''})</span>}
+                </button>
+              ))}
+            </div>
+          )}
           {presetOf(draft) === 'custom' && (
             <div className="settings__row">
               <input value={draft.baseUrl} onChange={(e) => setDraft({ ...draft, provider: 'openai', baseUrl: e.target.value })} placeholder="https://…/v1" aria-label="Adresse des Anbieters" />
@@ -503,7 +620,25 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
             Modell
           </label>
           <div className="settings__row">
-            <input id="ai-model" value={draft.model} maxLength={100} onChange={(e) => setDraft({ ...draft, model: e.target.value })} placeholder="Name des Modells beim Anbieter" />
+            <input id="ai-model" list="ai-model-list" value={draft.model} maxLength={100} onChange={(e) => setDraft({ ...draft, model: e.target.value })} placeholder="Name des Modells beim Anbieter" />
+            <datalist id="ai-model-list">
+              {modelList.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+            <button
+              className="btn btn--small"
+              disabled={busy === 'models' || !draft.baseUrl}
+              title="Fragt den Anbieter, welche Modelle es gibt"
+              onClick={wrap('models', async () => {
+                const list = await api.aiModels({ provider: draft.provider, baseUrl: draft.baseUrl });
+                setModelList(list);
+                if (list.length && !list.includes(draft.model)) setDraft({ ...draft, model: list[0] });
+                toast({ kind: 'info', title: list.length ? `${list.length} Modelle gefunden ✓` : 'Keine Modelle gefunden', text: list.length ? 'Im Feld „Modell“ auswählen.' : 'Bei lokalen Programmen zuerst ein Modell laden.', duration: 2500 });
+              })}
+            >
+              {busy === 'models' ? 'Lade …' : '🔍 Modelle laden'}
+            </button>
             {dirty && (
               <button className="btn btn--primary btn--small" disabled={busy === 'cfg'} onClick={wrap('cfg', () => saveConfig(true))}>
                 Übernehmen
@@ -549,7 +684,19 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
 
           <h4 className="ai-jobs__title">🤖 Aufträge</h4>
           {cfg.jobs.length === 0 && !editing && <p className="muted small">Noch keine Aufträge.</p>}
-          {cfg.jobs.map((j) =>
+          {jobServers.length > 1 && (
+            <div className="settings__row ai-target">
+              <select aria-label="Aufträge nach Server filtern" value={jobServer} onChange={(e) => setJobServer(e.target.value)}>
+                <option value="alle">Alle Server ({cfg.jobs.length})</option>
+                {jobServers.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    🖥 {g.name} ({cfg.jobs.filter((j) => serverOfJob(j) === g.id).length})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {cfg.jobs.filter((j) => jobServer === 'alle' || serverOfJob(j) === jobServer).map((j) =>
             editing?.id === j.id ? (
               <JobForm
                 key={j.id}
@@ -571,6 +718,7 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
                   <span className="muted small">
                     {describeSchedule(j.schedule)} → {j.channelName || 'Kanal'}
                     {j.postAs === 'thread' ? ' · als Thread' : ''}
+                    {j.web ? ' · 🌐 Websuche' : ''}
                     {j.contextSize > 0 ? ` · Kontext ${j.contextSize}` : ''}
                   </span>
                   {j.enabled && j.nextRun && (

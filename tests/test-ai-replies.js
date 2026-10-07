@@ -53,7 +53,7 @@ test('Antwortet bei Erwähnung als Antwort (Reply), pingt niemanden, gibt Hinwei
   assert.deepEqual(sent.allowedMentions.parse, []);
   assert.equal(sent.allowedMentions.repliedUser, false);
   assert.match(calls[0].messages[0].content, /Sei freundlich/); // Vorgaben des Besitzers
-  assert.match(calls[0].messages[1].content, /Anna fragt: Wie spät treffen wir uns\?/); // ohne „@PKBot“
+  assert.match(calls[0].messages[1].content, /Anna asks: Wie spät treffen wir uns\?/); // ohne „@PKBot“
   assert.ok(events.some((e) => e.type === 'ai:replied' && e.p.userName === 'Anna'));
   assert.equal(ai.getConfig().recent[0].ok, true);
 });

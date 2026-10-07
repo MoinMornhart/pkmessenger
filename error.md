@@ -265,3 +265,14 @@ Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zwei
 4. **Lösung:** Jeder Aufruf bekommt eine eigene Regex (`new RegExp(INLINE.source, 'g')`).
 5. **Testergebnis:** Demo-Lauf vollständig: `/shrug`, Spoiler und Zitat werden angezeigt, Layout ok.
 6. **Prävention:** Globale Regex (`/g`) nie in rekursiven Funktionen teilen. Der vollständige Demo-Lauf vor jedem PR hat das abgefangen.
+
+---
+
+## #22 – „api.aiModels is not a function“ (vor Veröffentlichung gefunden)
+
+1. **Datum & Uhrzeit:** 07.10.2026, ca. 16:00 (nur im Branch, nie veröffentlicht)
+2. **Was passiert ist:** Die neuen Knöpfe „Modelle laden“ und „Lokale KI suchen“ zeigten im Demo nur eine rote Meldung „C.aiModels is not a function“.
+3. **Ursache (geprüft):** Neue Aufrufe müssen an drei Stellen stehen: `ipc.js`, `preload.js` **und** in der Liste in `src/renderer/api.js`. Die dritte Stelle fehlte.
+4. **Lösung:** `aiModels` und `aiFindLocal` in `api.js` ergänzt.
+5. **Testergebnis:** Demo-Lauf: „2 Modelle gefunden ✓“, „✅ Ollama · 3 Modelle“.
+6. **Prävention:** Neuer Test `tests/test-api-sync.js` vergleicht preload.js mit api.js und schlägt fehl, wenn etwas fehlt.

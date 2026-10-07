@@ -382,6 +382,17 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await clickText('.ai-box .btn', 'Verbindung testen');
   await wait(500);
   const aiTest = await js(win, `[...document.querySelectorAll('.toast')].map(t=>t.textContent).find(t=>t.includes('KI antwortet'))||'(kein Test-Hinweis)'`);
+  // Issue #12: Modelle automatisch laden + lokale KI (Ollama, LM Studio, llama.cpp) auf diesem PC finden
+  await clickText('.ai-box .btn', 'Modelle laden');
+  await wait(500);
+  const modelOpts = await js(win, `[...document.querySelectorAll('#ai-model-list option')].map(o=>o.value).join(',')`);
+  await clickText('.ai-box .btn', 'Lokale KI');
+  await wait(800);
+  await win.webContents.executeJavaScript(`document.querySelector('.ai-local')?.scrollIntoView({block:'center'})`);
+  await wait(300);
+  await shoot(win, dir, '42-ki-lokal-gefunden');
+  const local = await js(win, `[...document.querySelectorAll('.ai-local__item')].map(b=>b.textContent.trim()).join(' | ')`);
+  console.log(`[ki-modelle] geladen: ${modelOpts} · lokal gefunden: ${local}`);
   await clickText('.ai-box .btn', 'Neuer Auftrag');
   await wait(300);
   await js(win, `(() => { ${SET} setVal(document.querySelector('#ai-job-name'),'Morgengruß'); setVal(document.querySelector('#ai-job-prompt'),'Schreib einen kurzen, fröhlichen Guten-Morgen-Gruß mit dem Plan für heute.'); const t=document.querySelector('#ai-job-target'); const o=[...t.options].find(o=>o.textContent.includes('#allgemein')); if(o) setVal(t,o.value); })()`);
@@ -396,6 +407,19 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await win.webContents.executeJavaScript(`document.querySelector('.ai-preview')?.scrollIntoView({block:'center'})`);
   await wait(300);
   await shoot(win, dir, '24-ki-auftrag');
+  // Websuche (Issue #12): einschalten → KI sucht erst, antwortet dann mit Quelle; danach wieder aus
+  const webBox = `[...document.querySelectorAll('.ai-job-form label.composer__ping')].find(l=>l.textContent.includes('Websuche'))?.querySelector('input')`;
+  await js(win, `${webBox}?.click()`);
+  await wait(200);
+  await clickText('.ai-job-form .btn', 'Vorschau');
+  await wait(900);
+  await win.webContents.executeJavaScript(`document.querySelector('.ai-preview')?.scrollIntoView({block:'center'})`);
+  await wait(300);
+  await shoot(win, dir, '43-ki-websuche');
+  const web = await js(win, `JSON.stringify({ vorschau: document.querySelector('.ai-preview__text')?.textContent.slice(0,60) || null, suche: [...document.querySelectorAll('.ai-status span')].map(s=>s.textContent).find(t=>t.includes('Websuche')) || null })`);
+  console.log(`[ki-websuche] ${web}`);
+  await js(win, `${webBox}?.click()`);
+  await wait(200);
   await clickText('.ai-job-form .btn', 'Auftrag speichern');
   await wait(500);
   await clickText('.ai-job .btn', 'Jetzt');

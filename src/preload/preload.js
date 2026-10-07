@@ -101,6 +101,8 @@ contextBridge.exposeInMainWorld('api', {
   aiUseProfile: call('pk:ai-use-profile'),
   aiDeleteProfile: call('pk:ai-delete-profile'),
   aiAbort: call('pk:ai-abort'),
+  aiModels: call('pk:ai-models'),
+  aiFindLocal: call('pk:ai-find-local'),
   openDM: call('pk:open-dm'),
   updateProfile: call('pk:update-profile'),
   refresh: call('pk:refresh'),

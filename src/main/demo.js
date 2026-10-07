@@ -227,12 +227,22 @@ function createDemo() {
   // KI-Agenten (Beta) im Demo: simulierter Anbieter (OpenAI-Format), Schlüssel nur im Speicher – keine echten Anfragen
   let demoKey = null;
   const aiSecret = { has: () => Boolean(demoKey), get: () => demoKey, set: (v) => (demoKey = v), clear: () => (demoKey = null) };
-  const aiFetch = async (_url, init) => {
+  const aiFetch = async (url, init = {}) => {
+    // Modelle abfragen (GET …/models): im Demo „läuft“ nur Ollama auf diesem PC
+    if (!init.body) {
+      if (url.startsWith('http://localhost:') && !url.startsWith('http://localhost:11434/')) throw new Error('ECONNREFUSED');
+      const data = url.startsWith('http://localhost:11434/') ? ['llama3.2:latest', 'qwen3:8b', 'gemma3:4b'] : ['demo-modell', 'demo-modell-mini'];
+      return { ok: true, status: 200, json: async () => ({ data: data.map((id) => ({ id })) }) };
+    }
     const body = JSON.parse(init.body);
     const user = body.messages?.at(-1)?.content || '';
-    const content = /Verbindung/.test(user) ? 'OK – Verbindung steht.' : /fragt:/.test(user) ? 'Heute um **19 Uhr** in der Lounge 🎉 Bis später, Anna!' : '☀️ **Guten Morgen, Team!** Heute steht das Treffen um 19 Uhr an. Bringt eure Ideen mit 🚀';
+    const sys = body.messages?.[0]?.content || '';
+    let content = /Verbindung/.test(user) ? 'OK – Verbindung steht.' : / asks:/.test(user) ? 'Heute um **19 Uhr** in der Lounge 🎉 Bis später, Anna!' : '☀️ **Guten Morgen, Team!** Heute steht das Treffen um 19 Uhr an. Bringt eure Ideen mit 🚀';
+    // Websuche: erst suchen, dann mit Quelle antworten
+    if (/SEARCH: <short/.test(sys)) content = /<web_results/.test(user) ? '🌤 **Wetter heute:** sonnig, bis 21 °C – perfekt fürs Treffen um 19 Uhr! (Quelle: wetter.example)' : 'SEARCH: wetter heute berlin';
     return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content } }] }) };
   };
+  const aiSearch = async (query) => ({ source: 'DuckDuckGo', results: [{ title: `Wetter: ${query}`, url: 'https://wetter.example/berlin', snippet: 'Sonnig, bis 21 °C, kaum Wind.' }] });
   // Für den Screenshot-Lauf: Anna erwähnt den Bot in #allgemein (wie eine echte Nachricht über das Gateway)
   const simulate = {
     mention(text) {
@@ -252,7 +262,7 @@ function createDemo() {
     autoUpdater.emit('checking-for-update');
     setTimeout(() => autoUpdater.emit('update-not-available'), 1200);
   };
-  return { world, envPath, createClient: () => client, voiceLib, stats, aiSecret, aiFetch, simulate, autoUpdater };
+  return { world, envPath, createClient: () => client, voiceLib, stats, aiSecret, aiFetch, aiSearch, simulate, autoUpdater };
 }
 
 module.exports = { createDemo };

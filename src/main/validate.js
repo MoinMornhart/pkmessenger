@@ -196,7 +196,7 @@ const validators = {
     return key.trim();
   },
   aiJob(p) {
-    const { id, name, channelId, channelName, prompt, schedule, context, enabled, maxLength, language, persona, contextSize, postAs, notify } = obj(p);
+    const { id, name, channelId, channelName, prompt, schedule, context, enabled, maxLength, language, persona, contextSize, postAs, notify, web } = obj(p);
     if (id !== undefined && !(typeof id === 'string' && /^[0-9a-f-]{36}$/.test(id))) throw new ValidationError('Ungültige Auftrags-ID.');
     if (typeof name !== 'string' || name.trim().length < 1 || name.length > 60) throw new ValidationError('Der Name muss 1–60 Zeichen haben.');
     if (typeof prompt !== 'string' || prompt.trim().length < 3 || prompt.length > 2000) throw new ValidationError('Der Auftrag muss 3–2000 Zeichen haben.');
@@ -216,6 +216,7 @@ const validators = {
     const mode = postAs === undefined ? 'message' : postAs;
     if (!['message', 'thread'].includes(mode)) throw new ValidationError('Ungültige Art (Nachricht oder Thread).');
     if (notify !== undefined && typeof notify !== 'boolean') throw new ValidationError('Ungültiges Feld "notify".');
+    if (web !== undefined && typeof web !== 'boolean') throw new ValidationError('Ungültiges Feld "web".');
     return {
       ...(id ? { id } : {}),
       name: name.trim(),
@@ -231,12 +232,19 @@ const validators = {
       persona: (persona || '').trim(),
       postAs: mode,
       notify: notify !== false,
+      web: web === true,
     };
   },
+  aiModels(p) {
+    const { provider, baseUrl } = obj(p);
+    if (provider !== 'openai' && provider !== 'anthropic') throw new ValidationError('Unbekannter KI-Anbieter-Typ.');
+    return { provider, baseUrl: aiBaseUrl(baseUrl) };
+  },
   aiResponder(p) {
-    const { enabled, channelIds, dms, allowUsers, blockUsers, instructions, context, notify } = obj(p);
+    const { enabled, channelIds, dms, allowUsers, blockUsers, instructions, context, notify, web = false } = obj(p);
+    if (typeof web !== 'boolean') throw new ValidationError('Ungültiges Feld "web".');
     for (const [k, v] of Object.entries({ enabled, dms, context, notify })) if (typeof v !== 'boolean') throw new ValidationError(`Ungültiges Feld "${k}".`);
-    if (!Array.isArray(channelIds) || channelIds.length > 100) throw new ValidationError('Ungültige Kanalliste.');
+    if (!Array.isArray(channelIds) || channelIds.length > 500) throw new ValidationError('Ungültige Kanalliste.');
     const people = (list, field) => {
       if (!Array.isArray(list) || list.length > 100) throw new ValidationError(`Ungültige Liste "${field}".`);
       const seen = new Set();
@@ -258,6 +266,7 @@ const validators = {
       instructions: instructions.trim(),
       context,
       notify,
+      web,
     };
   },
   aiLimits(p) {
