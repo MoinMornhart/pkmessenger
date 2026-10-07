@@ -107,6 +107,15 @@ const updater = createUpdater({
   squirrelInstalled: demo ? true : fs.existsSync(path.join(path.dirname(process.execPath), '..', 'Update.exe')),
 });
 
+// Eigener Benachrichtigungston: geprüfte WAV-Datei im App-Ordner (keine Geheimnisse, kein Netz)
+const SOUND_PATH = path.join(app.getPath('userData'), 'custom-sound.wav');
+const soundFile = {
+  has: () => fs.existsSync(SOUND_PATH),
+  get: () => (fs.existsSync(SOUND_PATH) ? new Uint8Array(fs.readFileSync(SOUND_PATH)) : null),
+  set: (data) => fs.writeFileSync(SOUND_PATH, Buffer.from(data.buffer, data.byteOffset, data.byteLength)),
+  clear: () => fs.rmSync(SOUND_PATH, { force: true }),
+};
+
 // KI-Agenten (Beta): API-Schlüssel verschlüsselt in ai-key.enc; im Demo simulierter Anbieter
 const ai = createAiManager({
   store,
@@ -154,6 +163,8 @@ function createWindow() {
       nodeIntegration: false,
       webSecurity: true,
       spellcheck: true,
+      // Benachrichtigungstöne auch ohne vorherigen Klick (z. B. App minimiert gestartet)
+      autoplayPolicy: 'no-user-gesture-required',
     },
   });
   // Bildschirmschutz: Windows blendet das Fenster bei Screenshots/Aufnahmen anderer Programme schwarz aus
@@ -210,7 +221,7 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
   const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile }, isTrustedSender);
   createWindow();
   service.connect(); // async – blockiert das Fenster nicht
   updater.start();

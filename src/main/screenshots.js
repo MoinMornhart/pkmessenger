@@ -342,6 +342,22 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   const upd = JSON.stringify({ waehrend: during, ...JSON.parse(updAfter) });
   console.log(`[update] ${upd}`);
   await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+  // Töne (Issue #12): Testton in den Einstellungen, dann löst eine Erwähnung den Erwähnungston aus
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+  await wait(500);
+  await js(win, `[...document.querySelectorAll('.settings h4')].find(h=>h.textContent.includes('Benachrichtigungen'))?.scrollIntoView({block:'start'})`);
+  await js(win, `document.querySelector('.sound-event button[aria-label^="Testton: Jemand erwähnt"]')?.click()`);
+  await wait(400);
+  await shoot(win, dir, '32-toene');
+  const overflow = await js(win, `(() => { const m=document.querySelector('.settings'); return m ? m.scrollWidth - m.clientWidth : -1; })()`);
+  console.log(`[toene] Einstellungen waagerecht übergelaufen um ${overflow}px`);
+  const test1 = await js(win, `JSON.stringify({ zeilen: document.querySelectorAll('.sound-event').length, log: (window.__pkSoundLog||[]).map(e=>e.event+':'+e.preset) })`);
+  await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+  await wait(1700); // Drosselung abwarten
+  simulate?.mention('Hörst du mich?');
+  await wait(800);
+  const test2 = await js(win, `JSON.stringify((window.__pkSoundLog||[]).slice(0,3).map(e=>e.event+':'+e.preset))`);
+  console.log(`[toene] Einstellungen: ${test1} · nach Erwähnung: ${test2}`);
 }
 
 module.exports = { runScreenshots };

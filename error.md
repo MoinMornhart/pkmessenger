@@ -232,3 +232,14 @@ Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zwei
 4. **Lösung:** `UpdateSection.jsx` mit deutschem Status, „geprüft um …“, Fehlertext und Hinweis, Knopf „Suche …“ plus Ergebnis-Hinweis (oder „keine Antwort“ nach 45 s), „Jetzt neu starten und installieren“. Updater: alle 15 Min. (Wunsch JoniMoni), erster Start prüft nach 60 s, ZIP-Version wird erkannt (fehlende `Update.exe`) und erklärt, keine Doppelprüfung während der Suche. Die Demo hat einen simulierten Updater (Screenshot 31).
 5. **Testergebnis:** Updater-Tests 9/9 (3 neu), Demo: `{"waehrend":"Suche …","status":"… Du hast die neueste Version ✓ · geprüft um 13:42","hinweis":"Kein Update nötig ✓ …"}`.
 6. **Prävention:** Nach einem Release mit `curl https://update.electronjs.org/<repo>/win32-x64/<alte Version>/RELEASES` prüfen, ob der Dienst die neue Version liefert, bevor man „Update ist da“ meldet.
+
+---
+
+## #19 – Git-Index verschwunden, alle Dateien „gelöscht“ vorgemerkt (iCloud)
+
+1. **Datum & Uhrzeit:** 07.10.2026, 13:47
+2. **Was passiert ist:** Nach einem `git pull` meldete Git `index.lock: File exists`, und `git status` zeigte alle 145 Dateien als gelöscht vorgemerkt. Die Dateien im Arbeitsordner waren unversehrt.
+3. **Ursache (geprüft):** Kein Git-Prozess lief mehr, die Sperre stammte vom abgebrochenen Pull. Die eigentliche `.git/index` fehlte ganz. Vermutlich hat iCloud Drive die Datei beim atomaren Umbenennen (`index.lock` → `index`) gestört, wie bei den „* 2“-Duplikaten (#8).
+4. **Lösung:** `index.lock`, `HEAD` und `ORIG_HEAD` ins Scratchpad gesichert, die Sperre entfernt, `git reset` (baut nur den Index aus HEAD neu, Arbeitsdateien unverändert), dann `git pull --ff-only` und `git fsck` (keine Fehler).
+5. **Testergebnis:** Arbeitsordner sauber, Stand = origin/main, alle Tests grün.
+6. **Prävention:** Vor Git-Befehlen auf `index.lock` achten. **Dringende Empfehlung bleibt: Projekt aus iCloud Drive herausnehmen** (z. B. `C:\Projekte\PKMessenger`).

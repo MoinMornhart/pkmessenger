@@ -15,6 +15,7 @@ import SettingsDialog from './SettingsDialog.jsx';
 import JoinServerDialog from './JoinServerDialog.jsx';
 import { ThreadsPanel } from './SidePanels.jsx';
 import { useVoice } from '../voice/useVoice';
+import { notify, notifyMessage } from '../sounds';
 
 const TYPING_MS = 10000;
 // Privatnachrichten werden wie ein eigener „Server“ in der Leiste behandelt
@@ -45,6 +46,15 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const lastRefresh = useRef(0);
   const activeRef = useRef(null);
   activeRef.current = channelId;
+  const botIdRef = useRef(null);
+  botIdRef.current = status.bot?.id || null;
+
+  // Verbindung verloren → Fehlerton (nur beim Wechsel weg von „verbunden“)
+  const prevState = useRef(status.state);
+  useEffect(() => {
+    if (prevState.current === 'ready' && status.state !== 'ready') notify('error');
+    prevState.current = status.state;
+  }, [status.state]);
 
   // Uhrzeiten in der Chat-Liste ("14:03" → "Gestern") minütlich aktualisieren
   useEffect(() => {
@@ -156,6 +166,8 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     return bus.on((type, p) => {
       if (type === 'message:create') {
         messageStore.upsertConfirmed(p);
+        // Ton (Issue #12): eigene nie; offener Chat bei aktivem Fenster je nach Einstellung still
+        notifyMessage(p, { botId: botIdRef.current, activeChannelId: activeRef.current, windowFocused: document.hasFocus() && !document.hidden });
         setLastIds((m) => ({ ...m, [p.channelId]: p.id }));
         setPreviews((m) => ({
           ...m,
@@ -203,6 +215,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
       } else if (type === 'dms:changed') {
         loadDMs();
       } else if (type === 'ai:replied') {
+        notify('ai');
         toast({ kind: 'info', title: `🤖 KI hat ${p.userName} geantwortet`, text: p.answer, duration: 6000 });
       }
     });

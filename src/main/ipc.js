@@ -9,7 +9,7 @@ const { describeError } = require('./errors');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile }) {
   const requireAi = () => {
     if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
     return ai;
@@ -86,6 +86,18 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:send-typing': (p) => service.sendTyping(validators.channelRef(p)),
     'pk:search-mentionables': (p) => service.searchMentionables(validators.searchMentionables(p)),
     'pk:get-settings': () => store.get(),
+    // Eigener Benachrichtigungston (liegt nur lokal im App-Ordner)
+    'pk:sound-custom-info': () => ({ has: Boolean(soundFile?.has()) }),
+    'pk:sound-custom-get': () => (soundFile ? soundFile.get() : null),
+    'pk:sound-custom-set': (p) => {
+      if (!soundFile) throw Object.assign(new Error('Eigene Töne sind hier nicht verfügbar.'), { code: 'NOT_FOUND' });
+      soundFile.set(validators.soundFile(p));
+      return { has: true };
+    },
+    'pk:sound-custom-clear': () => {
+      soundFile?.clear();
+      return { has: false };
+    },
     'pk:set-screen-protection': (p) => {
       const on = validators.flag(p);
       store.set('screenProtection', on);
