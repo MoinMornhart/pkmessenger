@@ -649,6 +649,9 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   console.log(`[personen] beim Reinklicken: ${onFocus} Vorschläge · mit „n“: ${withN}`);
   await js(win, `(() => { ${SET} setVal(${blockInput}, ''); ${blockInput}.blur(); })()`);
   await wait(300);
+  // Gedächtnis pro Person einschalten (Issue #1)
+  await js(win, `document.querySelector('[data-setting="ai-memory"] input')?.click()`);
+  await wait(200);
   await clickText('.ai-responder .btn', 'Speichern');
   await wait(400);
   await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
@@ -671,6 +674,21 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await shoot(win, dir, '30-ki-antwort-im-chat');
   const reply = await js(win, `JSON.stringify({ hinweis: [...document.querySelectorAll('.toast')].map(t=>t.textContent).find(t=>t.includes('geantwortet'))?.slice(0,60) || null, antwortAlsReply: [...document.querySelectorAll('.msg--out')].some(m=>m.querySelector('.reply-quote') && m.textContent.includes('19 Uhr** in der Lounge') || m.textContent.includes('in der Lounge 🎉')) })`);
   console.log(`[ki-antwort] ${reply}`);
+  // Gedächtnis: Anna steht jetzt drin → ansehen
+  await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+  await wait(600);
+  await js(win, `document.querySelector('.settings__nav [data-nav="beta"]')?.click()`);
+  await wait(400);
+  await js(win, `[...document.querySelectorAll('.ai-memory-row .btn')].find(b=>b.textContent.includes('Ansehen'))?.click()`);
+  await wait(400);
+  await js(win, `document.querySelector('[data-setting="ai-memory-list"]')?.scrollIntoView({block:'center'})`);
+  await wait(300);
+  await shoot(win, dir, '64-ki-gedaechtnis');
+  const mem = await js(win, `JSON.stringify({ personen: [...document.querySelectorAll('.ai-memory-row b')].map(b=>b.textContent), inhalt: document.querySelector('[data-setting="ai-memory-list"] .ai-preview')?.textContent.slice(0,90) || null })`);
+  console.log(`[ki-gedaechtnis] ${mem}`);
+  await js(win, `document.querySelector('.settings__nav [data-nav="alle"]')?.click()`);
+  await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+  await wait(300);
   // Aussehen: Einstellungen zeigen, dann Designs „Hell“ und „Lila + Pink“ im Chat
   await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
   await wait(600);

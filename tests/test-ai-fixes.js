@@ -96,7 +96,7 @@ test('Auto-Verbindung: Status wird gemerkt (verbunden / Fehler)', async () => {
   const { ai } = setup({ reply: 'OK – Verbindung steht.' });
   ai.setOptions(validators.aiOptions({ autoConnect: true, thinking: true }));
   const cfg = ai.getConfig();
-  assert.deepEqual(cfg.options, { thinking: true, autoConnect: true });
+  assert.deepEqual(cfg.options, { thinking: true, autoConnect: true, vision: false });
   await ai.connect();
   assert.equal(ai.getConfig().conn.ok, true);
   assert.throws(() => validators.aiOptions({ thinking: 'ja' }), /Schalter/);

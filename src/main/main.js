@@ -15,6 +15,7 @@ const { registerIpc } = require('./ipc');
 const { createUpdater, parseRepo } = require('./updater');
 const { createVoiceManager } = require('./voice');
 const { createAiManager, createSecretFile } = require('./ai');
+const { createMemory } = require('./ai-memory');
 const { createHello } = require('./hello');
 const { createAppLock } = require('./app-lock');
 const { createTokenStore } = require('./secrets');
@@ -177,6 +178,8 @@ const ai = createAiManager({
   service,
   emit: broadcast,
   secret: demo ? demo.aiSecret : createSecretFile({ safeStorage, filePath: path.join(app.getPath('userData'), 'ai-key.enc') }),
+  // Gedächtnis pro Person: verschlüsselt in ai-memory.enc (Demo: nur im Speicher)
+  memory: createMemory({ vault: demo ? demo.memoryVault : createSecretFile({ safeStorage, filePath: path.join(app.getPath('userData'), 'ai-memory.enc') }) }),
   ...(demo ? { fetchImpl: demo.aiFetch, searchImpl: demo.aiSearch } : {}),
 });
 

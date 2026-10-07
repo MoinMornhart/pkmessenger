@@ -29,3 +29,15 @@ test('Alle CSS-Klassen der Komponenten sind in styles.css gestylt', () => {
   const missing = [...used].filter((c) => !ALLOWED.has(c) && !new RegExp(`\\.${c}(?![a-z0-9_-])`).test(css));
   assert.deepEqual(missing, [], `Ohne Styles: ${missing.join(', ')}`);
 });
+
+test('styles.css: alle Klammern geschlossen, keine Konfliktmarker (Schutz bei Merges)', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'src', 'renderer', 'styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  let depth = 0;
+  for (const ch of css) {
+    if (ch === '{') depth += 1;
+    if (ch === '}') depth -= 1;
+    assert.ok(depth >= 0, 'Schließende Klammer ohne öffnende');
+  }
+  assert.equal(depth, 0, 'Nicht alle { wurden geschlossen');
+  assert.ok(!/^(<<<<<<<|=======|>>>>>>>)/m.test(css), 'Konfliktmarker in styles.css');
+});
