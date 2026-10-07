@@ -15,6 +15,7 @@ const EVENT_TYPES = new Set([
   'ai:changed',
   'ai:replied',
   'ai:busy',
+  'presence',
   'ai:job-done',
   'lock',
   'ratelimit',

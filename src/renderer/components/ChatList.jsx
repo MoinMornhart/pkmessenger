@@ -3,6 +3,7 @@ import { formatListTime, formatShortTime } from '../../shared/format';
 import { api } from '../api';
 import { prefs } from '../prefs';
 import { fuzzyFilter } from '../../shared/fuzzy';
+import { typingText } from '../../shared/typing';
 
 const UPDATE_TEXT = {
   idle: 'Updates: –',
@@ -43,11 +44,17 @@ export function hueFor(id) {
   return (h >>> 0) % 360;
 }
 
-export function ChannelAvatar({ channel, size = 46 }) {
+export function ChannelAvatar({ channel, size = 46, status = null }) {
   const hue = hueFor(channel.id);
   const [broken, setBroken] = useState(false);
+  const dot = status ? <span className={`presence presence--${status} chat-avatar__presence`} title={status}><span className="presence__dot" /></span> : null;
   if (channel.type === 'dm' && channel.avatarUrl && !broken)
-    return <img className="chat-avatar" src={channel.avatarUrl} alt="" style={{ width: size, height: size }} onError={() => setBroken(true)} />;
+    return (
+      <span className="chat-avatar__wrap">
+        <img className="chat-avatar" src={channel.avatarUrl} alt="" style={{ width: size, height: size }} onError={() => setBroken(true)} />
+        {dot}
+      </span>
+    );
   return (
     <div
       className="chat-avatar"
@@ -112,7 +119,7 @@ function VoiceRows({ channels, members, speaking, activeId, voice, onSelect }) {
         const talking = people.filter((p) => speaking.has(p.id)).map((p) => p.name);
         return (
           <button key={c.id} className={`chatrow ${c.id === activeId ? 'is-active' : ''}`} onClick={() => onSelect(c.id)} title={c.name}>
-            <ChannelAvatar channel={c} />
+            <ChannelAvatar channel={c} status={c.type === 'dm' ? presence[c.userId] ?? c.status ?? null : null} />
             <div className="chatrow__main">
               <div className="chatrow__top">
                 <span className="chatrow__name">{c.name}</span>
@@ -192,7 +199,7 @@ function CategoryHeader({ group, collapsed, unread, onToggle }) {
   );
 }
 
-function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings, onOpenForum = () => {}, onNewDM = () => {}, onChatContext = () => {} }) {
+function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings, onOpenForum = () => {}, onNewDM = () => {}, onChatContext = () => {}, typingIn = {}, presence = {} }) {
   const [filter, setFilter] = useState('');
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase().replace(/^#/, '');
@@ -225,15 +232,24 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
         const count = unreadCounts[c.id] || 0;
         return (
           <button key={c.id} className={`chatrow ${c.id === activeId ? 'is-active' : ''} ${unread ? 'is-unread' : ''}`} onClick={() => onSelect(c.id)} onContextMenu={(e) => onChatContext(e, c)} title={c.topic || c.name}>
-            <ChannelAvatar channel={c} />
+            <ChannelAvatar channel={c} status={c.type === 'dm' ? presence[c.userId] ?? c.status ?? null : null} />
             <div className="chatrow__main">
               <div className="chatrow__top">
                 <span className="chatrow__name">{c.name}</span>
                 {p && <span className="chatrow__time">{formatListTime(p.timestamp, now)}</span>}
               </div>
               <div className="chatrow__bottom">
-                <span className="chatrow__preview">
-                  {p ? (
+                <span className={`chatrow__preview ${typingIn[c.id]?.length ? 'is-typing' : ''}`}>
+                  {typingIn[c.id]?.length ? (
+                    <>
+                      <span className="typing__dots">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                      {typingText(typingIn[c.id])}
+                    </>
+                  ) : p ? (
                     <>
                       {p.system ? null : p.isOwn ? <span className="tick" aria-label="gesendet">✓</span> : <span className="chatrow__author">{p.authorName}: </span>}
                       {p.text || '…'}

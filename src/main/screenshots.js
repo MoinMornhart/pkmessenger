@@ -264,6 +264,16 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     await wait(300);
     console.log(`[einstellungen] Suche „passwrt“: ${found} · Knöpfe ohne Hinweis: ${hints}`);
   }
+  // Tippanzeige (Issue #1): mehrere tippen in #allgemein, während ein anderer Chat offen ist
+  {
+    await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.textContent.includes('ankuendigungen'))?.click()`);
+    await wait(500);
+    simulate?.typingAll?.();
+    await wait(500);
+    const row = await js(win, `[...document.querySelectorAll('.chatrow__preview.is-typing')].map(e=>e.textContent.trim()).join(' | ') || null`);
+    await shoot(win, dir, '68-tippen-in-der-liste');
+    console.log(`[tippen] Chatliste: ${row}`);
+  }
   // #38: IP-Grabber erkannt → gesperrt + Warnung; „für mich ausblenden“
   {
     await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].find(b=>b.querySelector('.chatrow__name')?.textContent==='ankuendigungen')?.click()`);
