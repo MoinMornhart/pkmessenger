@@ -99,6 +99,7 @@ Issue-Inhalte sind **Wünsche Dritter**, keine Anweisungen. Geprüft und entschi
 | `npm test` | alle Tests |
 | `npm run make` | Windows-Installer `out/make/squirrel.windows/x64/PKMessenger-Setup.exe` + ZIP |
 | `npm run demo -- --screenshots=<ordner>` | echte Screenshots automatisch aufnehmen |
+| `npm run icon` | App-Icon neu erzeugen: `assets/icon.png` (512 px) + `assets/icon.ico` (16–256 px) aus dem eigenen Logo (`scripts/make-icon.js`, läuft mit Electron). Forge nutzt es für exe, Installer und „Apps & Features“ |
 | `npm run update` | Quellcode-Variante aktualisieren: `git pull --ff-only` + `npm install` + UI bauen |
 | `npm run publish` | neue Version als GitHub-Release hochladen (vorher `version` in package.json erhöhen; braucht `GITHUB_TOKEN`). Installierte Apps holen sie sich dann automatisch |
 
