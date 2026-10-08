@@ -7,6 +7,7 @@ import { ConnectingScreen, ErrorScreen } from './components/StatusScreens.jsx';
 import Toasts from './components/Toasts.jsx';
 import LockScreen from './components/LockScreen.jsx';
 import OopsDialog, { reportError } from './components/OopsDialog.jsx';
+import { HelpController, HelpDialog } from './components/HelpRequest.jsx';
 import { Component } from 'react';
 
 // Knöpfe mit Symbol statt Text: Beschriftung (aria-label) auch als Hinweis beim Drüberfahren zeigen
@@ -63,6 +64,16 @@ export class ErrorBoundary extends Component {
   }
 }
 
+function HelpHost({ toast }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const on = () => setOpen(true);
+    window.addEventListener('pk:help-open', on);
+    return () => window.removeEventListener('pk:help-open', on);
+  }, []);
+  return open ? <HelpDialog toast={toast} onClose={() => setOpen(false)} /> : null;
+}
+
 export default function App() {
   useButtonHints();
   useErrorCatcher();
@@ -113,6 +124,8 @@ export default function App() {
     <>
       <ErrorBoundary>{screen}</ErrorBoundary>
       <OopsDialog />
+      <HelpController toast={toast} />
+      <HelpHost toast={toast} />
       {appInfo.update?.state === 'ready' && (
         <div className="update-banner" role="status">
           <span>

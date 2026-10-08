@@ -611,6 +611,13 @@ function HelpSection({ onClose }) {
       </ul>
       <p className="muted small">{pc('💡 Fährst du mit der Maus über einen Knopf, steht dort, was er macht.', '💡 Drückst du lange auf einen Chat oder eine Nachricht, kommt ein Menü mit allen Möglichkeiten.')}</p>
       <SetupCheck />
+      <span className="settings__label">🙋 Fernhilfe</span>
+      <div className="settings__row">
+        <button className="btn btn--small" onClick={() => window.dispatchEvent(new CustomEvent('pk:help-open'))}>
+          Jemanden um Hilfe bitten
+        </button>
+      </div>
+      <p className="muted small">Ein Helfer im selben WLAN sieht nur die Einrichtung – deine Chats und Nachrichten bleiben verborgen. Beenden jederzeit mit Strg+C.</p>
       <span className="settings__label">🐞 Fehler melden</span>
       <div className="settings__row">
         <button className="btn btn--small" onClick={() => reportError('manuell (Einstellungen → Hilfe)', 'Fehlerbericht von Hand erstellt')}>

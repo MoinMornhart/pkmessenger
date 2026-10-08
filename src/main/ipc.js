@@ -10,7 +10,7 @@ const { sealToken, openLink } = require('../shared/token-transfer');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help }) {
   const requireAi = () => {
     if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
     return ai;
@@ -196,6 +196,13 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:open-log-folder': () => (openLogFolder ? openLogFolder() : false),
     'pk:setup-check': () => service.setupCheck(),
     // Fernzugang im WLAN (Issue #46/#50) – nur vom eigenen Fenster steuerbar
+    // Fernhilfe (Issue #79)
+    'pk:help-status': () => (help ? help.status() : null),
+    'pk:help-request': () => help.requestWithQr(),
+    'pk:help-stop': () => help.stop(),
+    'pk:help-control': (p) => help.setControl(validators.flag(p)),
+    'pk:help-decide': (p) => help.decide(validators.remoteDecide(p)),
+    'pk:help-disconnect': () => help.disconnect(),
     'pk:remote-status': () => (remote ? remote.status() : null),
     'pk:remote-set-password': (p) => remote.setPassword(validators.remotePassword(p)),
     'pk:remote-enable': (p) => remote.setEnabled(validators.backgroundSet(p)),

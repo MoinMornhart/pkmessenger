@@ -38,6 +38,12 @@ export const api = Object.fromEntries(
     'setupCheck',
     'blocklistGet',
     'remoteStatus',
+    'helpStatus',
+    'helpRequest',
+    'helpStop',
+    'helpControl',
+    'helpDecide',
+    'helpDisconnect',
     'remoteSetPassword',
     'remoteEnable',
     'remoteOptions',
@@ -142,3 +148,7 @@ export const api = Object.fromEntries(
 export const onEvent = (cb) => raw.onEvent(cb);
 export const voicePacket = (data) => raw.voicePacket(data);
 export const onVoiceAudio = (cb) => raw.onVoiceAudio(cb);
+
+// Fernhilfe (Issue #79): Sonderfälle (kein invoke, sondern send/listen)
+api.helpView = (view) => raw.helpView(view);
+api.onHelpAction = (cb) => raw.onHelpAction(cb);

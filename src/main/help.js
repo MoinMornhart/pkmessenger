@@ -1,0 +1,284 @@
+'use strict';
+
+// Fernhilfe (Issue #79): Ein Helfer schaut dem Nutzer bei der EINRICHTUNG über die Schulter und darf harmlose
+// Schritte mitbedienen – Chats/Namen/Nachrichten bleiben verborgen, Token/Passwörter tippt nur der Nutzer selbst.
+//
+// Sicherheit (bewusst strenger als der Fernzugang):
+// - AB WERK AUS und OHNE Dauer-Server: läuft NUR, solange der Nutzer „Hilfe anfordern“ aktiv hat. Danach sofort zu.
+// - Nur EIN Helfer gleichzeitig. Kopplung mit Einmal-Code (10 Min) + Bestätigung am PC.
+// - Nur private Netze (wie Fernzugang); Ende-zu-Ende verschlüsselt (tweetnacl secretbox), Nonce + Zeitstempel.
+// - Der Helfer sieht einen GESCHWÄRZTEN Spiegel (help-redact.js): keine Chats, keine Namen, keine Geheimnisse.
+// - Mitsteuern ist abschaltbar („nur Zusehen“), jede Helfer-Aktion wird gegen allowHelperAction geprüft.
+// - Kein Bot-Token verlässt je das Gerät. Der Nutzer kann jederzeit beenden (Knopf oder Strg+C).
+
+const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const nacl = require('tweetnacl');
+const { isLocalAddress } = require('../shared/ai-limits');
+const { redactView, allowHelperAction } = require('../shared/help-redact');
+
+const CODE_TTL_MS = 10 * 60 * 1000;
+const SESSION_TTL_MS = 60 * 60 * 1000;
+const CLOCK_SKEW_MS = 2 * 60 * 1000;
+const APPROVAL_TIMEOUT_MS = 90 * 1000;
+const RATE_PER_MIN = 240;
+const MAX_BODY = 32 * 1024;
+const DEFAULT_PORT = 47816; // ein anderer Port als der Fernzugang (47815)
+
+const b64 = (u8) => Buffer.from(u8).toString('base64');
+const unb64 = (s) => new Uint8Array(Buffer.from(String(s || ''), 'base64'));
+const rid = (n = 16) => crypto.randomBytes(n).toString('base64url');
+// Kurzer, gut ablesbarer Einmal-Code (ohne 0/O/1/I)
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const newCode = () => Array.from(crypto.randomBytes(6), (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
+
+function seal(obj, key) {
+  const n = nacl.randomBytes(nacl.secretbox.nonceLength);
+  return { n: b64(n), c: b64(nacl.secretbox(Buffer.from(JSON.stringify(obj)), n, key)) };
+}
+function unseal(msg, key) {
+  const n = unb64(msg?.n);
+  const c = unb64(msg?.c);
+  if (n.length !== nacl.secretbox.nonceLength || !c.length) return null;
+  const plain = nacl.secretbox.open(c, n, key);
+  if (!plain) return null;
+  try {
+    return JSON.parse(Buffer.from(plain).toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+const remoteIp = (req) => String(req.socket?.remoteAddress || '').replace(/^::ffff:/, '');
+const isPrivateIp = (ip) => ip === '::1' || isLocalAddress(`http://${ip.includes(':') ? `[${ip}]` : ip}/`);
+
+/**
+ * @param {object} o
+ * @param {(t:string,p:any)=>void} o.emit
+ * @param {() => object} o.getView   aktueller (ungeschwärzter) Oberflächen-Zustand, wird hier geschwärzt
+ * @param {(action:object)=>void} o.applyAction  erlaubte Helfer-Aktion an die Oberfläche weitergeben
+ * @param {() => string[]} o.lanAddresses
+ * @param {string|null} o.hostName  mDNS-Name (kein IP im Link)
+ */
+function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () => {}, now = () => Date.now(), lanAddresses = () => [], bindHost = '0.0.0.0', hostName = null, logger = null, port = DEFAULT_PORT, webDir = null, naclPath = null }) {
+  let server = null;
+  let pairing = null; // { code, key, expires } – ein offener Einmal-Code
+  let session = null; // { key, expires, approved, control } – der eine verbundene Helfer
+  let pendingApproval = null; // { resolve }
+  const seenNonces = new Map();
+  const rate = new Map();
+  let controlAllowed = true; // „nur Zusehen“ schaltet das aus
+  const activity = [];
+
+  function log(action, extra = {}) {
+    const e = { at: now(), action, ...extra };
+    activity.unshift(e);
+    activity.length = Math.min(activity.length, 100);
+    emit('help:activity', e);
+    logger?.info?.('help', action);
+    return e;
+  }
+
+  function status() {
+    return {
+      running: Boolean(server?.listening),
+      waitingForHelper: Boolean(pairing && !session),
+      connected: Boolean(session?.approved),
+      controlAllowed,
+      host: hostName || null,
+      addresses: lanAddresses(),
+      port: server?.address()?.port || DEFAULT_PORT,
+      activity: activity.slice(0, 20),
+    };
+  }
+
+  function emitStatus() {
+    emit('help:status', status());
+  }
+
+  const cleanNonces = () => {
+    for (const [k, exp] of seenNonces) if (exp < now()) seenNonces.delete(k);
+  };
+  function rateOk(ip) {
+    const r = rate.get(ip) || { count: 0, win: now() };
+    if (now() - r.win > 60000) {
+      r.count = 0;
+      r.win = now();
+    }
+    r.count += 1;
+    rate.set(ip, r);
+    return r.count <= RATE_PER_MIN;
+  }
+
+  const json = (res, code, obj) => {
+    res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify(obj));
+  };
+
+  function askUser(info) {
+    // „Darf dieser Helfer verbinden?“ am PC. Nur eine Anfrage gleichzeitig.
+    if (pendingApproval) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const id = rid(8);
+      pendingApproval = { id, resolve };
+      emit('help:pending', { id, ...info });
+      setTimeout(() => {
+        if (pendingApproval?.id === id) {
+          pendingApproval = null;
+          emit('help:pending', { id, done: true });
+          resolve(false);
+        }
+      }, APPROVAL_TIMEOUT_MS).unref?.();
+    });
+  }
+  function decide({ id, allow }) {
+    if (!pendingApproval || pendingApproval.id !== id) return false;
+    const { resolve } = pendingApproval;
+    pendingApproval = null;
+    emit('help:pending', { id, done: true });
+    resolve(Boolean(allow));
+    return true;
+  }
+
+  // verschlüsselte Anfrage prüfen (Nonce frisch, Zeitstempel aktuell)
+  function openBody(body, key) {
+    const data = unseal(body, key);
+    if (!data || typeof data.t !== 'number' || Math.abs(now() - data.t) > CLOCK_SKEW_MS) return null;
+    const nonce = body.n;
+    cleanNonces();
+    if (seenNonces.has(nonce)) return null;
+    seenNonces.set(nonce, now() + 2 * CLOCK_SKEW_MS);
+    return data;
+  }
+
+  const STATIC = { '/help/': ['index.html', 'text/html; charset=utf-8'], '/help/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/help/nacl.js': [null, 'text/javascript; charset=utf-8'] };
+  const CSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
+  async function handle(req, res) {
+    const ip = remoteIp(req);
+    if (!isPrivateIp(ip)) return json(res, 403, { error: 'Nur im eigenen Netzwerk.' });
+    if (req.method === 'GET') {
+      const p = (req.url || '').split('?')[0].split('#')[0];
+      const hit = STATIC[p] || (p === '/help' ? STATIC['/help/'] : null);
+      if (!hit || !webDir) return json(res, 404, { error: 'Unbekannt.' });
+      try {
+        const body = fs.readFileSync(hit[0] ? path.join(webDir, hit[0]) : naclPath);
+        res.writeHead(200, { 'content-type': hit[1], 'cache-control': 'no-store', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'x-frame-options': 'DENY' });
+        return res.end(body);
+      } catch { return json(res, 500, { error: 'Fehler.' }); }
+    }
+    if (!rateOk(ip)) return json(res, 429, { error: 'Zu viele Anfragen.' });
+    const url = (req.url || '').split('?')[0];
+    let raw = '';
+    for await (const chunk of req) {
+      raw += chunk;
+      if (raw.length > MAX_BODY) return json(res, 413, { error: 'Zu groß.' });
+    }
+    let body = null;
+    try {
+      body = raw ? JSON.parse(raw) : {};
+    } catch {
+      return json(res, 400, { error: 'Ungültig.' });
+    }
+
+    // 1) Koppeln: Einmal-Code → Session (nach Bestätigung am PC)
+    if (url === '/pair' && req.method === 'POST') {
+      if (!pairing || pairing.expires < now()) return json(res, 403, { error: 'Code abgelaufen. Am PC „Hilfe anfordern“ neu starten.' });
+      if (String(body.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '') !== pairing.code) return json(res, 403, { error: 'Falscher Code.' });
+      if (session) return json(res, 409, { error: 'Es hilft bereits jemand.' });
+      const payload = unseal(body, pairing.key);
+      const helperName = String(payload?.name || 'Helfer').slice(0, 40);
+      const ok = await askUser({ helper: helperName, ip });
+      if (!ok) return json(res, 200, seal({ error: 'Am PC abgelehnt oder keine Antwort.' }, pairing.key));
+      session = { key: pairing.key, expires: now() + SESSION_TTL_MS, approved: true, control: controlAllowed, name: helperName };
+      pairing = null; // Code verbraucht
+      log('Helfer verbunden', { helper: helperName });
+      emitStatus();
+      return json(res, 200, seal({ ok: true, ttl: SESSION_TTL_MS }, session.key));
+    }
+
+    // alle weiteren Anfragen brauchen die Session
+    if (!session || session.expires < now()) return json(res, 401, { error: 'Nicht verbunden.' });
+    const data = openBody(body, session.key);
+    if (!data) return json(res, 400, { error: 'Ungültige oder wiederholte Anfrage.' });
+
+    // 2) Aktuellen (geschwärzten) Bildschirm abholen
+    if (url === '/view' && req.method === 'POST') {
+      return json(res, 200, seal({ view: redactView(getView()), control: controlAllowed }, session.key));
+    }
+    // 3) Aktion ausführen (geprüft)
+    if (url === '/act' && req.method === 'POST') {
+      const verdict = allowHelperAction(data.action, { view: getView(), enabled: true, controlAllowed });
+      if (!verdict.ok) return json(res, 200, seal({ rejected: verdict.reason }, session.key));
+      applyAction(data.action);
+      log('Helfer-Aktion', { kind: data.action?.type });
+      return json(res, 200, seal({ ok: true }, session.key));
+    }
+    return json(res, 404, { error: 'Unbekannt.' });
+  }
+
+  /** „Hilfe anfordern“: Server starten (falls nötig), Einmal-Code erzeugen. */
+  function request() {
+    const key = nacl.randomBytes(nacl.secretbox.keyLength);
+    const code = newCode();
+    pairing = { code, key, expires: now() + CODE_TTL_MS };
+    session = null;
+    const startServer = () =>
+      new Promise((resolve) => {
+        if (server?.listening) return resolve();
+        server = http.createServer((req, res) => handle(req, res).catch(() => json(res, 500, { error: 'Fehler.' })));
+        server.on('error', (err) => {
+          logger?.error?.('help', `listen failed: ${err.message}`);
+          resolve();
+        });
+        server.listen(port, bindHost, resolve);
+      });
+    return startServer().then(() => {
+      const port = server?.address()?.port || DEFAULT_PORT;
+      const hash = `#c=${b64(key)}`;
+      // Kein IP im Link (wie Fernzugang): nur der PC-Name. Der Code wird separat angezeigt.
+      const url = hostName ? `http://${hostName}:${port}/help/${hash}` : null;
+      log('Hilfe angefordert');
+      emitStatus();
+      return { code, url, port, host: hostName, expires: pairing.expires };
+    });
+  }
+
+  /** Mitsteuern erlauben/sperren (nur Zusehen). */
+  function setControl({ on }) {
+    controlAllowed = Boolean(on);
+    if (session) session.control = controlAllowed;
+    emitStatus();
+    return status();
+  }
+
+  /** Helfer trennen, aber Code offen lassen (falls jemand anderes helfen soll). */
+  function disconnect() {
+    session = null;
+    log('Helfer getrennt');
+    emitStatus();
+    return status();
+  }
+
+  /** Alles beenden (Knopf oder Strg+C): Server zu, keine Verbindung mehr. */
+  function stop() {
+    pairing = null;
+    session = null;
+    if (pendingApproval) {
+      pendingApproval.resolve(false);
+      pendingApproval = null;
+    }
+    const s = server;
+    server = null;
+    if (s) s.close();
+    log('Fernhilfe beendet');
+    emitStatus();
+    return status();
+  }
+
+  return { status, request, decide, setControl, disconnect, stop, _test: { seal, unseal, handleAddress: () => server?.address() } };
+}
+
+module.exports = { createHelp, isPrivateIp, DEFAULT_PORT };
