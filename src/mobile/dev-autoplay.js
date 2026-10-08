@@ -50,6 +50,9 @@ window.addEventListener('unhandledrejection', (e) => log(`FEHLER ${e.reason?.mes
   await wait(2000); // Schritt 4 (CI-Bild 4): Einstellungen
   results.einstellungen = Boolean($('.settings'));
   results.ueberstand = document.documentElement.scrollWidth > innerWidth + 1;
+  const prev = document.querySelector('.look-theme__preview i');
+  results.vorschau = prev ? `${Math.round(prev.getBoundingClientRect().width)}x${Math.round(prev.getBoundingClientRect().height)} ${getComputedStyle(prev).backgroundColor}` : 'fehlt';
+  log(`vorschau ${results.vorschau}`);
   // Echter Netzweg (CapacitorHttp → CSP 'self'): die Update-Abfrage bei GitHub darf nicht scheitern
   const st = await window.api.getAppInfo();
   const u = st?.data?.update || {};
