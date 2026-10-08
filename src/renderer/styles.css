@@ -2809,6 +2809,9 @@ img.chat-avatar {
 }
 .look-theme__preview i {
   display: block;
+  /* feste Maße: ältere Android-WebViews zeichneten die leeren Felder sonst nicht (Emulator-Test 08.10.2026) */
+  min-width: 1px;
+  height: 42px;
 }
 .look-theme__preview i:last-child {
   position: relative;
