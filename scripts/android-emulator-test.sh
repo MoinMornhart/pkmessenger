@@ -13,7 +13,7 @@ adb shell am start -n "$PKG/.MainActivity"
 shot() { adb exec-out screencap -p > "$OUT/$1.png"; echo "Bild: $1"; }
 
 # Takt passend zu src/mobile/dev-autoplay.js (App-Start im Emulator dauert ein paar Sekunden)
-sleep 11; shot 01-chatliste
+sleep 12; shot 01-chatliste
 sleep 9;  shot 02-chat
 sleep 7;  shot 03-gesendet
 sleep 6;  shot 04-menue

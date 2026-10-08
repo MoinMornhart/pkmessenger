@@ -14,7 +14,9 @@ window.addEventListener('unhandledrejection', (e) => log(`FEHLER ${e.reason?.mes
   } catch {
     /* egal */
   }
-  await wait(9000); // Schritt 1 (CI-Bild 1): Chatliste
+  // Schritt 1 (CI-Bild 1): Chatliste – warten, bis verbunden und Chats da sind (Emulator ist unterschiedlich schnell)
+  for (let i = 0; i < 60 && document.querySelectorAll('.chatrow').length === 0; i++) await wait(500);
+  await wait(1500);
   results.chats = document.querySelectorAll('.chatrow').length;
   results.verbunden = /Verbunden/.test($('.chatlist')?.textContent || '');
   log(`schritt 1 liste chats=${results.chats} verbunden=${results.verbunden}`);
@@ -53,6 +55,7 @@ window.addEventListener('unhandledrejection', (e) => log(`FEHLER ${e.reason?.mes
   const u = st?.data?.update || {};
   // Eine Antwort von GitHub (auch „zu viele Abfragen“ von geteilten CI-Rechnern) beweist den Netzweg; blockiert wäre „Failed to fetch“
   results.update = u.state === 'error' && /GitHub antwortet/.test(u.error?.detail || '') ? 'antwort' : u.state || 'unbekannt';
+  if (u.state === 'error') log(`update-fehler ${JSON.stringify(u.error)}`);
   log(`schritt 4 einstellungen=${results.einstellungen} zurueck=${results.zurueck} ueberstand=${results.ueberstand} update=${results.update}`);
   const ok = results.chats > 0 && results.verbunden && results.gesendet && results.menue && results.zurueck && results.einstellungen && !results.ueberstand && results.update !== 'error';
   log(`ERGEBNIS ${ok ? 'OK' : 'FEHLER'} ${JSON.stringify(results)}`);
