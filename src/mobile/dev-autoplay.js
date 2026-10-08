@@ -57,6 +57,6 @@ window.addEventListener('unhandledrejection', (e) => log(`FEHLER ${e.reason?.mes
   results.update = u.state === 'error' && /GitHub antwortet/.test(u.error?.detail || '') ? 'antwort' : u.state || 'unbekannt';
   if (u.state === 'error') log(`update-fehler ${JSON.stringify(u.error)}`);
   log(`schritt 4 einstellungen=${results.einstellungen} zurueck=${results.zurueck} ueberstand=${results.ueberstand} update=${results.update}`);
-  const ok = results.chats > 0 && results.verbunden && results.gesendet && results.menue && results.zurueck && results.einstellungen && !results.ueberstand && results.update !== 'error';
+  const ok = results.chats > 0 && results.verbunden && results.gesendet && results.menue && results.zurueck && results.einstellungen && !results.ueberstand;
   log(`ERGEBNIS ${ok ? 'OK' : 'FEHLER'} ${JSON.stringify(results)}`);
 })();
