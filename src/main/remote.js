@@ -219,13 +219,20 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
     const key = nacl.randomBytes(32);
     const expires = now() + PAIR_TTL_MS;
     pairings.set(pairId, { key, expires, used: false });
-    // Keine IP im Link (Issue #53): Gerätename des PCs über mDNS („name.local“, in Windows eingebaut); Adresse nur als Ersatz
+    // Nie eine IP im Link (Issue #53/#50): nur der Gerätename des PCs über mDNS („name.local“, in Windows eingebaut).
+    // Kein Ersatz-Link mit Adresse mehr. Taugt der PC-Name nicht, gibt es keinen Link (Hinweis zum Umbenennen).
+    if (!hostName) {
+      pairings.delete(pairId);
+      throw Object.assign(new Error('Der Name dieses PCs taugt nicht für den Link.'), {
+        code: 'VALIDATION',
+        hint: 'Windows-Einstellungen → System → Info → „Diesen PC umbenennen“: nur Buchstaben, Ziffern und Bindestrich. Danach neu starten.',
+      });
+    }
     const port = server.address().port;
     const hash = `#p=${pairId}&k=${Buffer.from(key).toString('base64url')}`;
-    const url = `http://${hostName || lanAddresses()[0] || '127.0.0.1'}:${port}/${hash}`;
-    const fallbackUrl = `http://${lanAddresses()[0] || '127.0.0.1'}:${port}/${hash}`;
+    const url = `http://${hostName}:${port}/${hash}`;
     log({ action: 'Kopplungs-Code erstellt', device: '', ip: '' });
-    return { pairId, url, fallbackUrl, expires, host: hostName || null };
+    return { pairId, url, expires, host: hostName };
   }
   function cancelPairing({ pairId }) {
     pairings.delete(pairId);
