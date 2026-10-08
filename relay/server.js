@@ -10,6 +10,8 @@
 //   ORIGIN       erlaubte Origin(s) für Browser-Clients, kommagetrennt (leer = alle; App-Clients senden keine Origin)
 
 const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
 const { WebSocketServer } = require('ws');
 const { createRelay, MAX_MSG_BYTES } = require('./core');
 
@@ -23,10 +25,25 @@ const relay = createRelay({ maxRooms: MAX_ROOMS });
 const rate = new Map(); // ip → { count, win }
 const ipOf = (req) => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
 
+// Die Helfer-Oberfläche liegt im Repo unter src/help-web und wird hier mit ausgeliefert (gleicher Code wie am PC).
+const WEB_DIR = path.join(__dirname, '..', 'src', 'help-web');
+const STATIC = { '/help/': ['index.html', 'text/html; charset=utf-8'], '/help/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/help/nacl.js': ['nacl.js', 'text/javascript; charset=utf-8'] };
+const CSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src wss: 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const server = http.createServer((req, res) => {
-  if (req.url === '/' || req.url === '/health') {
+  const p = (req.url || '').split('?')[0].split('#')[0];
+  if (p === '/' || p === '/health') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     return res.end(JSON.stringify({ ok: true, service: 'pkmessenger-relay', ...relay.stats() }));
+  }
+  const hit = STATIC[p] || (p === '/help' ? STATIC['/help/'] : null);
+  if (hit) {
+    try {
+      res.writeHead(200, { 'content-type': hit[1], 'cache-control': 'no-store', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' });
+      return res.end(fs.readFileSync(path.join(WEB_DIR, hit[0])));
+    } catch {
+      res.writeHead(500).end();
+      return;
+    }
   }
   res.writeHead(404).end();
 });

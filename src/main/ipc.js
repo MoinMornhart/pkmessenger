@@ -203,6 +203,10 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:help-control': (p) => help.setControl(validators.flag(p)),
     'pk:help-decide': (p) => help.decide(validators.remoteDecide(p)),
     'pk:help-disconnect': () => help.disconnect(),
+    'pk:help-set-relay': (p) => {
+      store.set('helpRelay', validators.helpRelay(p).url);
+      return help.status();
+    },
     'pk:remote-status': () => (remote ? remote.status() : null),
     'pk:remote-set-password': (p) => remote.setPassword(validators.remotePassword(p)),
     'pk:remote-enable': (p) => remote.setEnabled(validators.backgroundSet(p)),
