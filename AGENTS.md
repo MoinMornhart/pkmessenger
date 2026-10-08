@@ -231,3 +231,5 @@ Lokal geht weiterhin: `$env:GITHUB_TOKEN="…"; npm run publish`.
 - **Einklappen (#61):** „Sprachkanäle“ und „Weitere Kanäle“ einklappbar (`prefs.collapsedSections`), eingeklappt bleibt der offene/verbundene Kanal sichtbar.
 - **Einstellungen (#62):** Bei „Alle anzeigen“ ist nur dieser Knopf voll markiert; der gerade sichtbare Bereich bekommt einen dezenten Strich (`is-here`).
 - Tests: `test-names-live.js`, `test-chat-notify.js`; Screenshots 79–82.
+
+- **Bot einladen lassen (Wunsch MoinMornhart 08.10.2026, v0.13.3):** „Bot einladen“ (Server-Leiste, Einrichtungs-Assistent) öffnet `InviteDialog.jsx`: offizieller OAuth2-Einladungslink + QR-Code + fertige Nachricht für eine Server-Admin. Wer PKMessenger nutzt, braucht dafür **kein eigenes Discord-Konto** – die Admin öffnet den Link mit ihrem Konto (Discord verlangt „Server verwalten“). Fenster schließt sich, sobald der Bot auf einem neuen Server ist. Ereignis `pk:invite-dialog`. Screenshot 83.
