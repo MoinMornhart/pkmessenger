@@ -1,3 +1,4 @@
+import { pc } from '../platform';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 
@@ -148,7 +149,7 @@ export default function SetupWizard({ status, onClose = null, onReconnect = null
             <li>
               <b>„Copy“</b> klicken. Der Token wird nur <b>einmal</b> angezeigt.
             </li>
-            <li>Hier einfügen (Strg+V) und speichern. Er wird sofort verschlüsselt und nie wieder angezeigt.</li>
+            <li>Hier einfügen ({pc('Strg+V', 'lange ins Feld drücken → Einfügen')}) und speichern. Er wird sofort verschlüsselt und nie wieder angezeigt.</li>
           </ol>
           {auto.token ? (
             <p className="ok small">✓ Token ist gespeichert und gültig.</p>

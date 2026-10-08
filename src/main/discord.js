@@ -35,10 +35,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   ]);
   const THREAD_TYPES = new Set([ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread]);
 
-  const makeClient =
-    createClient ||
-    (() =>
-      new discord.Client({
+  // Gleiche Optionen für discord.js (PC) und den schlanken Client der Android-App (createClient bekommt sie mit)
+  const clientOptions = () => ({
         // Nur was wir brauchen (Datensparsamkeit). KEIN GuildMembers. GuildPresences NUR, wenn in den Einstellungen
         // eingeschaltet (Online-Status, privilegiert, Issue #1) – sonst nicht.
         intents: [
@@ -61,7 +59,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         partials: Partials ? [Partials.Message, Partials.Reaction, Partials.Channel] : [],
         // Sicherheitsnetz: standardmäßig pingt der Bot NIEMANDEN, nur explizit gelistete IDs.
         allowedMentions: { parse: [], repliedUser: false },
-      }));
+      });
+  const makeClient = () => (createClient ? createClient(clientOptions()) : new discord.Client(clientOptions()));
 
   let client = null;
   let connecting = null;

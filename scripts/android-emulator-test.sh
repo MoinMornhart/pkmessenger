@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Emulator-Test der Android-App (CI, Issue #56): Demo-APK installieren, starten, der eingebaute Autoplay klickt sich
+# durch; hier entstehen Screenshots in festen Abständen. Am Ende muss im Protokoll „ERGEBNIS OK“ stehen.
+set -euo pipefail
+OUT=android-test
+APK=mobile/android/app/build/outputs/apk/debug/app-debug.apk
+PKG=io.github.morniteam.pkmessenger
+mkdir -p "$OUT"
+
+adb install -r "$APK"
+adb logcat -c
+adb shell am start -n "$PKG/.MainActivity"
+shot() { adb exec-out screencap -p > "$OUT/$1.png"; echo "Bild: $1"; }
+
+sleep 8;  shot 01-chatliste
+sleep 9;  shot 02-chat
+sleep 8;  shot 03-gesendet
+sleep 8;  shot 04-menue
+sleep 6;  shot 05-einstellungen
+sleep 2
+
+adb logcat -d > "$OUT/logcat.txt" || true
+grep -a "pk-autoplay" "$OUT/logcat.txt" | tee "$OUT/autoplay.txt" || true
+# WebView-Version (für die Fehlersuche)
+adb shell dumpsys package com.google.android.webview | grep -m1 versionName | tee -a "$OUT/autoplay.txt" || true
+
+if grep -aq "ERGEBNIS OK" "$OUT/autoplay.txt"; then
+  echo "✔ Android-Emulator-Test bestanden"
+else
+  echo "::error::Android-Emulator-Test fehlgeschlagen – siehe Artefakt android-test (Screenshots + autoplay.txt)"
+  exit 1
+fi

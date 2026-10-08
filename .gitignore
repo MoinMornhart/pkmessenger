@@ -17,3 +17,12 @@ Thumbs.db
 
 # Claude-Code-Sitzungsdateien (z. B. scheduled_tasks.lock) – nie ins öffentliche Repo
 .claude/
+
+# Android-App (Issue #56): gebaute Web-Dateien, Gradle-Ausgaben, Signierschlüssel nie ins Repo
+mobile/www/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/local.properties
+*.keystore
+*.jks

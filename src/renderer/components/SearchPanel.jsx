@@ -1,3 +1,4 @@
+import { pc } from '../platform';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { NavContext } from '../state';
@@ -103,7 +104,7 @@ export default function SearchPanel({ messages, guild, channelId, onJump, onClos
                   if (r.channelId === channelId) onJump(r.id);
                   else {
                     nav.openChannel(r.channelId);
-                    toast?.({ kind: 'info', title: `#${r.channelName || 'Kanal'} geöffnet`, text: 'Die Nachricht findest du dort per Strg+F.', duration: 3500 });
+                    toast?.({ kind: 'info', title: `#${r.channelName || 'Kanal'} geöffnet`, text: pc('Die Nachricht findest du dort per Strg+F.', 'Die Nachricht findest du dort über 🔎.'), duration: 3500 });
                   }
                 }}
               >

@@ -1,0 +1,62 @@
+/* ---------- Android-App (Issue #56): Handy-Layout ----------
+   Liste ODER Chat im Vollbild (wie Messenger-Apps), Platz für Statusleiste/Gestenleiste, größere Tippflächen. */
+html[data-platform='android'] body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  box-sizing: border-box;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.layout.layout--mobile {
+  grid-template-columns: 60px minmax(0, 1fr);
+}
+.layout--mobile.layout--list > main.chat {
+  display: none;
+}
+.layout--mobile.layout--chat {
+  grid-template-columns: minmax(0, 1fr);
+}
+.layout--mobile.layout--chat > .rail,
+.layout--mobile.layout--chat > .chatlist {
+  display: none;
+}
+.layout--mobile .chatlist {
+  border-right: 0;
+}
+.layout--mobile .rail {
+  padding-top: 8px;
+  gap: 8px;
+}
+/* Tippflächen mind. ~44 px (Android-Empfehlung 48 dp) */
+html[data-platform='android'] .icon-btn {
+  min-width: 42px;
+  min-height: 42px;
+}
+html[data-platform='android'] .chatrow {
+  min-height: 64px;
+}
+/* Kopfzeile im Chat: Titel darf schrumpfen, Knöpfe bleiben sichtbar */
+html[data-platform='android'] .chat__head {
+  gap: 6px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+html[data-platform='android'] .chat__title {
+  min-width: 0;
+}
+html[data-platform='android'] .chat__title h1,
+html[data-platform='android'] .chat__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Fenster/Dialoge: fast Vollbild, scrollbar */
+html[data-platform='android'] .modal {
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+html[data-platform='android'] .modal.settings {
+  width: calc(100vw - 16px);
+  height: calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+/* Langer Druck auf eine Nachricht/einen Chat öffnet das Menü (Android meldet ihn als Rechtsklick) */

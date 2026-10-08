@@ -1,3 +1,4 @@
+import { isAndroid } from '../platform';
 import { memo, useEffect, useState } from 'react';
 import { ChannelAvatar, hueFor } from './ChatList.jsx';
 import { prefs } from '../prefs';
@@ -103,7 +104,9 @@ function CallView({ channel, members, speaking, voice, bot, micLevel, onJoin, on
         {!here ? (
           <>
             {elsewhere && <span className="muted small">Du bist gerade in 🔊 {voice.channelName}. Beitreten wechselt den Kanal.</span>}
-            {!channel.canConnect ? (
+            {isAndroid ? (
+              <span className="call__warn">📱 In der Android-App siehst du, wer im Sprachkanal ist. Sprechen und Zuhören gehen bisher nur am PC.</span>
+            ) : !channel.canConnect ? (
               <span className="call__warn">🔒 Der Bot darf diesem Sprachkanal nicht beitreten. Was kann ich tun? Gib der Bot-Rolle hier „Verbinden“.</span>
             ) : (
               <button className="call-btn call-btn--join" onClick={() => onJoin(channel)} title="Beitreten">

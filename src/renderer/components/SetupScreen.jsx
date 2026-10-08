@@ -1,3 +1,4 @@
+import { isAndroid } from '../platform';
 import { useState } from 'react';
 import { api } from '../api';
 import Logo from './Logo.jsx';
@@ -39,13 +40,13 @@ export default function SetupScreen({ status, onReconnect }) {
         </div>
 
         <SetupWizard status={status} onReconnect={retry} />
-        <p className="muted small">
+        {!isAndroid && <p className="muted small">
           Alternativ: Eine <code>.env</code> mit <code>DISCORD_TOKEN=…</code> wird beim Start automatisch übernommen, verschlüsselt und gelöscht.{' '}
           <button className="link-btn" onClick={openEnv}>
             .env-Datei öffnen
           </button>
           {envInfo?.path && <span> ({envInfo.path})</span>}
-        </p>
+        </p>}
       </div>
     </div>
   );

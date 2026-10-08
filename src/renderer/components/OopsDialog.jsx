@@ -1,3 +1,4 @@
+import { pc } from '../platform';
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 
@@ -40,7 +41,7 @@ export default function OopsDialog() {
       .catch(() => setCopied(false));
   const openIssue = () => {
     const title = `Fehler: ${String(oops.error).split('\n')[0].slice(0, 80)}`;
-    const body = 'Bitte hier den kopierten Fehlerbericht einfügen (Strg+V) und kurz schreiben, was du gerade gemacht hast.\n\n';
+    const body = 'Bitte hier den kopierten Fehlerbericht einfügen (' + pc('Strg+V', 'lange drücken → Einfügen') + ') und kurz schreiben, was du gerade gemacht hast.\n\n';
     api.openExternal({ url: `${ISSUE_URL}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}` }).catch(() => {});
   };
   return (
@@ -50,7 +51,7 @@ export default function OopsDialog() {
         <p>{inTour ? 'Eigentlich wollte ich dir gerade was zeigen, ABER da ist etwas schiefgelaufen.' : 'Da ist etwas schiefgelaufen, das hätte nicht passieren sollen.'} Hilf mit, es zu reparieren:</p>
         <ol className="oops__steps">
           <li className={copied ? 'is-done' : ''}>Fehlerbericht kopieren {copied && '✓'}</li>
-          <li>GitHub öffnen, einfügen (Strg+V), abschicken</li>
+          <li>GitHub öffnen, einfügen ({pc('Strg+V', 'lange drücken → Einfügen')}), abschicken</li>
         </ol>
         <textarea className="oops__report" readOnly value={oops.report} rows={7} aria-label="Fehlerbericht" onFocus={(e) => e.target.select()} />
         <p className="muted small">Der Bericht ist auf Englisch und enthält keine Passwörter, Tokens oder Nachrichten. Ohne GitHub-Konto: Text einfach an MoinMornhart schicken.</p>
