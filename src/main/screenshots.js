@@ -719,6 +719,27 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await wait(800);
   const dmRows2 = await js(win, `[...document.querySelectorAll('.chatlist__items .chatrow')].map(r=>r.querySelector('.chatrow__name')?.textContent).join(',')`);
   console.log(`[dm] Nach "Neuer Privatchat": ${dmRows2} · offen: ${await js(win, `document.querySelector('.chat__head')?.textContent.slice(0,40)`)}`);
+  // Neue Gruppe: privaten Kanal für Anna anlegen (Issue #1 „Gruppe erstellen“)
+  {
+    const setInput = (sel, v) => js(win, `(() => { const el=document.querySelector('${sel}'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,'${v}'); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    await js(win, `document.querySelector('.rail__item:not(.rail__dm):not(.rail__add)')?.click()`);
+    await wait(500);
+    await js(win, `document.querySelector('.newgroup-btn')?.click()`);
+    await wait(300);
+    await setInput('#newgroup-name', 'Team Planung');
+    await js(win, `document.querySelector('.newgroup__private input')?.click()`);
+    await wait(200);
+    await setInput('.newgroup__people input', 'An');
+    await wait(600);
+    await js(win, `document.querySelector('.newgroup .newdm__item')?.click()`);
+    await wait(200);
+    await shoot(win, dir, '77-neue-gruppe');
+    await js(win, `document.querySelector('.newgroup button[type="submit"]')?.click()`);
+    await wait(1200);
+    const grp = await js(win, `JSON.stringify({ dialogZu: !document.querySelector('.newgroup'), offen: document.querySelector('.chat__head')?.textContent.slice(0,40), inListe: [...document.querySelectorAll('.chatrow__name')].some(n=>n.textContent.includes('team-planung')) })`);
+    console.log(`[gruppe] ${grp}`);
+    await shoot(win, dir, '78-gruppe-erstellt');
+  }
   // KI-Agenten (Beta): einschalten, Anbieter + Modell + Schlüssel, Verbindung testen, Auftrag anlegen und sofort ausführen
   const SET = `const setVal=(el,v)=>{ const proto=el instanceof HTMLSelectElement?HTMLSelectElement:el instanceof HTMLTextAreaElement?HTMLTextAreaElement:HTMLInputElement; Object.getOwnPropertyDescriptor(proto.prototype,'value').set.call(el,v); el.dispatchEvent(new Event(el instanceof HTMLSelectElement?'change':'input',{bubbles:true})); };`;
   const clickText = (sel, text) => js(win, `[...document.querySelectorAll('${sel}')].find(b=>b.textContent.includes('${text}'))?.click()`);

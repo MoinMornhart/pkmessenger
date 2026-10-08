@@ -346,7 +346,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   function listGuilds() {
     const c = requireReady();
     return [...c.guilds.cache.values()]
-      .map((g) => ({ id: g.id, name: g.name, acronym: g.nameAcronym, iconUrl: g.iconURL({ size: 96, extension: 'png' }) }))
+      .map((g) => ({ id: g.id, name: g.name, acronym: g.nameAcronym, iconUrl: g.iconURL({ size: 96, extension: 'png' }), canCreateChannels: Boolean(g.members?.me?.permissions?.has?.(PermissionFlagsBits.ManageChannels)) }))
       .sort((a, b) => a.name.localeCompare(b.name, 'de'));
   }
 
@@ -1148,6 +1148,50 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     return { channelId };
   }
 
+  /**
+   * Neue Gruppe = neuer Text- oder Sprachkanal (Issue #1 „Gruppe erstellen“). Braucht „Kanäle verwalten“.
+   * Privat: @everyone sieht ihn nicht, nur der Bot und die ausgewählten Personen. Es werden nur Rechte vergeben,
+   * die der Bot selbst auf dem Server hat (sonst lehnt Discord ab).
+   */
+  async function createChannel({ guildId, name, kind, parentId, isPrivate, memberIds }) {
+    const c = requireReady();
+    const guild = requireGuild(guildId);
+    if (!guild.members?.me?.permissions?.has?.(PermissionFlagsBits.ManageChannels))
+      throw appError('MISSING_PERMISSION', 'Der Bot darf auf diesem Server keine Kanäle anlegen.', 'Gib der Bot-Rolle das Recht „Kanäle verwalten“.');
+    let parent = null;
+    if (parentId) {
+      parent = guild.channels.cache.get(parentId);
+      if (!parent || parent.type !== ChannelType.GuildCategory) throw appError('NOT_FOUND', 'Kategorie nicht gefunden.');
+    }
+    const voice = kind === 'voice';
+    const wanted = voice
+      ? [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak]
+      : [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory];
+    const botHas = wanted.filter((f) => guild.members.me.permissions.has(f));
+    let permissionOverwrites;
+    if (isPrivate) {
+      const members = [];
+      for (const id of memberIds) {
+        if (id === c.user.id) continue;
+        members.push(await requireMember(guild, id));
+      }
+      permissionOverwrites = [
+        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] }, // @everyone
+        { id: c.user.id, allow: botHas }, // der Bot sperrt sich nicht selbst aus
+        ...members.map((m) => ({ id: m.id, allow: botHas })),
+      ];
+    }
+    const ch = await guild.channels.create({
+      name,
+      type: voice ? ChannelType.GuildVoice : ChannelType.GuildText,
+      ...(parent ? { parent: parent.id } : {}),
+      ...(permissionOverwrites ? { permissionOverwrites } : {}),
+      reason: 'PKMessenger: neue Gruppe',
+    });
+    emit('channels:changed', { guildId: guild.id });
+    return { id: ch.id, guildId: guild.id, name: ch.name, type: voice ? 'voice' : 'text', private: Boolean(isPrivate) };
+  }
+
   // ---------- Moderation (Rechtsklick → Person verwalten, Issue #1) ----------
   // Nur was der Bot laut Discord-Rechten wirklich darf. discord.js prüft dabei Rollen-Reihenfolge, Besitzer und Admins
   // (member.manageable / moderatable / kickable / bannable). Mitglied wird per REST geladen – kein privilegiertes Intent nötig.
@@ -1433,6 +1477,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     listDMs,
     openDM,
     renameChannel,
+    createChannel,
     moveChannel,
     getMemberInfo,
     setMemberRole,

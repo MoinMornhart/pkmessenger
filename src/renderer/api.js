@@ -91,6 +91,7 @@ export const api = Object.fromEntries(
     'listDMs',
     'channelRename',
     'channelMove',
+    'channelCreate',
     'memberInfo',
     'memberRole',
     'memberTimeout',

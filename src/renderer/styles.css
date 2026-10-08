@@ -4413,3 +4413,76 @@ kbd {
   display: grid;
   gap: 2px;
 }
+
+/* ---------- Neue Gruppe (Kanal anlegen) ---------- */
+.newgroup {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 22px;
+}
+.newgroup input:not([type='checkbox']),
+.newgroup select {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  color: var(--text);
+  font: inherit;
+}
+.newgroup__kinds {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+.newgroup__kind {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.newgroup__kind.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  font-weight: 600;
+}
+.newgroup__private {
+  margin: 12px 0 6px;
+}
+.newgroup__people {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.newgroup__picked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.newgroup__chip {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.newdm__item.is-on {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.newgroup__tick {
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 700;
+}
+.newgroup-btn {
+  margin-top: 4px;
+}
