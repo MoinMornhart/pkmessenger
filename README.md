@@ -26,7 +26,7 @@ Lesen, schreiben, erwähnen, suchen und in Sprachkanälen sprechen, ohne den Dis
 
 ## 💡 Was ist PKMessenger?
 
-PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau und Uhrzeit, rechts die Unterhaltung in Sprechblasen. Im Hintergrund steckt aber **kein** persönlicher Discord-Account, sondern ein **Bot, den du selbst anlegst** und auf deinen Server einlädst. So bleibt alles im Rahmen der offiziellen Discord-Regeln.
+PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau und Uhrzeit, rechts die Unterhaltung in Sprechblasen. Im Hintergrund steckt aber **kein** persönlicher Discord-Account, sondern ein **Bot**. Zum Benutzen brauchst du **nur seinen Token**. So bleibt alles im Rahmen der offiziellen Discord-Regeln.
 
 > **Wichtig, damit keine falschen Erwartungen entstehen:** Nachrichten und Sprache laufen immer als dein Bot, mit sichtbarem **BOT**-Abzeichen. PKMessenger ist kein offizielles Discord-Produkt und ersetzt nicht deinen persönlichen Account.
 
@@ -127,17 +127,23 @@ PKMessenger sieht aus wie ein moderner Messenger: links deine Chats mit Vorschau
 
 ---
 
-## 🤖 Bot einrichten (einmalig, ca. 10 Minuten)
+## 🔑 Loslegen: nur der Bot-Token
+
+**Mehr brauchst du nicht.** Beim ersten Start fragt PKMessenger nur nach dem **Bot-Token**. Einfügen, „Verbinden“, fertig. Den Token bekommst du von der Person, der der Bot gehört.
+
+Ist der Bot noch auf keinem Server, zeigt die App einen **Einladungslink mit QR-Code und fertiger Nachricht**. Den schickst du einer Admin des Servers, sie klickt ihn an, und der Bot ist da.
+
+### Noch keinen Bot? Einmalig neu anlegen (ca. 10 Minuten)
 
 <img src="docs/images/einrichtung.png" alt="Einrichtungs-Assistent von PKMessenger" width="900">
 
-Die App zeigt dir diese Schritte auch selbst an:
+Die App zeigt dir diese Schritte auch selbst an (Einrichtung → „Noch keinen Bot?“):
 
 1. **Bot anlegen:** Öffne das [Discord Developer Portal](https://discord.com/developers/applications) → **New Application** → Namen vergeben → links **Bot** → **Reset Token** → Token **einmal** kopieren.
 2. **Token eintragen:** In PKMessenger den Token ins Feld einfügen und **„Speichern & verbinden“** klicken. Er wird sofort **verschlüsselt** gespeichert (an dein Windows-Konto gebunden) und nie wieder angezeigt. Ändern kannst du ihn später unter ⚙ Einstellungen.
    > 🔐 Den Token **nie** weitergeben, posten oder abfotografieren. Er ist das Passwort deines Bots. Falls er doch irgendwo landet: im Portal sofort **Reset Token**.
 3. **Message Content Intent einschalten:** Im Portal unter **Bot → Privileged Gateway Intents** nur **Message Content Intent** aktivieren. *Server Members* und *Presence* bleiben aus, die braucht PKMessenger nicht.
-4. **Bot einladen:** Die App zeigt dir den fertigen **Einladungslink** an. Er enthält genau die nötigen Rechte: Kanäle ansehen, Nachrichten senden, Verlauf lesen, Reaktionen, Dateien, Links einbetten, Verbinden, Sprechen.
+4. **Bot einladen:** Die App zeigt dir den fertigen **Einladungslink** an (auch als QR-Code und fertige Nachricht für eine Admin des Servers). Er enthält genau die nötigen Rechte: Kanäle ansehen, Nachrichten senden, Verlauf lesen, Reaktionen, Dateien, Links einbetten, Verbinden, Sprechen.
 5. **Verbinden** klicken. Fertig, unten links steht **„Verbunden ✓“**.
 
 > Solange PKMessenger nicht läuft, zeigt Discord deinen Bot als **offline** an. Das ist normal. Der Bot sieht außerdem nur Kanäle, die seine Rolle sehen darf.

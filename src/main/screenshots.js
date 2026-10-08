@@ -786,6 +786,27 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     console.log(`[einladen] ${inv} · Nachricht: ${JSON.stringify(kopiert.slice(0, 60))} … enthält Link: ${/discord\.com\/oauth2\/authorize/.test(kopiert)}`);
     await js(win, `document.querySelector('.invite .icon-btn[aria-label="Schließen"]')?.click()`);
     await wait(200);
+    // JoniMoni #73: Reaktions-Smileys an einer kurzen Nachricht links dürfen nicht aus dem Chat ragen
+    await js(win, `document.querySelector('.rail__item:not(.rail__dm):not(.rail__add)')?.click()`);
+    await wait(500);
+    await js(win, `[...document.querySelectorAll('.chatrow')].find(r=>r.textContent.includes('allgemein'))?.click()`);
+    await wait(700);
+    // echte Mausbewegung über die letzte fremde Nachricht (die Aktionsleiste erscheint nur beim Darüberfahren)
+    const pos = JSON.parse(await js(win, `(() => { const b = [...document.querySelectorAll('.msg--in .bubble')].at(-1); b?.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }); })()`));
+    await wait(200);
+    win.webContents.sendInputEvent({ type: 'mouseMove', x: pos.x, y: pos.y });
+    await wait(300);
+    // „Reagieren“ → Schnellauswahl → ➕ „Mehr Smileys“ = das große Fenster aus Jonis Bild
+    await js(win, `[...document.querySelectorAll('.msg--in')].at(-1)?.querySelector('button[aria-label="Reagieren"]')?.click()`);
+    await wait(250);
+    await js(win, `[...document.querySelectorAll('.msg--in')].at(-1)?.querySelector('button[aria-label="Mehr Smileys"]')?.click()`);
+    await wait(500);
+    const emo = await js(win, `(() => { const p = document.querySelector('.emoji-panel--reactions'); const c = document.querySelector('.chat')?.getBoundingClientRect(); if (!p || !c) return 'kein Fenster'; const r = p.getBoundingClientRect(); return JSON.stringify({ links: Math.round(r.left - c.left), rechts: Math.round(c.right - r.right), unten: Math.round(innerHeight - r.bottom), ganzSichtbar: r.left >= c.left && r.right <= c.right && r.bottom <= innerHeight }); })()`);
+    await shoot(win, dir, '85-reaktion-smileys');
+    const dbg = await js(win, `JSON.stringify({ msgsIn: document.querySelectorAll('.msg--in').length, bubbles: document.querySelectorAll('.msg--in .bubble').length, knoepfe: document.querySelectorAll('.msg-actions button[aria-label="Reagieren"]').length, panels: document.querySelectorAll('.emoji-panel').length, chat: document.querySelector('.chat__head h1')?.textContent })`);
+    console.log(`[issue73] Reaktions-Smileys: ${emo} · ${dbg} · pos ${JSON.stringify(pos)}`);
+    await js(win, `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+    await wait(200);
     console.log(`[issue61] Schnellfenster: ${notify} · Abschnitt: ${zu} · Einstellungen: ${nav} · @ im Privatchat: ${dmAt}`);
     await js(win, `document.querySelector('.rail__item:not(.rail__dm):not(.rail__add)')?.click()`);
     await wait(500);

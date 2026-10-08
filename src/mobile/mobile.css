@@ -60,3 +60,14 @@ html[data-platform='android'] .modal.settings {
   height: calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 /* Langer Druck auf eine Nachricht/einen Chat öffnet das Menü (Android meldet ihn als Rechtsklick) */
+
+/* Einrichtung am Handy: nichts darf seitlich überstehen */
+html[data-platform='android'] .center-screen {
+  overflow-x: hidden;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+html[data-platform='android'] .center-card {
+  max-width: 100%;
+  box-sizing: border-box;
+}

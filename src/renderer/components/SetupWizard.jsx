@@ -91,31 +91,13 @@ export default function SetupWizard({ status, onClose = null, onReconnect = null
 
   const steps = [
     {
-      id: 'account',
-      title: 'Discord-Konto für den Bot-Besitzer',
-      done: ticks.account || auto.token,
-      body: (
-        <>
-          <p>Einen Bot kann nur jemand mit Discord-Konto anlegen (das ist Discords Regel). Das musst nur <b>du als Besitzer</b> einmal machen. Wer später nur mitliest, braucht für PKMessenger nichts weiter.</p>
-          <div className="settings__row">
-            <button className="btn btn--small" onClick={() => ext('https://discord.com/register')}>
-              Konto erstellen ↗
-            </button>
-            <button className="btn btn--ghost btn--small" onClick={() => tick('account')}>
-              ✓ Habe ich schon
-            </button>
-          </div>
-        </>
-      ),
-    },
-    {
       id: 'app',
       title: 'Anwendung im Entwicklerportal anlegen',
       done: ticks.app || auto.token,
       body: (
         <>
           <ol className="wizard__how">
-            <li>„Entwicklerportal öffnen“ klicken und mit deinem Discord-Konto anmelden.</li>
+            <li>„Entwicklerportal öffnen“ klicken und dort anmelden (nur zum Anlegen des Bots nötig).</li>
             <li>
               Oben rechts <b>„New Application“</b> klicken.
             </li>
@@ -252,7 +234,7 @@ export default function SetupWizard({ status, onClose = null, onReconnect = null
               <button className="btn btn--primary btn--small" onClick={() => ext(invite)}>
                 Einladungslink öffnen ↗
               </button>
-              <button className="btn btn--ghost btn--small" onClick={() => window.dispatchEvent(new CustomEvent('pk:invite-dialog'))} title="Kein eigenes Discord-Konto? Eine Admin des Servers kann den Bot einladen.">
+              <button className="btn btn--ghost btn--small" onClick={() => window.dispatchEvent(new CustomEvent('pk:invite-dialog'))} title="Eine Admin des Servers kann den Bot einladen.">
                 🤝 Link an eine Admin schicken
               </button>
             </div>

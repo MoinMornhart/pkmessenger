@@ -4654,3 +4654,39 @@ kbd {
   flex: 1;
   min-width: 0;
 }
+
+/* ---------- Einrichtung: nur der Token (JoniMoni #71) ---------- */
+.token-quick {
+  margin: 16px 0;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+}
+.token-quick h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+.token-quick__row {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 6px;
+}
+.token-quick__row input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+.setup-more {
+  margin-top: 8px;
+}
+.setup-more > summary {
+  cursor: pointer;
+  color: var(--muted);
+  padding: 8px 0;
+}

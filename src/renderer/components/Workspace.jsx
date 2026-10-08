@@ -239,7 +239,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   useEffect(() => {
     if (!autoWizard.current && guilds && guilds.length === 0 && !/[?&]shots=1/.test(window.location.search)) {
       autoWizard.current = true;
-      setWizardOpen(true);
+      setInviteOpen(true); // nur Token nötig: eine Server-Admin holt den Bot per Link (JoniMoni #71)
     }
   }, [guilds]);
 

@@ -1,11 +1,8 @@
-# Tests bei JEDEM Push auf main und jedem Pull Request (JoniMoni #70: „CI auf main nicht zuverlässig“).
-# Vorher liefen die Tests nur beim Release (package.json geändert) – ein normaler Merge wurde nicht geprüft.
+# Tests bei jedem Pull Request (JoniMoni #70). Auf main laufen sie NICHT noch einmal (JoniMoni #73: dort nur
+# veröffentlichen) – „Release bauen“ führt vor dem Veröffentlichen ohnehin npm test aus.
 name: Tests
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
   workflow_dispatch:
 
