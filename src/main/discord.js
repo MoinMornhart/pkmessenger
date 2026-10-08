@@ -459,6 +459,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       reactions: valuesOf(msg?.reactions?.cache).map(serializeReaction).filter(Boolean),
       embeds: (Array.isArray(msg?.embeds) ? msg.embeds : []).slice(0, 10).map(serializeEmbed),
       pinned: Boolean(msg?.pinned),
+      components: serializeComponents(msg),
       poll: serializePoll(msg?.poll),
       thread: msg?.hasThread && msg.thread ? { id: msg.thread.id, name: msg.thread.name ?? 'Thread', messageCount: msg.thread.messageCount ?? null } : null,
       // Bearbeiten nur eigene (Discord-Regel); Löschen eigene oder mit "Nachrichten verwalten"
@@ -538,6 +539,35 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       url = null;
     }
     return { key: e.id ? `${e.name ?? 'emoji'}:${e.id}` : e.name, name: e.name ?? '', id: e.id ?? null, animated: Boolean(e.animated), url, count: Number(r.count) || 0, me: Boolean(r.me) };
+  }
+
+  // #86: Knöpfe/Auswahlmenüs einer Nachricht (components) NUR zur Ansicht serialisieren.
+  // Ein Bot kann fremde Knöpfe nicht drücken (Discord-Grenze), darum reine Anzeige. Link-Knöpfe tragen ihre URL mit
+  // (werden im Renderer über den normalen Link-Schutz geöffnet). Alles null-sicher und gekürzt.
+  function serializeComponent(c) {
+    const type = Number(c?.type) || 0;
+    if (type === 2) {
+      const style = Number(c?.style) || 1; // 1 primary, 2 secondary, 3 success, 4 danger, 5 link
+      return {
+        kind: 'button',
+        label: typeof c?.label === 'string' ? c.label.slice(0, 80) : '',
+        style,
+        url: style === 5 && typeof c?.url === 'string' ? c.url : null,
+        emoji: c?.emoji?.name || null,
+        disabled: Boolean(c?.disabled),
+      };
+    }
+    if (type === 3 || (type >= 5 && type <= 8)) {
+      return { kind: 'select', placeholder: typeof c?.placeholder === 'string' ? c.placeholder.slice(0, 100) : 'Auswahl', disabled: Boolean(c?.disabled) };
+    }
+    return null;
+  }
+  function serializeComponents(msg) {
+    const rows = Array.isArray(msg?.components) ? msg.components : [];
+    return rows
+      .slice(0, 5)
+      .map((row) => ({ components: (Array.isArray(row?.components) ? row.components : []).slice(0, 5).map(serializeComponent).filter(Boolean) }))
+      .filter((r) => r.components.length);
   }
 
   // F11: Embed anzeigen (nur Anzeige-Felder, alles null-sicher und gekürzt)
