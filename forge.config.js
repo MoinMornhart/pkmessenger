@@ -14,7 +14,7 @@ module.exports = {
     // App-Icon (erzeugt mit `npm run icon` aus dem eigenen Logo); Electron Packager hängt unter Windows .ico an
     icon: 'assets/icon',
     // NIEMALS .env, Tests, Quellcode des Renderers oder Doku mit ausliefern.
-    ignore: [/^\/\.env/, /^\/tests/, /^\/src\/renderer/, /^\/src\/mobile/, /^\/mobile/, /^\/scripts/, /^\/docs/, /^\/out/, /^\/\.git/, /^\/screenshots/, /^\/src\/main\/demo\.js$/, /^\/src\/main\/screenshots\.js$/, /\.md$/],
+    ignore: [/^\/\.env/, /^\/tests/, /^\/src\/renderer/, /^\/src\/mobile/, /^\/mobile/, /^\/relay/, /^\/scripts/, /^\/docs/, /^\/out/, /^\/\.git/, /^\/screenshots/, /^\/src\/main\/demo\.js$/, /^\/src\/main\/screenshots\.js$/, /\.md$/],
   },
   makers: [
     {
