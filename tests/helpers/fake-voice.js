@@ -58,7 +58,7 @@ function createFakeVoiceLib({ readyOnJoin = true } = {}) {
     });
 
   lib.createAudioPlayer = (opts) => {
-    const p = { opts, played: [], stopped: 0, play: (r) => p.played.push(r), stop: () => (p.stopped += 1) };
+    const p = Object.assign(new EventEmitter(), { opts, played: [], stopped: 0, play: (r) => p.played.push(r), stop: () => (p.stopped += 1) });
     lib.players.push(p);
     return p;
   };

@@ -352,6 +352,10 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
         log({ action: 'Kopplung abgelehnt', device: name, ip });
         return json(res, 200, seal({ error: 'Am PC abgelehnt.' }, p.key));
       }
+      if (loadDevices().length >= MAX_DEVICES) {
+        pairings.delete(String(body.p));
+        return json(res, 200, seal({ error: `Höchstens ${MAX_DEVICES} Geräte. Entferne am PC erst ein altes Gerät.` }, p.key));
+      }
       const dev = { id: rid(12), name, key: b64(nacl.randomBytes(32)), pairedAt: now(), lastSeen: now(), ip };
       saveDevices([...loadDevices(), dev]);
       log({ action: 'Gerät gekoppelt', device: name, ip });

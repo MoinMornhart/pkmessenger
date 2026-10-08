@@ -33,7 +33,7 @@ if (!app.requestSingleInstanceLock()) {
 
 const ROOT = path.join(__dirname, '..', '..');
 const RENDERER_HTML = path.join(ROOT, 'build', 'renderer', 'index.html');
-const RENDERER_URL_PREFIX = require('node:url').pathToFileURL(path.dirname(RENDERER_HTML)).toString();
+const RENDERER_URL_PREFIX = `${require('node:url').pathToFileURL(path.dirname(RENDERER_HTML)).toString()}/`;
 
 // Entwickler-Schalter (in der installierten App wirkungslos):
 //   --demo                 simulierte Daten ohne Discord-Verbindung (für Screenshots/UI-Tests)
@@ -297,10 +297,9 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (e, url) => {
     if (!url.startsWith(RENDERER_URL_PREFIX)) e.preventDefault();
   });
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
-    return { action: 'deny' };
-  });
+  // Neue Fenster (Mittelklick, Umschalt+Klick) immer ablehnen und NICHT selbst öffnen: sonst würde der Link-Schutz
+  // (Warnung bei gefährlichen Links) übersprungen. Links öffnen nur per Klick über den Renderer (nav.openExternal).
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   // DevTools nur in der Entwicklung (Strg+Umschalt+I).
   mainWindow.webContents.on('before-input-event', (_e, input) => {
     if (!app.isPackaged && input.control && input.shift && input.key.toLowerCase() === 'i') mainWindow.webContents.toggleDevTools();

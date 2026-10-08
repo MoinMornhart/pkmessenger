@@ -15,12 +15,14 @@ export default function CreateChannelDialog({ guild, categories = [], onClose, o
   const nameRef = useRef(null);
   const allowed = Boolean(guild?.canCreateChannels);
 
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     nameRef.current?.focus();
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const onKey = (e) => e.key === 'Escape' && closeRef.current();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   // Personen nur von diesem Server (gleiche Suche wie „Neuer Privatchat“)
   useEffect(() => {
@@ -28,8 +30,8 @@ export default function CreateChannelDialog({ guild, categories = [], onClose, o
     let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        const res = await api.searchPeople({ query: query.trim().slice(0, 32) });
-        if (!cancelled) setFound(res.filter((u) => !u.bot && u.guilds?.includes(guild?.name)));
+        const res = await api.searchPeople({ query: query.trim().slice(0, 32), guildId: guild.id });
+        if (!cancelled) setFound(res.filter((u) => !u.bot));
       } catch {
         if (!cancelled) setFound([]);
       }
@@ -38,7 +40,7 @@ export default function CreateChannelDialog({ guild, categories = [], onClose, o
       cancelled = true;
       clearTimeout(t);
     };
-  }, [isPrivate, query, guild?.name]);
+  }, [isPrivate, query, guild?.id]);
 
   const toggle = (u) => setPicked((p) => (p.some((x) => x.id === u.id) ? p.filter((x) => x.id !== u.id) : p.length >= 25 ? p : [...p, u]));
 

@@ -86,11 +86,20 @@ function createVoiceManager({ voiceLib, getVoiceTarget, emit, sendAudio, joinTim
     const s = { guildId, channelId, connection, player, mic: null, receivers: new Map(), listening: listen, talking: false, canSpeak: target.canSpeak, botId: target.botId, channelName: target.channelName };
     session = s;
     connection.subscribe(player);
+    // Netzwerk-/DAVE-/Stream-Fehler: sauber auflegen statt halb offener Sitzung mit „verbunden“
+    const onError = () => {
+      if (session !== s) return;
+      cleanupSession();
+      setState({ state: 'error', guildId, channelId, error: { message: 'Die Sprachverbindung wurde unterbrochen.', hint: 'Einfach erneut beitreten.' } });
+    };
+    connection.on?.('error', onError);
+    player.on?.('error', onError);
 
     try {
       await entersState(connection, VoiceConnectionStatus.Ready, joinTimeoutMs);
     } catch {
-      if (session === s) cleanupSession();
+      if (session !== s) throw appError('VOICE_ABORTED', 'Beitritt abgebrochen.'); // inzwischen anderer Kanal/aufgelegt
+      cleanupSession();
       setState({ state: 'error', guildId, channelId, error: { message: 'Verbindung zum Sprachkanal fehlgeschlagen.', hint: 'Prüfe deine Internetverbindung und die Rechte „Verbinden“/„Sprechen“ der Bot-Rolle, dann erneut beitreten.' } });
       throw appError('VOICE_TIMEOUT', 'Verbindung zum Sprachkanal fehlgeschlagen.', 'Internet und Bot-Rechte prüfen, dann erneut beitreten.');
     }

@@ -675,7 +675,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
    * Personen über ALLE Server des Bots + bekannte Privatchat-Partner suchen (Issue #1: „überall sollen Namen kommen“,
    * auch @ im Privatchat). Unscharf, ohne Duplikate, Bots zuletzt. Nur Mitglieder, die Discord dem Bot ohnehin zeigt.
    */
-  async function searchPeople({ query, limit = 10 }) {
+  async function searchPeople({ query, guildId = null, limit = 10 }) {
     const c = requireReady();
     const found = new Map(); // userId → { user, member, guilds }
     const add = (user, member, guildName) => {
@@ -685,7 +685,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       if (!e.member && member) e.member = member;
       found.set(user.id, e);
     };
-    const guilds = [...c.guilds.cache.values()].slice(0, 25);
+    const guilds = guildId ? [requireGuild(guildId)] : [...c.guilds.cache.values()].slice(0, 25);
     await Promise.all(
       guilds.map(async (g) => {
         for (const m of g.members.cache.values()) add(m.user, m, g.name);
@@ -697,7 +697,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         }
       }),
     );
-    for (const ch of c.channels.cache.values()) if (isDM(ch) && ch.recipient) add(ch.recipient, null, null);
+    if (!guildId) for (const ch of c.channels.cache.values()) if (isDM(ch) && ch.recipient) add(ch.recipient, null, null);
     const list = [...found.values()];
     const names = (e) => [e.member?.displayName, e.user.globalName, e.user.username];
     const ranked = query ? fuzzyFilter(list, query, names) : list.sort((a, b) => names(a)[0]?.localeCompare?.(names(b)[0] || '') || 0);
@@ -1167,7 +1167,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     const wanted = voice
       ? [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak]
       : [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory];
-    const botHas = wanted.filter((f) => guild.members.me.permissions.has(f));
+    const where = parent?.permissionsFor ? permsIn(parent) : guild.members.me.permissions; // in einer Kategorie zählen deren Rechte
+    const botHas = wanted.filter((f) => where?.has(f));
     let permissionOverwrites;
     if (isPrivate) {
       const members = [];
