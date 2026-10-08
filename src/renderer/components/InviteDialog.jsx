@@ -59,7 +59,7 @@ export default function InviteDialog({ guilds = [], onClose, toast }) {
           </button>
         </div>
         <p>
-          <b>Du brauchst dafür kein eigenes Discord-Konto.</b> Schick den Link an eine Admin oder einen Admin des Servers. Sie öffnet ihn mit dem eigenen Konto, wählt den Server und klickt „Autorisieren“ – fertig.
+          Schick den Link an eine Admin oder einen Admin des Servers. Sie öffnet ihn, wählt den Server und klickt „Autorisieren“ – fertig. Du selbst brauchst nur den Bot-Token.
         </p>
         {error && <p className="muted">{error}</p>}
         {url && (
@@ -89,9 +89,6 @@ export default function InviteDialog({ guilds = [], onClose, toast }) {
           </li>
           <li>Der Bot erscheint hier automatisch – dieses Fenster schließt sich dann von selbst.</li>
         </ol>
-        <p className="muted small">
-          💡 Ein Discord-Konto braucht nur, wer den Bot im Entwicklerportal <i>anlegt</i> (einmalig). Zum Benutzen von PKMessenger und zum Einladen auf Server reicht der Bot-Token.
-        </p>
       </div>
     </div>
   );

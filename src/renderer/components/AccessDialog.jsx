@@ -58,7 +58,7 @@ export default function AccessDialog({ access, guildName, onClose, onRefresh }) 
         <div className="callout">
           <span className="callout__label">Was kann ich tun?</span>
           <ol className="access__steps">
-            <li>In Discord mit einem Admin-Konto: Rechtsklick auf den Kanal (oder die Kategorie) → <b>Kanal bearbeiten</b> → <b>Berechtigungen</b>.</li>
+            <li>Eine Admin des Servers in Discord: Rechtsklick auf den Kanal (oder die Kategorie) → <b>Kanal bearbeiten</b> → <b>Berechtigungen</b>.</li>
             <li>
               <b>Mitglieder oder Rollen hinzufügen</b> → die <b>Rolle des Bots</b> wählen.
             </li>

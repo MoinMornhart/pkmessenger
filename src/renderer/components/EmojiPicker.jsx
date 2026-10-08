@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CATEGORIES, searchEmojis } from '../../shared/emoji-data';
 
 // Smiley-Auswahl mit Kategorien und Suche (Issue #1: „mehr Smileys“). Optional: eigene Server-Emojis (customEmojis).
@@ -24,6 +24,23 @@ export default function EmojiPicker({ onPick, onClose, customEmojis = [], classN
 
   const found = query ? searchEmojis(query) : null;
   const current = CATEGORIES.find((c) => c.id === cat);
+
+  // Immer ganz sichtbar (JoniMoni #73): ragt das Fenster aus dem Chat-Bereich (z. B. Reaktion auf eine Nachricht links),
+  // rückt es so weit wie nötig hinein – seitlich und nach oben/unten. 'translate' stört die Einblend-Animation nicht.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const area = el.closest('.chat')?.getBoundingClientRect();
+    const b = { left: Math.max(area?.left ?? 0, 0) + 8, right: Math.min(area?.right ?? innerWidth, innerWidth) - 8, top: 8, bottom: innerHeight - 8 };
+    const r = el.getBoundingClientRect();
+    let dx = 0;
+    let dy = 0;
+    if (r.right > b.right) dx = b.right - r.right;
+    if (r.left + dx < b.left) dx = b.left - r.left;
+    if (r.bottom > b.bottom) dy = b.bottom - r.bottom;
+    if (r.top + dy < b.top) dy = b.top - r.top;
+    el.style.translate = dx || dy ? `${Math.round(dx)}px ${Math.round(dy)}px` : '';
+  }, []);
 
   return (
     <div ref={ref} className={`emoji-panel ${className}`} role="dialog" aria-label="Smileys">

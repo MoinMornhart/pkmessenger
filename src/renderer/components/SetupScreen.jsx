@@ -1,5 +1,6 @@
 import { isAndroid } from '../platform';
 import { useState } from 'react';
+import { pc } from '../platform';
 import { api } from '../api';
 import Logo from './Logo.jsx';
 import SetupWizard from './SetupWizard.jsx';
@@ -11,6 +12,50 @@ const REASONS = {
   'read-error': ['Die .env-Datei konnte nicht gelesen werden.', 'Prüfe, ob die Datei von einem anderen Programm gesperrt ist.'],
   TOKEN_INVALID: ['Discord hat den Token abgelehnt.', 'Der Token ist falsch oder wurde zurückgesetzt. Erzeuge im Developer Portal unter "Bot" mit "Reset Token" einen neuen und trage ihn ein.'],
 };
+
+// Schnellstart (JoniMoni #71/#44): Zum Benutzen braucht man NUR den Bot-Token – kein eigenes Discord-Konto.
+// Wer noch keinen Bot hat, findet den ausführlichen Assistenten (Bot neu anlegen) darunter.
+function TokenQuickStart({ onDone }) {
+  const [token, setToken] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const save = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await api.tokenSave({ token });
+      setToken('');
+      if (res?.state !== 'ready') setErr({ message: res?.error?.message || 'Verbindung fehlgeschlagen.', hint: res?.error?.hint || '' });
+      else onDone?.();
+    } catch (e) {
+      setErr({ message: e.message, hint: e.hint });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="token-quick">
+      <h2>🔑 Bot-Token eingeben – mehr brauchst du nicht</h2>
+      <p>
+        Den Token bekommst du von der Person, der der Bot gehört. Danach bist du sofort drin und schreibst als dieser Bot.
+      </p>
+      <div className="token-quick__row">
+        <input type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && token && !busy && save()} placeholder="Bot-Token einfügen" aria-label="Bot-Token" autoFocus />
+        <button className="btn btn--primary" disabled={!token.trim() || busy} onClick={save}>
+          {busy ? 'Verbinde …' : 'Verbinden'}
+        </button>
+      </div>
+      {err && (
+        <p className="warn small">
+          {err.message} {err.hint}
+        </p>
+      )}
+      <p className="muted small">
+        🔒 Der Token wird sofort verschlüsselt {pc('(an dein Windows-Konto gebunden)', '(im Android-Schlüsselspeicher)')} und nie wieder angezeigt. Einfügen: {pc('Strg+V', 'lange ins Feld drücken → Einfügen')}.
+      </p>
+    </div>
+  );
+}
 
 export default function SetupScreen({ status, onReconnect }) {
   const [reason, hint] = REASONS[status.reason] || REASONS['missing-token'];
@@ -34,12 +79,20 @@ export default function SetupScreen({ status, onReconnect }) {
           </div>
         </div>
 
-        <div className="callout callout--warn">
-          <strong>{reason}</strong>
-          <p>{hint}</p>
-        </div>
+        {/* Hinweis nur bei echten Problemen – „noch kein Token“ ist der Normalfall und steht im Kasten darunter */}
+        {['invalid-format', 'read-error', 'TOKEN_INVALID'].includes(status.reason) && (
+          <div className="callout callout--warn">
+            <strong>{reason}</strong>
+            <p>{hint}</p>
+          </div>
+        )}
 
-        <SetupWizard status={status} onReconnect={retry} />
+        <TokenQuickStart onDone={retry} />
+
+        <details className="setup-more">
+          <summary>Noch keinen Bot? Hier einen neuen anlegen (einmalig)</summary>
+          <SetupWizard status={status} onReconnect={retry} />
+        </details>
         {!isAndroid && <p className="muted small">
           Alternativ: Eine <code>.env</code> mit <code>DISCORD_TOKEN=…</code> wird beim Start automatisch übernommen, verschlüsselt und gelöscht.{' '}
           <button className="link-btn" onClick={openEnv}>
