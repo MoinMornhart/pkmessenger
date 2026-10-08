@@ -360,9 +360,9 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
   };
 
   const onKeyDown = (e) => {
-    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && ['b', 'i', 'u'].includes(e.key.toLowerCase())) {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && ['b', 'i', 'u'].includes((e.key || '').toLowerCase())) {
       e.preventDefault();
-      format({ b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()]);
+      format({ b: 'bold', i: 'italic', u: 'underline' }[(e.key || '').toLowerCase()]);
       return;
     }
     if (suggest) {

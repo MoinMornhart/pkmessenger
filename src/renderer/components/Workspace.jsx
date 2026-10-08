@@ -508,7 +508,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
 
   useEffect(() => {
     const onKey = (e) => {
-      const k = e.key.toLowerCase();
+      const k = (e.key || '').toLowerCase();
       if (e.ctrlKey && k === 'k') {
         e.preventDefault();
         setQuickOpen((v) => !v);
