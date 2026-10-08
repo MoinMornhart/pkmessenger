@@ -29,7 +29,8 @@ test('Strenge CSP: nur eigene Skripte, Verbindungen nur zu Discord und GitHub', 
   assert.match(csp, /script-src 'self';/);
   assert.doesNotMatch(csp, /unsafe-inline|unsafe-eval|\*;|http:/);
   const connect = /connect-src ([^;]+);/.exec(csp)[1].split(/\s+/);
-  for (const host of connect) assert.match(host, /^(https:\/\/(discord\.com|api\.github\.com|github\.com|objects\.githubusercontent\.com|release-assets\.githubusercontent\.com|raw\.githubusercontent\.com)|wss:\/\/(gateway\.discord\.gg|\*\.discord\.gg))$/);
+  assert.ok(connect.includes("'self'"), 'Capacitors HTTP-Weg (https://localhost/_capacitor_http_interceptor_) muss erlaubt sein');
+  for (const host of connect.filter((h) => h !== "'self'")) assert.match(host, /^(https:\/\/(discord\.com|api\.github\.com|github\.com|objects\.githubusercontent\.com|release-assets\.githubusercontent\.com|raw\.githubusercontent\.com)|wss:\/\/(gateway\.discord\.gg|\*\.discord\.gg))$/);
 });
 
 test('Android-Manifest: keine Datensicherung, kein Klartext-HTTP, FileProvider nur für den Cache', () => {
