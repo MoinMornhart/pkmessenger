@@ -7,7 +7,7 @@ const { readyService, GUILD_ID } = require('./helpers/fake-discord');
 
 test('Serverliste enthält ID, Name, Kürzel', async () => {
   const { service } = await readyService();
-  assert.deepEqual(service.listGuilds(), [{ id: GUILD_ID, name: 'Testserver', acronym: 'T', iconUrl: null }]);
+  assert.deepEqual(service.listGuilds(), [{ id: GUILD_ID, name: 'Testserver', acronym: 'T', iconUrl: null, canCreateChannels: false }]);
 });
 
 test('Kanalliste: unsichtbare Kanäle fehlen, Sprachkanäle als type "voice" (seit F17), Kategorien gruppiert', async () => {

@@ -199,7 +199,7 @@ function CategoryHeader({ group, collapsed, unread, onToggle }) {
   );
 }
 
-function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings, onOpenForum = () => {}, onNewDM = () => {}, onChatContext = () => {}, typingIn = {}, presence = {} }) {
+function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread, unreadCounts, onSelect, status, hasGuilds, loading, onInvite, now, appInfo, voiceChannels = [], otherChannels = [], voiceMembers = {}, speaking, voice, onToggleMic, onLeaveVoice, onRefresh, refreshing, access, onShowAccess, onOpenSettings, onOpenForum = () => {}, onNewDM = () => {}, onNewGroup = () => {}, onChatContext = () => {}, typingIn = {}, presence = {} }) {
   const [filter, setFilter] = useState('');
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase().replace(/^#/, '');
@@ -322,6 +322,11 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
         {isDM && (
           <button className="newdm-btn" onClick={onNewDM}>
             ＋ Neuer Privatchat
+          </button>
+        )}
+        {!isDM && hasGuilds && !loading && !filter && (
+          <button className="newdm-btn newgroup-btn" onClick={onNewGroup} title={guild?.canCreateChannels ? 'Neuen Kanal auf diesem Server anlegen' : 'Dafür braucht der Bot das Recht „Kanäle verwalten“'}>
+            ＋ Neue Gruppe
           </button>
         )}
         {isDM && !loading && chats.length === 0 && (

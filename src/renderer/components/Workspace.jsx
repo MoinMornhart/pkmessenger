@@ -7,6 +7,7 @@ import { maskSpoilers } from '../../shared/format-text';
 import { systemInfo } from '../../shared/system-messages';
 import ServerRail, { DM_ID } from './ServerRail.jsx';
 import NewDMDialog from './NewDMDialog.jsx';
+import CreateChannelDialog from './CreateChannelDialog.jsx';
 import ContextMenu from './ContextMenu.jsx';
 import WallpaperDialog from './WallpaperDialog.jsx';
 import { NameDialog } from './SidePanels.jsx';
@@ -69,6 +70,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   }, []);
   const [joinOpen, setJoinOpen] = useState(false);
   const [newDmOpen, setNewDmOpen] = useState(false);
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [chatMenu, setChatMenu] = useState(null); // Rechtsklick auf einen Chat
   const [wallFor, setWallFor] = useState(null); // Hintergrund-Dialog { channelId, guildId, chatName, guildName }
   const [renameFor, setRenameFor] = useState(null); // Kanal umbenennen
@@ -582,6 +584,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
           onShowAccess={() => setAccessOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
           onNewDM={() => setNewDmOpen(true)}
+          onNewGroup={() => setNewGroupOpen(true)}
           onChatContext={(e, c) => {
             e.preventDefault();
             const guildPart = c.guildId === DM_ID ? '@me' : c.guildId;
@@ -684,6 +687,24 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
                 .channelRename({ channelId: c.id, name })
                 .then(() => toast({ kind: 'info', title: 'Umbenannt ✓', duration: 2000 }))
                 .catch((err) => toast({ kind: 'error', title: err.message, text: err.hint }));
+            }}
+          />
+        )}
+        {newGroupOpen && guild && guildId !== DM_ID && (
+          <CreateChannelDialog
+            guild={guild}
+            categories={(channels || []).map((g) => g.category).filter(Boolean)}
+            onClose={() => setNewGroupOpen(false)}
+            toast={toast}
+            onCreated={async (c) => {
+              setNewGroupOpen(false);
+              toast({ kind: 'info', title: `Gruppe „${c.name}“ erstellt ✓`, text: c.private ? 'Nur du (über den Bot) und die ausgewählten Personen sehen sie.' : undefined, duration: 3500 });
+              await loadChannels(c.guildId);
+              if (c.type === 'text') {
+                setActiveThread(null);
+                setForum(null);
+                setChannelId(c.id);
+              }
             }}
           />
         )}

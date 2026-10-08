@@ -325,6 +325,16 @@ function createFakeWorld({ loginBehavior = 'ready', withExtraTypes = false } = {
     channels.thread = makeChannel(guild, { id: '444444444444444410', name: 'ein-thread', type: ChannelType.PublicThread, parentId: '444444444444444401', perms: all });
   }
   guild.channels = { cache: new Map([[category.id, category], ...Object.values(channels).map((c) => [c.id, c])]) };
+  // Neue Gruppe (Kanal anlegen): merkt sich die Optionen, neuer Kanal ist für den Bot sichtbar
+  guild.channels.created = [];
+  guild.channels.create = async (opts) => {
+    guild.channels.created.push(opts);
+    const id = discord.SnowflakeUtil.generate().toString();
+    const ch = makeChannel(guild, { id, name: String(opts.name).toLowerCase().replace(/\s+/g, '-'), type: opts.type, parentId: opts.parent || null, position: 50, perms: all });
+    ch.permissionOverwrites = opts.permissionOverwrites || [];
+    guild.channels.cache.set(id, ch);
+    return ch;
+  };
   guild.voiceStates = { cache: new Map() };
   // REST-Nachladen (für "Aktualisieren"): zählt Aufrufe, kann zum Scheitern gebracht werden.
   guild.refreshCalls = [];

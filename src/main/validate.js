@@ -339,6 +339,21 @@ const validators = {
     if (typeof name !== 'string' || name.trim().length < 1 || name.length > 100) throw new ValidationError('Der Kanalname muss 1–100 Zeichen haben.');
     return { channelId: snowflake(channelId, 'channelId'), name: name.trim() };
   },
+  channelCreate(p) {
+    const { guildId, name, kind, parentId, isPrivate, memberIds } = obj(p);
+    if (typeof name !== 'string' || name.trim().length < 1 || name.trim().length > 100) throw new ValidationError('Der Name muss 1–100 Zeichen haben.');
+    if (kind !== 'text' && kind !== 'voice') throw new ValidationError('Ungültige Art.');
+    if (memberIds !== undefined && (!Array.isArray(memberIds) || memberIds.length > 25)) throw new ValidationError('Höchstens 25 Personen.');
+    const ids = [...new Set((memberIds || []).map((id) => snowflake(id, 'memberIds')))];
+    return {
+      guildId: snowflake(guildId, 'guildId'),
+      name: name.trim(),
+      kind,
+      parentId: parentId == null || parentId === '' ? null : snowflake(parentId, 'parentId'),
+      isPrivate: isPrivate === true,
+      memberIds: isPrivate === true ? ids : [],
+    };
+  },
   channelMove(p) {
     const { channelId, direction } = obj(p);
     if (direction !== 'up' && direction !== 'down') throw new ValidationError('Ungültige Richtung.');
