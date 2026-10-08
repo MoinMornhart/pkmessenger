@@ -1249,6 +1249,17 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     };
   }
 
+  /** Darf diese Person auf dem Server verwalten? (Administrator oder „Server verwalten“) – für „modus …“ im Chat */
+  async function isServerAdmin({ guildId, userId }) {
+    const guild = requireGuild(guildId);
+    if (guild.ownerId === userId) return true;
+    const m = await Promise.resolve()
+      .then(() => guild.members.cache.get(userId) || guild.members.fetch(userId))
+      .catch(() => null);
+    const p = m?.permissions;
+    return Boolean(p?.has?.(PermissionFlagsBits.Administrator) || p?.has?.(PermissionFlagsBits.ManageGuild));
+  }
+
   async function getMemberInfo({ guildId, userId }) {
     const guild = requireGuild(guildId);
     const m = await requireMember(guild, userId);
@@ -1522,6 +1533,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     createChannel,
     moveChannel,
     getMemberInfo,
+    isServerAdmin,
     setMemberRole,
     timeoutMember,
     kickMember,

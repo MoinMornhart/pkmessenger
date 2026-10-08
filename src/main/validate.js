@@ -266,7 +266,7 @@ const validators = {
     return { provider, baseUrl: aiBaseUrl(baseUrl) };
   },
   aiResponder(p) {
-    const { enabled, channelIds, dms, allowUsers, blockUsers, instructions, context, notify, web = false, quietWhenOpen = true, memory = false, memoryBudget = 3000, memoryAuto = true } = obj(p);
+    const { enabled, channelIds, dms, allowUsers, blockUsers, instructions, context, notify, web = false, quietWhenOpen = true, memory = false, memoryBudget = 3000, memoryAuto = true, modes = [], activeModes = {}, modeUsers = [], replyLimit = 30 } = obj(p);
     if (typeof web !== 'boolean' || typeof quietWhenOpen !== 'boolean' || typeof memory !== 'boolean' || typeof memoryAuto !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
     if (![1000, 3000, 8000, 16000].includes(memoryBudget)) throw new ValidationError('Ungültige Gedächtnisgröße.');
     for (const [k, v] of Object.entries({ enabled, dms, context, notify })) if (typeof v !== 'boolean') throw new ValidationError(`Ungültiges Feld "${k}".`);
@@ -283,6 +283,24 @@ const validators = {
         .filter((u) => !seen.has(u.id) && seen.add(u.id));
     };
     if (typeof instructions !== 'string' || instructions.length > 1500) throw new ValidationError('Die Anweisungen dürfen höchstens 1500 Zeichen haben.');
+    // KI-Modi: Name (für „modus Name“ im Chat), eigene Anweisungen, optional eigenes Modell
+    if (!Array.isArray(modes) || modes.length > 20) throw new ValidationError('Höchstens 20 Modi.');
+    const names = new Set();
+    const cleanModes = modes.map((x) => {
+      const { id, name, instructions: ins = '', model = '' } = obj(x);
+      if (typeof id !== 'string' || !/^[a-z0-9-]{4,40}$/i.test(id)) throw new ValidationError('Ungültige Modus-ID.');
+      if (typeof name !== 'string' || !/^[\p{L}\p{N} _-]{1,32}$/u.test(name.trim())) throw new ValidationError('Modus-Name: 1–32 Buchstaben, Zahlen, Leerzeichen, - oder _.');
+      const key = name.trim().toLowerCase();
+      if (names.has(key) || ['standard', 'normal', 'aus', 'default', 'reset'].includes(key)) throw new ValidationError(`Den Modus-Namen „${name.trim()}“ gibt es schon oder er ist reserviert.`);
+      names.add(key);
+      if (typeof ins !== 'string' || ins.length > 1500) throw new ValidationError('Modus-Anweisungen: höchstens 1500 Zeichen.');
+      if (typeof model !== 'string' || model.length > 100 || /[\s<>]/.test(model.trim())) throw new ValidationError('Ungültiger Modellname.');
+      return { id, name: name.trim(), instructions: ins.trim(), model: model.trim() };
+    });
+    if (!activeModes || typeof activeModes !== 'object' || Array.isArray(activeModes)) throw new ValidationError('Ungültige aktive Modi.');
+    const ids = new Set(cleanModes.map((x) => x.id));
+    const cleanActive = Object.fromEntries(Object.entries(activeModes).filter(([k, v]) => isSnowflake(k) && ids.has(v)).slice(0, 500));
+    if (!Number.isInteger(replyLimit) || replyLimit < 0 || replyLimit > 500) throw new ValidationError('Antworten pro Stunde: 0 (unbegrenzt) bis 500.');
     return {
       enabled,
       channelIds: [...new Set(channelIds.map((c) => snowflake(c, 'channelIds')))],
@@ -297,6 +315,10 @@ const validators = {
       memory,
       memoryBudget,
       memoryAuto,
+      modes: cleanModes,
+      activeModes: cleanActive,
+      modeUsers: people(modeUsers, 'modeUsers'),
+      replyLimit,
     };
   },
   aiLimits(p) {
