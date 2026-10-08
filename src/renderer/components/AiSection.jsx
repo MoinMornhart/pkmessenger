@@ -315,6 +315,59 @@ function PeoplePicker({ label, people, onChange, guilds }) {
 }
 
 // Antwort-Agent: antwortet als Bot, wenn er in zugewiesenen Kanälen erwähnt (oder privat angeschrieben) wird
+// KI-Modi (Wunsch MoinMornhart 08.10.2026): mehrere unabhängige Persönlichkeiten/Modelle; Admins wechseln im Chat
+// mit „modus Name“. Hier nur anlegen/bearbeiten – welcher gerade wo aktiv ist, steht darunter.
+function ModesEditor({ r, set, guilds }) {
+  const modes = r.modes || [];
+  const update = (id, patch) => set({ modes: modes.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
+  const add = () => set({ modes: [...modes, { id: crypto.randomUUID(), name: `Modus ${modes.length + 1}`, instructions: '', model: '' }] });
+  const remove = (id) => {
+    const active = Object.fromEntries(Object.entries(r.activeModes || {}).filter(([, v]) => v !== id));
+    set({ modes: modes.filter((x) => x.id !== id), activeModes: active });
+  };
+  const guildName = (gid) => guilds.find((g) => g.id === gid)?.name || 'Privatchat';
+  const activeList = Object.entries(r.activeModes || {}).map(([scope, id]) => [scope, modes.find((x) => x.id === id)]).filter(([, x]) => x);
+  return (
+    <div className="ai-modes" data-setting="ai-modes">
+      <span className="settings__label">🎭 Modi</span>
+      <p className="muted small">
+        Mehrere unabhängige Persönlichkeiten für den Bot, jede mit eigenen Anweisungen und auf Wunsch eigenem Modell. Eine Admin schreibt im Chat <b>„modus Name“</b> – der Bot wechselt sofort. „modus“ allein zeigt die Liste, „modus standard“ schaltet zurück.
+      </p>
+      {modes.map((x) => (
+        <div key={x.id} className="ai-mode">
+          <div className="settings__row">
+            <input aria-label="Name des Modus" value={x.name} maxLength={32} onChange={(e) => update(x.id, { name: e.target.value })} placeholder="Name, z. B. Rainer" />
+            <input aria-label="Eigenes Modell (optional)" value={x.model} maxLength={100} onChange={(e) => update(x.id, { model: e.target.value })} placeholder="Modell (leer = wie oben)" />
+            <button className="btn btn--ghost btn--small" onClick={() => remove(x.id)} aria-label={`Modus ${x.name} löschen`}>
+              🗑
+            </button>
+          </div>
+          <textarea className="profile__desc" rows={2} maxLength={1500} value={x.instructions} onChange={(e) => update(x.id, { instructions: e.target.value })} placeholder="So ist der Bot in diesem Modus …" />
+        </div>
+      ))}
+      {modes.length < 20 && (
+        <button className="btn btn--ghost btn--small" onClick={add}>
+          ＋ Modus hinzufügen
+        </button>
+      )}
+      {modes.length > 0 && (
+        <>
+          <PeoplePicker label="Außer Server-Admins dürfen auch diese Personen den Modus wechseln" people={r.modeUsers || []} onChange={(modeUsers) => set({ modeUsers })} guilds={guilds} />
+          <p className="muted small">🔒 Wechseln dürfen nur Server-Admins (Recht „Server verwalten“) und die Personen oben – im Privatchat nur die Personen oben. Andere bekommen eine kurze Absage.</p>
+          {activeList.length > 0 && (
+            <p className="small">
+              Gerade aktiv: {activeList.map(([scope, x]) => `${guildName(scope)} → „${x.name}“`).join(' · ')}{' '}
+              <button className="link-btn" onClick={() => set({ activeModes: {} })}>
+                alle auf Standard
+              </button>
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function ResponderSection({ cfg, targets, guilds, toast }) {
   const [r, setR] = useState(cfg.responder);
   const [busy, setBusy] = useState(false);
@@ -391,6 +444,7 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
             onChange={(e) => set({ instructions: e.target.value })}
             placeholder="z. B. Du bist Claw, locker und hilfsbereit. Du kennst die Server-Regeln: …"
           />
+          <ModesEditor r={r} set={set} guilds={guilds} />
           <label className="composer__ping">
             <input type="checkbox" checked={r.context} onChange={(e) => set({ context: e.target.checked })} /> Letzte 20 Nachrichten als Kontext mitschicken
           </label>
@@ -425,7 +479,20 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
           <label className="composer__ping">
             <input type="checkbox" checked={r.notify} onChange={(e) => set({ notify: e.target.checked })} /> Hinweis in der App, wenn der Bot geantwortet hat
           </label>
-          <p className="muted small">🛑 Schutz: antwortet nie anderen Bots, höchstens alle 15 Sek. pro Kanal und 30× pro Stunde, pingt niemanden.</p>
+          <div className="settings__row ai-limits">
+            <label>
+              Antworten pro Stunde
+              <select value={r.replyLimit ?? 30} onChange={(e) => set({ replyLimit: Number(e.target.value) })}>
+                {[10, 30, 60, 120, 300].map((n) => (
+                  <option key={n} value={n}>
+                    höchstens {n}
+                  </option>
+                ))}
+                <option value={0}>unbegrenzt</option>
+              </select>
+            </label>
+          </div>
+          <p className="muted small">🛑 Schutz: antwortet nie anderen Bots, höchstens alle 15 Sek. pro Kanal{(r.replyLimit ?? 30) > 0 ? ` und ${r.replyLimit ?? 30}× pro Stunde` : ''}, pingt niemanden.</p>
         </>
       )}
       {dirty && (

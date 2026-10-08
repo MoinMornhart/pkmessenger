@@ -4633,3 +4633,24 @@ kbd {
   padding-left: 20px;
   line-height: 1.6;
 }
+
+/* ---------- KI-Modi ---------- */
+.ai-modes {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.ai-mode {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.ai-mode input {
+  flex: 1;
+  min-width: 0;
+}

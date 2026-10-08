@@ -888,6 +888,15 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   console.log(`[personen] beim Reinklicken: ${onFocus} Vorschläge · mit „n“: ${withN}`);
   await js(win, `(() => { ${SET} setVal(${blockInput}, ''); ${blockInput}.blur(); })()`);
   await wait(300);
+  // KI-Modi (Wunsch MoinMornhart 08.10.2026): Modus anlegen
+  await clickText('.ai-modes .btn', 'Modus hinzufügen');
+  await wait(200);
+  await js(win, `(() => { ${SET} setVal(document.querySelector('.ai-mode input[aria-label="Name des Modus"]'), 'Rainer'); setVal(document.querySelector('.ai-mode textarea'), 'Kurz, trocken, mit Humor.'); })()`);
+  await wait(200);
+  await js(win, `document.querySelector('.ai-modes')?.scrollIntoView({block:'center'})`);
+  await wait(300);
+  await shoot(win, dir, '84-ki-modi');
+  console.log(`[ki-modi] ${await js(win, `JSON.stringify({ modi: document.querySelectorAll('.ai-mode').length, name: document.querySelector('.ai-mode input')?.value, wechsler: Boolean([...document.querySelectorAll('.ai-people')].find(p=>p.textContent.includes('Modus wechseln'))), limit: document.querySelector('.ai-responder .ai-limits select')?.value })`)}`);
   // Gedächtnis pro Person einschalten (Issue #1)
   await js(win, `document.querySelector('[data-setting="ai-memory"] input')?.click()`);
   await wait(200);
