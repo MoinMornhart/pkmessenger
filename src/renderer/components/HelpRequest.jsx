@@ -102,7 +102,7 @@ export function HelpController({ toast }) {
     });
     api.helpStatus().then((s) => s?.running && (setActive(true), startHelpBridge())).catch(() => {});
     const onKey = (e) => {
-      if (e.ctrlKey && e.key.toLowerCase() === 'c' && active) api.helpStop().catch(() => {});
+      if (e.ctrlKey && (e.key || '').toLowerCase() === 'c' && active) api.helpStop().catch(() => {});
     };
     window.addEventListener('keydown', onKey);
     return () => {
