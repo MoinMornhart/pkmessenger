@@ -108,9 +108,6 @@ export default function RemoteSection({ toast }) {
               <button className="btn btn--ghost btn--small" onClick={() => api.copyText({ text: pair.url }).then(() => toast({ kind: 'info', title: 'Link kopiert', duration: 1500 }))}>
                 📋 Link kopieren
               </button>
-              <button className="btn btn--ghost btn--small" title="Nur falls das Handy den PC-Namen nicht findet (ältere Android-Geräte)" onClick={() => api.copyText({ text: pair.fallbackUrl }).then(() => toast({ kind: 'info', title: 'Ersatz-Link kopiert', text: 'Enthält die WLAN-Adresse des PCs.', duration: 2500 }))}>
-                Klappt nicht? Ersatz-Link
-              </button>
               <button
                 className="btn btn--ghost btn--small"
                 onClick={() => {

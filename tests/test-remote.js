@@ -9,7 +9,7 @@ const nacl = require('tweetnacl');
 const { createRemote, seal, unseal, isPrivateIp } = require('../src/main/remote');
 const { validators } = require('../src/main/validate');
 
-function setup({ approve = true, requireApproval = false, hostName = null } = {}) {
+function setup({ approve = true, requireApproval = false, hostName = '127.0.0.1' } = {}) {
   const data = { remote: { port: 0, requireApproval } };
   const store = { get: () => ({ ...data }), set: (k, v) => (data[k] = v) };
   let vaultRaw = null;
@@ -184,14 +184,19 @@ test('Verschlüsselung: falscher Schlüssel oder veränderte Daten → nicht les
   assert.equal(unseal(broken, k1), null);
 });
 
-test('Issue #53: Link enthält den PC-Namen statt der IP-Adresse; IP nur im Ersatz-Link', async () => {
+test('Issue #53/#50: Link enthält nur den PC-Namen, nie eine IP; ohne PC-Namen kein Link', async () => {
   const ctx = setup({ hostName: 'morni.local' });
   ctx.remote.setPassword({ password: 'geheim12345' });
   await ctx.remote.setEnabled({ on: true });
   const r = ctx.remote.createPairing();
   assert.equal(new URL(r.url).hostname, 'morni.local');
   assert.doesNotMatch(r.url.split('#')[0], /\d+\.\d+\.\d+\.\d+/);
-  assert.equal(new URL(r.fallbackUrl).hostname, '127.0.0.1');
+  assert.equal('fallbackUrl' in r, false);
   assert.equal(ctx.remote.status().host, 'morni.local');
   await ctx.remote.stop();
+  const none = setup({ hostName: null });
+  none.remote.setPassword({ password: 'geheim12345' });
+  await none.remote.setEnabled({ on: true });
+  assert.throws(() => none.remote.createPairing(), /Name dieses PCs/);
+  await none.remote.stop();
 });
