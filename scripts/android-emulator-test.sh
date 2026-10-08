@@ -12,12 +12,13 @@ adb logcat -c
 adb shell am start -n "$PKG/.MainActivity"
 shot() { adb exec-out screencap -p > "$OUT/$1.png"; echo "Bild: $1"; }
 
-sleep 8;  shot 01-chatliste
+# Takt passend zu src/mobile/dev-autoplay.js (App-Start im Emulator dauert ein paar Sekunden)
+sleep 11; shot 01-chatliste
 sleep 9;  shot 02-chat
-sleep 8;  shot 03-gesendet
-sleep 8;  shot 04-menue
-sleep 6;  shot 05-einstellungen
-sleep 2
+sleep 7;  shot 03-gesendet
+sleep 6;  shot 04-menue
+sleep 9;  shot 05-einstellungen
+sleep 3
 
 adb logcat -d > "$OUT/logcat.txt" || true
 grep -a "pk-autoplay" "$OUT/logcat.txt" | tee "$OUT/autoplay.txt" || true

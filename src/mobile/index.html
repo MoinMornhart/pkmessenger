@@ -2,10 +2,11 @@
 <html lang="de" data-platform="android">
   <head>
     <meta charset="utf-8" />
-    <!-- Wie am PC streng: nur eigene Skripte; Verbindungen nur zu Discord (Bot-API/Gateway) und GitHub (Updates, Sperrlisten) -->
+    <!-- Wie am PC streng: nur eigene Skripte; Verbindungen nur zu Discord (Bot-API/Gateway) und GitHub (Updates, Sperrlisten).
+         'self' = Capacitors nativer HTTP-Weg (https://localhost/_capacitor_http_interceptor_), über den fetch auf Android läuft -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.discordapp.com https://*.discordapp.net; media-src https://cdn.discordapp.com https://*.discordapp.net; font-src 'self'; connect-src https://discord.com wss://gateway.discord.gg wss://*.discord.gg https://api.github.com https://github.com https://objects.githubusercontent.com https://release-assets.githubusercontent.com https://raw.githubusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.discordapp.com https://*.discordapp.net; media-src https://cdn.discordapp.com https://*.discordapp.net; font-src 'self'; connect-src 'self' https://discord.com wss://gateway.discord.gg wss://*.discord.gg https://api.github.com https://github.com https://objects.githubusercontent.com https://release-assets.githubusercontent.com https://raw.githubusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="color-scheme" content="dark light" />
