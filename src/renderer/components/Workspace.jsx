@@ -306,6 +306,8 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
         messageStore.upsertConfirmed(p);
       } else if (type === 'message:delete') {
         messageStore.remove(p);
+      } else if (type === 'user:renamed') {
+        messageStore.renameUser(p); // neuer Name überall: Nachrichten, Erwähnungen, Systemnachrichten (#53)
       } else if (type === 'typing') {
         setTyping((t) => ({ ...t, [p.channelId]: { ...(t[p.channelId] || {}), [p.userId]: { name: p.name, until: Date.now() + TYPING_MS } } }));
       } else if (type === 'channels:changed' && p.guildId) {
@@ -613,6 +615,15 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
             const items = [
               { icon: '✓', label: 'Als gelesen markieren', onClick: () => lastIds[c.id] && markRead(c.id, lastIds[c.id]) },
               { icon: '🖼', label: 'Hintergrund …', onClick: () => setWallFor({ channelId: c.id, guildId: c.guildId, chatName: c.name, guildName: guild?.name }) },
+              {
+                icon: '🔔',
+                label: 'Benachrichtigungen …',
+                onClick: () => {
+                  // Chat öffnen und dort das Schnellfenster zeigen
+                  selectChat(c.id);
+                  setTimeout(() => window.dispatchEvent(new CustomEvent('pk:chat-notify', { detail: { channelId: c.id } })), 120);
+                },
+              },
               { icon: '🔗', label: 'Link kopieren', onClick: () => run(api.copyText({ text: `https://discord.com/channels/${guildPart}/${c.id}` }), 'Link kopiert') },
               c.canManage && { separator: true },
               c.canManage && { icon: '✏️', label: 'Umbenennen …', onClick: () => setRenameFor(c) },

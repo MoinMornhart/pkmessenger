@@ -65,4 +65,36 @@ function decideSound(event, settings, { lastPlayedAt = 0, now = Date.now() } = {
   return { event, preset: rule.preset };
 }
 
-module.exports = { PRESETS, EVENTS, COOLDOWN_MS, DEFAULT_SOUND, sanitizeSound, classifyMessage, decideSound };
+// ---------- Benachrichtigungen pro Chat oder Server (JoniMoni #61: „welche Kanäle man ignorieren soll“) ----------
+// mode: 'alle' (wie eingestellt) | 'erwaehnungen' (nur Erwähnungen + Privatchats) | 'aus' (stumm); preset: eigener Ton
+const CHAT_MODES = ['alle', 'erwaehnungen', 'aus'];
+const CHAT_KEY = /^(\d{17,20}|@dm)$/;
+
+function sanitizeChatNotify(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [k, v] of Object.entries(raw).slice(0, 500)) {
+    if (!CHAT_KEY.test(k) || !v || typeof v !== 'object') continue;
+    const mode = CHAT_MODES.includes(v.mode) ? v.mode : 'alle';
+    const preset = PRESETS.includes(v.preset) && v.preset !== 'aus' ? v.preset : null;
+    if (mode === 'alle' && !preset) continue; // Standard → nicht speichern
+    out[k] = { mode, preset };
+  }
+  return out;
+}
+
+/** Regel für einen Chat: zuerst der Chat selbst, dann sein Server, sonst Standard. */
+function resolveChatNotify(map, { channelId, guildId } = {}) {
+  const m = sanitizeChatNotify(map);
+  return m[channelId] || m[guildId || '@dm'] || { mode: 'alle', preset: null };
+}
+
+/** Ereignis + Regel → Ereignis (oder null = stumm) und ggf. eigener Ton. */
+function applyChatNotify(event, rule) {
+  if (!event || !rule) return { event, preset: null };
+  if (rule.mode === 'aus') return { event: null, preset: null };
+  if (rule.mode === 'erwaehnungen' && event !== 'mention' && event !== 'dm') return { event: null, preset: null };
+  return { event, preset: rule.preset || null };
+}
+
+module.exports = { PRESETS, EVENTS, COOLDOWN_MS, DEFAULT_SOUND, CHAT_MODES, sanitizeSound, classifyMessage, decideSound, sanitizeChatNotify, resolveChatNotify, applyChatNotify };

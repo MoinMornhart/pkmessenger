@@ -236,8 +236,17 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     // F15: Slash-Befehle – Antwort innerhalb von 3 Sekunden (Discord-Vorgabe)
     c.on(Events.InteractionCreate, (i) => handleInteraction(i, c));
     // Rechte des Bots können sich ändern (neue Rolle, Rolle gelöscht) → Kanalliste neu berechnen (Issue #1).
-    c.on(Events.GuildMemberUpdate, (_old, member) => {
+    c.on(Events.GuildMemberUpdate, (old, member) => {
       if (member?.id && member.id === c.user?.id) emit('channels:changed', { guildId: member.guild?.id ?? null });
+      // Spitzname geändert → überall in der Oberfläche mitziehen (JoniMoni #53)
+      const before = old?.displayName;
+      if (member?.id && before && member.displayName && before !== member.displayName) emit('user:renamed', { userId: member.id, guildId: member.guild?.id ?? null, oldName: before, name: member.displayName });
+    });
+    // Name einer Person geändert (Discord meldet das, sobald es die Person neu überträgt) → live überall ersetzen
+    c.on(Events.UserUpdate, (old, user) => {
+      const before = old ? old.globalName || old.username : null;
+      const now = user ? user.globalName || user.username : null;
+      if (user?.id && before && now && before !== now) emit('user:renamed', { userId: user.id, guildId: null, oldName: before, name: now });
     });
     c.on(Events.GuildRoleCreate, (role) => emit('channels:changed', { guildId: role?.guild?.id ?? null }));
     c.on(Events.GuildRoleDelete, (role) => emit('channels:changed', { guildId: role?.guild?.id ?? null }));
@@ -440,7 +449,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       })),
       embedsCount: Array.isArray(msg?.embeds) ? msg.embeds.length : 0,
       mentions: {
-        users: valuesOf(msg?.mentions?.users).map((u) => ({ id: u.id, name: displayNameOf(u, guild?.members?.cache?.get?.(u.id)) })),
+        users: mentionedUsers(msg, guild),
         roles: valuesOf(msg?.mentions?.roles).map((r) => ({ id: r.id, name: r.name ?? 'Rolle', color: hexOrNull(r.hexColor) })),
         channels: valuesOf(msg?.mentions?.channels).map((ch) => ({ id: ch.id, name: ch.name ?? 'kanal' })),
         everyone: Boolean(msg?.mentions?.everyone),
@@ -456,6 +465,32 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       canEdit: Boolean(author?.id) && author.id === client?.user?.id,
       canDelete: (Boolean(author?.id) && author.id === client?.user?.id) || (msg?.channel ? can(msg.channel, PermissionFlagsBits.ManageMessages) : false),
     };
+  }
+
+  /**
+   * Erwähnte Personen mit ihrem AKTUELLEN Namen. Discord liefert in Privatchats nur Teilnehmer mit – wer sonst
+   * mit <@id> im Text steht, wird über alle bekannten Personen aufgelöst (JoniMoni #56: sonst „@Unbekannt“).
+   */
+  function mentionedUsers(msg, guild) {
+    const out = valuesOf(msg?.mentions?.users).map((u) => ({ id: u.id, name: displayNameOf(u, guild?.members?.cache?.get?.(u.id)) }));
+    const seen = new Set(out.map((u) => u.id));
+    const text = typeof msg?.content === 'string' ? msg.content : '';
+    for (const m of text.matchAll(/<@!?(\d{17,20})>/g)) {
+      const id = m[1];
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const name = knownName(id, guild);
+      if (name) out.push({ id, name });
+    }
+    return out;
+  }
+
+  /** Aktueller Name einer Person: Server-Spitzname → irgendein gemeinsamer Server → Nutzer-Cache. */
+  function knownName(id, guild) {
+    if (!client) return null;
+    const member = guild?.members?.cache?.get?.(id) || [...client.guilds.cache.values()].map((g) => g.members?.cache?.get?.(id)).find(Boolean);
+    const user = member?.user || client.users?.cache?.get?.(id);
+    return member || user ? displayNameOf(user, member) : null;
   }
 
   // Umfragen: Frage, Antworten mit Stimmen, Ende, ob ausgezählt
@@ -1370,6 +1405,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   async function updateProfile({ username, avatar, description, guildId, nick }) {
     const c = requireReady();
     const changed = [];
+    const oldName = c.user.globalName || c.user.username;
+    const oldNick = guildId ? c.guilds.cache.get(guildId)?.members?.me?.displayName : null;
     try {
       if (username !== undefined || avatar !== undefined) {
         const body = {};
@@ -1397,6 +1434,11 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       throw err;
     }
     if (changed.some((k) => k === 'username' || k === 'avatar')) setStatus({ ...status, bot: botInfo() });
+    // Neuer Name des Bots sofort in allen offenen Chats (auch in Erwähnungen) – nicht erst nach Neuladen
+    const newName = c.user.globalName || c.user.username;
+    if (changed.includes('username') && oldName !== newName) emit('user:renamed', { userId: c.user.id, guildId: null, oldName, name: newName });
+    const newNick = guildId ? c.guilds.cache.get(guildId)?.members?.me?.displayName : null;
+    if (changed.includes('nick') && oldNick && newNick && oldNick !== newNick) emit('user:renamed', { userId: c.user.id, guildId, oldName: oldNick, name: newNick });
     return { changed, profile: await getProfile({ guildId }) };
   }
 

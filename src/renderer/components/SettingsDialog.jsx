@@ -668,7 +668,7 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
     if (!focus) return undefined;
     setOnly(null);
     const t = setTimeout(() => {
-      const el = document.querySelector(`.settings [data-setting="${focus}"]`);
+      const el = document.querySelector(`.settings [data-setting="${focus}"], .settings section[data-section="${focus}"]`);
       if (!el) return;
       el.scrollIntoView({ block: 'center', behavior: 'smooth' });
       el.classList.add('is-focus');
@@ -737,7 +737,7 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
           </button>
           {visible.length === 0 && <p className="muted small">Nichts gefunden.</p>}
           {visible.map((x) => (
-            <button key={x.id} data-nav={x.id} className={`settings__navitem ${(only ? only === x.id : !query.trim() && active === x.id) ? 'is-on' : ''}`} onClick={() => jump(x.id)} title={x.desc}>
+            <button key={x.id} data-nav={x.id} className={`settings__navitem ${only === x.id ? 'is-on' : !only && !query.trim() && active === x.id ? 'is-here' : ''}`} aria-current={only === x.id ? 'true' : undefined} onClick={() => jump(x.id)} title={x.desc}>
               <span>{x.icon}</span> {x.title}
               {x.id === 'beta' && <span className="settings__beta">experimentell</span>}
             </button>

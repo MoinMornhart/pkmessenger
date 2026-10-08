@@ -1,4 +1,5 @@
 import { pc } from '../platform';
+import ChatNotifyPanel from './ChatNotifyPanel.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { messageStore, randomNonce, useChannelMessages, MessageActionsContext } from '../state';
@@ -66,6 +67,14 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
   const [editing, setEditing] = useState(null); // F9
   const [confirmDelete, setConfirmDelete] = useState(null); // F9
   const [ctxMenu, setCtxMenu] = useState(null); // Rechtsklick-Menü { x, y, items }
+  const [notifyOpen, setNotifyOpen] = useState(false); // Schnellfenster Benachrichtigungen (#61)
+  const [notifyRule, setNotifyRule] = useState(() => prefs.get().chatNotify || {});
+  useEffect(() => prefs.subscribe((p) => setNotifyRule(p.chatNotify || {})), []);
+  useEffect(() => {
+    const onOpen = (e) => e.detail?.channelId === channel?.id && setNotifyOpen(true);
+    window.addEventListener('pk:chat-notify', onOpen);
+    return () => window.removeEventListener('pk:chat-notify', onOpen);
+  }, [channel?.id]);
   const [walls, setWalls] = useState(() => prefs.get().wallpapers);
   useEffect(() => prefs.subscribe((p) => setWalls(p.wallpapers)), []);
   const [modTarget, setModTarget] = useState(null); // Person verwalten { guildId, userId }
@@ -273,10 +282,20 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
           <button className={`icon-btn icon-btn--lg ${panel === 'pins' ? 'is-on' : ''}`} onClick={() => setPanel((p) => (p === 'pins' ? null : 'pins'))} title="Angeheftete Nachrichten" aria-label="Angeheftete Nachrichten">
             📌
           </button>
+          {(() => {
+            const r = notifyRule[channel.id] || notifyRule[channel.type === 'dm' ? '@dm' : channel.guildId || guild?.id];
+            const icon = r?.mode === 'aus' ? '🔕' : r?.mode === 'erwaehnungen' ? '＠' : '🔔';
+            return (
+              <button className={`icon-btn icon-btn--lg ${notifyOpen ? 'is-on' : ''}`} data-notify-toggle onClick={() => setNotifyOpen((v) => !v)} title="Benachrichtigungen für diesen Chat" aria-label="Benachrichtigungen für diesen Chat">
+                {icon}
+              </button>
+            );
+          })()}
           <button className="icon-btn icon-btn--lg" onClick={onOpenSearch} title={pc('Suchen (Strg+F)', 'Suchen')} aria-label="Suchen">
             ⌕
           </button>
         </div>
+        {notifyOpen && <ChatNotifyPanel channel={channel} guild={guild} onClose={() => setNotifyOpen(false)} />}
       </header>
       <MessageActionsContext.Provider value={actions}>
       <div className="chat__main">

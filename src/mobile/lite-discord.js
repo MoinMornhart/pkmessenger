@@ -33,6 +33,7 @@ const Events = {
   GuildRoleUpdate: 'roleUpdate',
   GuildRoleDelete: 'roleDelete',
   GuildMemberUpdate: 'guildMemberUpdate',
+  UserUpdate: 'userUpdate',
   MessageReactionAdd: 'messageReactionAdd',
   MessageReactionRemove: 'messageReactionRemove',
   MessageReactionRemoveAll: 'messageReactionRemoveAll',
@@ -206,7 +207,9 @@ function createClient({ intents = [], fetchImpl = globalThis.fetch?.bind(globalT
       };
       users.set(d.id, u);
     }
-    Object.assign(u, { username: d.username ?? u.username, globalName: d.global_name ?? u.globalName ?? null, bot: Boolean(d.bot ?? u.bot), avatar: d.avatar ?? u.avatar ?? null });
+    const before = u.username ? { id: u.id, username: u.username, globalName: u.globalName } : null;
+    Object.assign(u, { username: d.username ?? u.username, globalName: d.global_name !== undefined ? d.global_name : (u.globalName ?? null), bot: Boolean(d.bot ?? u.bot), avatar: d.avatar ?? u.avatar ?? null });
+    if (before && (before.username !== u.username || before.globalName !== u.globalName)) client.emit(Events.UserUpdate, before, u);
     if (d.accent_color != null) u.hexAccentColor = hex(d.accent_color);
     return u;
   }
@@ -720,7 +723,8 @@ function createClient({ intents = [], fetchImpl = globalThis.fetch?.bind(globalT
       }
       case 'GUILD_MEMBER_UPDATE': {
         const g = guilds.get(d.guild_id);
-        if (g) client.emit(Events.GuildMemberUpdate, null, upsertMember(g, d));
+        const before = g?.members.cache.get(d.user?.id)?.displayName;
+        if (g) client.emit(Events.GuildMemberUpdate, before ? { displayName: before } : null, upsertMember(g, d));
         break;
       }
       case 'MESSAGE_CREATE': {

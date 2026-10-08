@@ -110,11 +110,40 @@ function createMessageStore(api) {
     set(channelId, { messages: s.messages.filter((m) => !(isLocal(m) && m.nonce === nonce)) });
   }
 
+  /**
+   * Jemand heißt jetzt anders (JoniMoni #53): Autor-Namen und Erwähnungen in allen geladenen Chats ersetzen.
+   * Nur wo bisher der alte Name stand (ein Spitzname auf einem anderen Server bleibt unberührt); guildId grenzt
+   * Spitznamen auf ihren Server ein.
+   */
+  function renameUser({ userId, name, oldName, guildId = null } = {}) {
+    if (!userId || !name) return 0;
+    let changedChannels = 0;
+    for (const [id, s] of channels) {
+      let hit = false;
+      const fix = (n) => !oldName || n === oldName;
+      const messages = s.messages.map((m) => {
+        if (guildId && m.guildId && m.guildId !== guildId) return m;
+        let next = m;
+        if (m.author?.id === userId && m.author.name !== name && fix(m.author.name)) next = { ...next, author: { ...m.author, name } };
+        const users = m.mentions?.users;
+        if (users?.some((u) => u.id === userId && u.name !== name && fix(u.name))) next = { ...next, mentions: { ...m.mentions, users: users.map((u) => (u.id === userId && fix(u.name) ? { ...u, name } : u)) } };
+        if (m.reference?.authorName && oldName && m.reference.authorName === oldName && m.author) next = { ...next, reference: { ...next.reference, authorName: name } };
+        if (next !== m) hit = true;
+        return next;
+      });
+      if (hit) {
+        set(id, { messages });
+        changedChannels++;
+      }
+    }
+    return changedChannels;
+  }
+
   function invalidate(channelId) {
     channels.delete(channelId);
   }
 
-  return { get, subscribe, loadInitial, loadOlder, upsertConfirmed, remove, addPending, markFailed, discardLocal, invalidate };
+  return { get, subscribe, loadInitial, loadOlder, upsertConfirmed, remove, addPending, markFailed, discardLocal, invalidate, renameUser };
 }
 
 module.exports = { createMessageStore, EMPTY };

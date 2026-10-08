@@ -740,6 +740,45 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     console.log(`[gruppe] ${grp}`);
     await shoot(win, dir, '78-gruppe-erstellt');
   }
+  // JoniMoni #61/#62/#56: Schnellfenster Benachrichtigungen, Abschnitte einklappen, Einstellungs-Markierung, @ im Privatchat
+  {
+    await js(win, `[...document.querySelectorAll('.chatrow')].find(r=>r.textContent.includes('allgemein'))?.click()`);
+    await wait(600);
+    await js(win, `document.querySelector('[data-notify-toggle]')?.click()`);
+    await wait(400);
+    await shoot(win, dir, '79-benachrichtigungen');
+    await js(win, `[...document.querySelectorAll('.notify-pop__mode')].find(b=>b.textContent.includes('Stumm'))?.click()`);
+    await wait(300);
+    const notify = await js(win, `JSON.stringify({ fenster: Boolean(document.querySelector('.notify-pop')), stummInListe: [...document.querySelectorAll('.chatrow')].some(r=>r.textContent.includes('allgemein') && r.textContent.includes('🔕')), knopf: document.querySelector('[data-notify-toggle]')?.textContent.trim() })`);
+    await js(win, `document.querySelector('.notify-pop .link-btn')?.click()`); // Zurücksetzen
+    await js(win, `document.querySelector('[data-notify-toggle]')?.click()`);
+    await wait(200);
+    await js(win, `[...document.querySelectorAll('.chatlist__section-btn')].find(b=>b.textContent.includes('Sprachkanäle'))?.click()`);
+    await wait(300);
+    const zu = await js(win, `JSON.stringify({ eingeklappt: document.querySelector('.chatlist__section-btn')?.getAttribute('aria-expanded') === 'false', sprachZeilen: [...document.querySelectorAll('.chatrow')].filter(r=>r.textContent.includes('Sprache')).length })`);
+    await shoot(win, dir, '80-abschnitt-eingeklappt');
+    await js(win, `[...document.querySelectorAll('.chatlist__section-btn')].find(b=>b.textContent.includes('Sprachkanäle'))?.click()`);
+    await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+    await wait(500);
+    await js(win, `document.querySelector('.settings__body')?.scrollTo({ top: 1400 }); document.querySelector('.settings__body')?.dispatchEvent(new Event('scroll'))`);
+    await wait(300);
+    const nav = await js(win, `JSON.stringify({ voll: document.querySelectorAll('.settings__navitem.is-on').length, strich: document.querySelectorAll('.settings__navitem.is-here').length })`);
+    await shoot(win, dir, '81-einstellungen-markierung');
+    await js(win, `document.querySelector('.settings .icon-btn[aria-label="Schließen"]')?.click()`);
+    await wait(300);
+    await js(win, `document.querySelector('.rail__dm')?.click()`);
+    await wait(700);
+    await js(win, `[...document.querySelectorAll('.chatrow')].find(r=>r.textContent.includes('Anna'))?.click()`);
+    await wait(700);
+    await js(win, `(() => { const el=document.querySelector('.composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'@'); el.selectionStart=el.selectionEnd=1; el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    await wait(700);
+    const dmAt = await js(win, `JSON.stringify([...document.querySelectorAll('.suggest .suggest__item, .suggest li, .suggest button')].map(x=>x.textContent.trim().slice(0,30)))`);
+    await shoot(win, dir, '82-privatchat-erwaehnen');
+    await js(win, `(() => { const el=document.querySelector('.composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,''); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    console.log(`[issue61] Schnellfenster: ${notify} · Abschnitt: ${zu} · Einstellungen: ${nav} · @ im Privatchat: ${dmAt}`);
+    await js(win, `document.querySelector('.rail__item:not(.rail__dm):not(.rail__add)')?.click()`);
+    await wait(500);
+  }
   // KI-Agenten (Beta): einschalten, Anbieter + Modell + Schlüssel, Verbindung testen, Auftrag anlegen und sofort ausführen
   const SET = `const setVal=(el,v)=>{ const proto=el instanceof HTMLSelectElement?HTMLSelectElement:el instanceof HTMLTextAreaElement?HTMLTextAreaElement:HTMLInputElement; Object.getOwnPropertyDescriptor(proto.prototype,'value').set.call(el,v); el.dispatchEvent(new Event(el instanceof HTMLSelectElement?'change':'input',{bubbles:true})); };`;
   const clickText = (sel, text) => js(win, `[...document.querySelectorAll('${sel}')].find(b=>b.textContent.includes('${text}'))?.click()`);

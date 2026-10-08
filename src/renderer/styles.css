@@ -3848,6 +3848,11 @@ video.embed__image {
   background: var(--panel-2);
   color: var(--text);
 }
+/* „Alle anzeigen“: nur ein dezenter Strich zeigt, wo man beim Scrollen gerade ist (keine zweite volle Markierung) */
+.settings__navitem.is-here {
+  color: var(--text);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 70%, transparent);
+}
 .settings__navitem.is-on {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--text);
@@ -4485,4 +4490,109 @@ kbd {
 }
 .newgroup-btn {
   margin-top: 4px;
+}
+
+/* ---------- Schnellfenster: Benachrichtigungen pro Chat (JoniMoni #61) ---------- */
+.chat__head {
+  position: relative;
+}
+.notify-pop {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 12px;
+  width: min(320px, calc(100vw - 24px));
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 10px;
+  animation: drop 0.18s var(--ease);
+}
+.notify-pop__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.notify-pop__scope {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.notify-pop__scope button {
+  flex: 1;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.notify-pop__scope button.is-on {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+}
+.notify-pop__modes {
+  display: grid;
+  gap: 4px;
+}
+.notify-pop__mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.notify-pop__mode > span:first-child {
+  width: 24px;
+  text-align: center;
+  font-size: 16px;
+}
+.notify-pop__mode small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.notify-pop__mode:hover {
+  background: var(--panel-2);
+}
+.notify-pop__mode.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.notify-pop__sound {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.notify-pop__sound select {
+  flex: 1;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--text);
+  font: inherit;
+}
+.notify-pop__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.chatlist__section-btn {
+  padding-top: 16px;
 }
