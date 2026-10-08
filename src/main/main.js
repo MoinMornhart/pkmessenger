@@ -20,6 +20,7 @@ const { createHello } = require('./hello');
 const { createLogger, buildReport } = require('./logger');
 const { createBlocklist } = require('./blocklist');
 const { createRemote } = require('./remote');
+const { createHelp } = require('./help');
 const { validators: remoteValidators } = require('./validate');
 const os = require('node:os');
 const qrcode = require('qrcode-generator');
@@ -189,6 +190,29 @@ remote.createPairingWithQr = () => {
   return { ...p, qr: qr.createDataURL(6, 2) };
 };
 
+// Fernhilfe (Issue #79): Helfer schaut bei der Einrichtung zu – Chats bleiben verborgen, läuft nur auf Anforderung.
+let latestHelpView = { screen: 'setup' };
+const help = createHelp({
+  emit: broadcast,
+  getView: () => latestHelpView,
+  applyAction: (action) => mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents.send('pk:help-action', action),
+  logger,
+  lanAddresses: demo ? () => ['127.0.0.1'] : lanAddresses,
+  bindHost: demo ? '127.0.0.1' : '0.0.0.0',
+  hostName: demo ? 'localhost' : /^[a-z0-9-]{1,63}$/i.test(os.hostname()) ? `${os.hostname().toLowerCase()}.local` : null,
+  webDir: path.join(__dirname, '..', 'help-web'),
+  naclPath: require.resolve('tweetnacl/nacl-fast.min.js'),
+});
+/** „Hilfe anfordern“: Einmal-Code + QR-Code (als Bild) für die Oberfläche */
+help.requestWithQr = async () => {
+  const p = await help.request();
+  if (!p.url) return p;
+  const qr = qrcode(0, 'M');
+  qr.addData(p.url);
+  qr.make();
+  return { ...p, qr: qr.createDataURL(6, 2) };
+};
+
 // Windows Hello zum Entsperren (Issue #29) – Windows-eigene Prüfung, siehe hello.js
 const hello = demo ? { availability: async () => 'Available', verify: async () => true } : createHello();
 
@@ -345,7 +369,11 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
   const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help }, isTrustedSender);
+  // Der Renderer meldet laufend seine (ungeschwärzte) Sicht; geschwärzt wird erst im Hilfe-Manager.
+  ipcMain.on('pk:help-view', (event, view) => {
+    if (isTrustedSender(event) && view && typeof view === 'object') latestHelpView = view;
+  });
   // Automatische Sperre: PC eine Weile unbenutzt → App sperren
   setInterval(() => appLock.idleTick(powerMonitor.getSystemIdleTime()), 30000).unref?.();
   createWindow();
@@ -375,6 +403,7 @@ app.on('before-quit', (e) => {
     /* ignorieren */
   }
   remote.stop().catch(() => {});
+  try { help.stop(); } catch { /* egal */ }
   try {
     voice.leave(); // sauber auflegen
   } catch {

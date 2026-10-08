@@ -1104,6 +1104,22 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await wait(800);
   const test2 = await js(win, `JSON.stringify((window.__pkSoundLog||[]).slice(0,3).map(e=>e.event+':'+e.preset))`);
   console.log(`[toene] Einstellungen: ${test1} · nach Erwähnung: ${test2}`);
+  // Fernhilfe (Issue #79): Hilfe anfordern → Code + QR. In try/catch, damit es den Lauf nie abbricht.
+  try {
+    await js(win, `document.querySelector('.rail__item:not(.rail__dm):not(.rail__add)')?.click()`);
+    await wait(400);
+    await js(win, `window.dispatchEvent(new CustomEvent('pk:help-open'))`);
+    await wait(400);
+    await js(win, `[...document.querySelectorAll('.modal .btn--primary')].find((b) => b.textContent.includes('Hilfe anfordern'))?.click()`);
+    await wait(700);
+    const helpInfo = await js(win, `JSON.stringify({ code: document.querySelector('.login-code')?.textContent?.length || 0, qr: Boolean(document.querySelector('.invite__qr')), zusehen: Boolean([...document.querySelectorAll('.composer__ping')].find((l) => l.textContent.includes('mithelfen'))) })`);
+    await shoot(win, dir, '86-fernhilfe');
+    console.log(`[fernhilfe] ${helpInfo}`);
+    await js(win, `[...document.querySelectorAll('.modal .btn--danger')].find((b) => b.textContent.includes('beenden'))?.click()`);
+    await js(win, `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  } catch (e) {
+    console.log(`[fernhilfe] Fehler: ${e.message}`);
+  }
 }
 
 module.exports = { runScreenshots };

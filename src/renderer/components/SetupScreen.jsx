@@ -109,6 +109,11 @@ export default function SetupScreen({ status, onReconnect }) {
         )}
 
         <TokenQuickStart onDone={retry} />
+        <p className="setup-help">
+          <button className="link-btn" onClick={() => window.dispatchEvent(new CustomEvent('pk:help-open'))}>
+            🙋 Jemanden um Hilfe bitten (im selben WLAN)
+          </button>
+        </p>
 
         <details className="setup-more">
           <summary>Noch keinen Bot? Hier einen neuen anlegen (einmalig)</summary>

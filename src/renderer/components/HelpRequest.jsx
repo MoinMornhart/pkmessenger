@@ -1,0 +1,145 @@
+import { useEffect, useRef, useState } from 'react';
+import { api } from '../api';
+import { bus } from '../state';
+import { startHelpBridge, stopHelpBridge } from '../helpBridge';
+
+// Fernhilfe (Issue #79): Der Nutzer fordert Hilfe an. Ein Helfer sieht nur die Einrichtung (Chats verborgen),
+// kann optional mithelfen, und der Nutzer kann jederzeit beenden (Knopf oder Strg+C).
+
+/** Fenster „Hilfe anfordern“ (öffnet sich über Event pk:help-open oder Prop open). */
+export function HelpDialog({ onClose, toast }) {
+  const [info, setInfo] = useState(null); // { code, qr, url }
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  useEffect(() => {
+    api.helpStatus().then(setStatus).catch(() => {});
+    const off = bus.on((type, p) => type === 'help:status' && setStatus(p));
+    const onKey = (e) => e.key === 'Escape' && closeRef.current();
+    window.addEventListener('keydown', onKey);
+    return () => {
+      off();
+      window.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  const request = async () => {
+    setBusy(true);
+    try {
+      setInfo(await api.helpRequest());
+    } catch (e) {
+      toast?.({ kind: 'error', title: e.message, text: e.hint });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const stop = async () => {
+    await api.helpStop().catch(() => {});
+    setInfo(null);
+    onClose();
+  };
+
+  const connected = status?.connected;
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal invite" role="dialog" aria-label="Hilfe anfordern" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="settings__head">
+          <h3>🙋 Hilfe bei der Einrichtung anfordern</h3>
+          <button className="icon-btn" onClick={onClose} aria-label="Schließen">
+            ×
+          </button>
+        </div>
+        <p>Jemand, dem du vertraust, kann dir im selben WLAN beim Einrichten helfen. <b>Deine Chats und Nachrichten bleiben dabei verborgen.</b> Beenden kannst du jederzeit – auch mit <b>Strg+C</b>.</p>
+        {!info ? (
+          <p>
+            <button className="btn btn--primary" disabled={busy} onClick={request}>
+              {busy ? 'Starte …' : 'Hilfe anfordern'}
+            </button>
+          </p>
+        ) : (
+          <>
+            <div className="invite__box">
+              {info.qr && <img className="invite__qr" src={info.qr} alt="QR-Code für den Helfer" />}
+              <div className="invite__actions">
+                <span className="muted small">Code für den Helfer (nur hier sichtbar):</span>
+                <b className="login-code">{info.code}</b>
+                {connected ? <span className="ok">✅ Helfer verbunden</span> : <span className="muted small">Warte auf den Helfer …</span>}
+                <label className="composer__ping">
+                  <input type="checkbox" defaultChecked={status?.controlAllowed !== false} onChange={(e) => api.helpControl({ on: e.target.checked }).catch(() => {})} /> Helfer darf mithelfen (sonst nur zusehen)
+                </label>
+                <button className="btn btn--danger btn--small" onClick={stop}>
+                  ⏹ Hilfe beenden
+                </button>
+              </div>
+            </div>
+            <ol className="invite__steps">
+              <li>Der Helfer scannt den QR-Code (gleiches WLAN) oder öffnet den Link.</li>
+              <li>Er gibt den <b>Code</b> ein, du bestätigst hier am PC.</li>
+              <li>Fertig. Er sieht nur die Einrichtung, nie deine Chats.</li>
+            </ol>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Läuft immer im Hintergrund: Bestätigung, Bridge start/stop, Strg+C, kleine Leiste wenn aktiv. */
+export function HelpController({ toast }) {
+  const [pending, setPending] = useState(null);
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    const off = bus.on((type, p) => {
+      if (type === 'help:pending') setPending(p.done ? null : p);
+      if (type === 'help:status') {
+        const running = Boolean(p?.running);
+        setActive(running);
+        if (running) startHelpBridge();
+        else stopHelpBridge();
+      }
+    });
+    api.helpStatus().then((s) => s?.running && (setActive(true), startHelpBridge())).catch(() => {});
+    const onKey = (e) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'c' && active) api.helpStop().catch(() => {});
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      off();
+      window.removeEventListener('keydown', onKey);
+      stopHelpBridge();
+    };
+  }, [active]);
+
+  return (
+    <>
+      {pending && (
+        <div className="modal-backdrop">
+          <div className="modal confirm" role="dialog" aria-label="Helfer zulassen">
+            <h3>🙋 Darf dieser Helfer verbinden?</h3>
+            <p>
+              <b>{pending.helper || 'Jemand'}</b> möchte dir bei der Einrichtung helfen. Er sieht nur die Einrichtung, <b>nie deine Chats</b>.
+            </p>
+            <div className="confirm__actions">
+              <button className="btn btn--ghost" onClick={() => api.helpDecide({ id: pending.id, allow: false }).catch(() => {})}>
+                Ablehnen
+              </button>
+              <button className="btn btn--primary" onClick={() => api.helpDecide({ id: pending.id, allow: true }).catch(() => {})}>
+                Zulassen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {active && (
+        <div className="help-bar" role="status">
+          🙋 Fernhilfe aktiv – Chats verborgen
+          <button className="btn btn--small" onClick={() => api.helpStop().catch(() => {})}>
+            Beenden (Strg+C)
+          </button>
+        </div>
+      )}
+    </>
+  );
+}

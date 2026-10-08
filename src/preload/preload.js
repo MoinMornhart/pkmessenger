@@ -20,6 +20,9 @@ const EVENT_TYPES = new Set([
   'blocklist',
   'remote:activity',
   'remote:pending',
+  'help:status',
+  'help:pending',
+  'help:activity',
   'ai:job-done',
   'lock',
   'ratelimit',
@@ -56,6 +59,12 @@ contextBridge.exposeInMainWorld('api', {
   setupCheck: call('pk:setup-check'),
   blocklistGet: call('pk:blocklist-get'),
   remoteStatus: call('pk:remote-status'),
+  helpStatus: call('pk:help-status'),
+  helpRequest: call('pk:help-request'),
+  helpStop: call('pk:help-stop'),
+  helpControl: call('pk:help-control'),
+  helpDecide: call('pk:help-decide'),
+  helpDisconnect: call('pk:help-disconnect'),
   remoteSetPassword: call('pk:remote-set-password'),
   remoteEnable: call('pk:remote-enable'),
   remoteOptions: call('pk:remote-options'),
@@ -164,6 +173,15 @@ contextBridge.exposeInMainWorld('api', {
     };
     ipcRenderer.on('pk:voice-audio', listener);
     return () => ipcRenderer.removeListener('pk:voice-audio', listener);
+  },
+  // Fernhilfe (Issue #79): Der Renderer meldet seine Sicht; Main schickt erlaubte Aktionen zurück.
+  helpView(view) {
+    if (view && typeof view === 'object') ipcRenderer.send('pk:help-view', view);
+  },
+  onHelpAction(callback) {
+    const listener = (_e, action) => action && typeof action === 'object' && callback(action);
+    ipcRenderer.on('pk:help-action', listener);
+    return () => ipcRenderer.removeListener('pk:help-action', listener);
   },
   // Abo auf Live-Events. Gibt eine Abmelde-Funktion zurück.
   onEvent(callback) {
