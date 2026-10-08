@@ -92,6 +92,8 @@ contextBridge.exposeInMainWorld('api', {
   tokenInfo: call('pk:token-info'),
   tokenSave: call('pk:token-save'),
   tokenClear: call('pk:token-clear'),
+  tokenShare: call('pk:token-share'),
+  tokenImport: call('pk:token-import'),
   invitePreview: call('pk:invite-preview'),
   editMessage: call('pk:edit-message'),
   endPoll: call('pk:end-poll'),

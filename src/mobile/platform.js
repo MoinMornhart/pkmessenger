@@ -51,6 +51,16 @@ export function onBackButton(fn) {
   return () => h.then((x) => x.remove());
 }
 
+/** Anmelde-Link aus der Kamera (pkmessenger://login…) → Oberfläche (Einrichtung) */
+export function onLoginLink(fn) {
+  if (!isNative()) return () => {};
+  const h = App.addListener('appUrlOpen', (e) => typeof e?.url === 'string' && e.url.startsWith('pkmessenger://login') && fn(e.url));
+  App.getLaunchUrl?.()
+    .then((r) => r?.url?.startsWith('pkmessenger://login') && fn(r.url))
+    .catch(() => {});
+  return () => h.then((x) => x.remove());
+}
+
 /** App kommt zurück in den Vordergrund (Android trennt im Hintergrund oft die Verbindung). */
 export function onResume(fn) {
   if (!isNative()) return () => {};

@@ -2,6 +2,7 @@
 
 const { validators } = require('./validate');
 const { describeError } = require('./errors');
+const { sealToken, openLink } = require('../shared/token-transfer');
 
 /**
  * Definiert alle erlaubten IPC-Kanäle. Jeder Handler:
@@ -27,6 +28,18 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:token-info': () => (tokenStore ? tokenStore.info() : { stored: false, demo: true }),
     'pk:token-save': async (p) => {
       const info = requireTokens().save(validators.tokenInput(p));
+      const status = await service.connect();
+      return { info, state: status.state, error: status.error || null };
+    },
+    // Anmelden per Link/QR (JoniMoni #77): verschlüsselter Link + Code, der nur auf diesem Bildschirm steht
+    'pk:token-share': async () => {
+      const t = requireTokens().load();
+      if (t.status !== 'ok') throw Object.assign(new Error('Hier ist noch kein Bot-Token gespeichert.'), { code: 'VALIDATION' });
+      return sealToken(t.token);
+    },
+    'pk:token-import': async (p) => {
+      const { link, code } = validators.tokenImport(p);
+      const info = requireTokens().save(await openLink(link, code));
       const status = await service.connect();
       return { info, state: status.state, error: status.error || null };
     },

@@ -549,6 +549,12 @@ const validators = {
     if (!code) throw new ValidationError('Das ist kein gültiger Discord-Einladungslink (z. B. discord.gg/abc123).');
     return { code };
   },
+  tokenImport(p) {
+    const { link, code } = obj(p);
+    if (typeof link !== 'string' || link.length > 2000 || !link.trim().startsWith('pkmessenger://login')) throw new ValidationError('Das ist kein gültiger Anmelde-Link.');
+    if (typeof code !== 'string' || !/^[A-Za-z0-9]{4}[- ]?[A-Za-z0-9]{4}$/.test(code.trim())) throw new ValidationError('Der Code hat 8 Zeichen (z. B. ABCD-2345).');
+    return { link: link.trim(), code: code.trim() };
+  },
   tokenInput(p) {
     const { token } = obj(p);
     if (typeof token !== 'string' || token.length < 20 || token.length > 200) throw new ValidationError('Das sieht nicht wie ein Bot-Token aus.');

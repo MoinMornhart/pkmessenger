@@ -74,6 +74,8 @@ export const api = Object.fromEntries(
     'tokenInfo',
     'tokenSave',
     'tokenClear',
+    'tokenShare',
+    'tokenImport',
     'invitePreview',
     'editMessage',
     'endPoll',
