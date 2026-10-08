@@ -1,5 +1,5 @@
 import { memo, useContext, useState, useEffect } from 'react';
-import { MessageActionsContext } from '../state';
+import { MessageActionsContext, NavContext } from '../state';
 import { formatShortTime, formatFull, formatDayPill } from '../../shared/format';
 import MessageContent, { OwnMessageContext } from './MessageContent.jsx';
 import { ReplyQuote, Reactions, Embeds, ThreadChip, MessageActionBar, PollCard } from './MessageExtras.jsx';
@@ -23,6 +23,46 @@ function Avatar({ author }) {
     );
   }
   return <img className="avatar" src={author.avatarUrl} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} />;
+}
+
+// #86: Knöpfe/Auswahlmenüs einer Nachricht ANZEIGEN. Fremde Knöpfe kann ein Bot nicht drücken (Discord-Grenze),
+// darum nur Ansicht. Link-Knöpfe sind echte Links und öffnen über den normalen Link-Schutz im Browser.
+const BTN_STYLE = { 1: 'primary', 2: 'secondary', 3: 'success', 4: 'danger', 5: 'link' };
+function MessageButtons({ rows }) {
+  const nav = useContext(NavContext);
+  if (!rows?.length) return null;
+  const openLink = (url) => {
+    const check = checkLink(url, prefs.get().trustedDomains, getLists());
+    if (check.level === 'danger') return; // gefährliche Link-Knöpfe nicht öffnen
+    nav.openExternal(url);
+  };
+  const needHint = rows.some((r) => r.components.some((c) => c.kind === 'select' || (c.kind === 'button' && !c.url)));
+  return (
+    <div className="msg-buttons">
+      {rows.map((row, ri) => (
+        <div className="msg-buttons__row" key={ri}>
+          {row.components.map((c, ci) =>
+            c.kind === 'select' ? (
+              <span className="msg-btn msg-btn--select" key={ci} title="Auswahlmenü – bedient nur ein Nutzer im Discord-Client">
+                ▾ {c.placeholder}
+              </span>
+            ) : c.url ? (
+              <button className={`msg-btn msg-btn--${BTN_STYLE[c.style] || 'secondary'} msg-btn--link`} key={ci} onClick={() => openLink(c.url)} title={`${c.url} (öffnet im Browser)`}>
+                {c.emoji ? `${c.emoji} ` : ''}
+                {c.label || 'Link'} ↗
+              </button>
+            ) : (
+              <span className={`msg-btn msg-btn--${BTN_STYLE[c.style] || 'secondary'} msg-btn--ro`} key={ci} title="Diesen Knopf kann nur ein Nutzer im Discord-Client drücken">
+                {c.emoji ? `${c.emoji} ` : ''}
+                {c.label || 'Knopf'}
+              </span>
+            ),
+          )}
+        </div>
+      ))}
+      {needHint && <span className="msg-buttons__hint muted small">Knöpfe anderer Apps kann nur ein Nutzer im Discord-Client drücken.</span>}
+    </div>
+  );
 }
 
 function formatSize(bytes) {
@@ -171,6 +211,7 @@ function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
         <Attachments items={m.attachments} />
         <PollCard message={m} />
         <Embeds embeds={m.embeds} />
+        <MessageButtons rows={m.components} />
         <ThreadChip thread={m.thread} />
         <span className="bubble__meta" title={formatFull(m.createdTimestamp)}>
           {m.pinned && <span title="Angeheftet">📌 </span>}

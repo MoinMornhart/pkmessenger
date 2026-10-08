@@ -847,6 +847,60 @@ a:hover {
   border-radius: 8px;
   width: fit-content;
 }
+/* #86: Nachrichten-Knöpfe (nur Ansicht; Link-Knöpfe sind klickbar) */
+.msg-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.msg-buttons__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.msg-buttons__hint {
+  opacity: 0.75;
+}
+.msg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: #4e5058;
+  max-width: 100%;
+}
+.msg-btn--primary {
+  background: var(--accent, #5865f2);
+  color: var(--accent-ink, #fff);
+}
+.msg-btn--success {
+  background: #248046;
+}
+.msg-btn--danger {
+  background: #da373c;
+}
+.msg-btn--secondary,
+.msg-btn--select {
+  background: #4e5058;
+}
+.msg-btn--link {
+  background: #4e5058;
+  cursor: pointer;
+}
+.msg-btn--link:hover {
+  filter: brightness(1.12);
+}
+.msg-btn--ro,
+.msg-btn--select {
+  cursor: default;
+  opacity: 0.85;
+}
 .jump-bottom {
   position: absolute;
   bottom: 12px;

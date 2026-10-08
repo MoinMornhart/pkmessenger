@@ -104,6 +104,16 @@ function createDemo() {
   [['Freitag', 5], ['Samstag', 8], ['Sonntag', 2]].forEach(([text, n], i) => pollMsg.poll.answers.set(i + 1, { id: i + 1, text, voteCount: n, poll: pollMsg.poll }));
   extra.add(PF.SendPolls);
 
+  // #86 Beispiel: Nachricht eines anderen Bots mit Knöpfen (nur Ansicht) + Link-Knopf + Auswahlmenü
+  const btnMsg = add(a, bernd, 'Willkommen! Bitte bestätige kurz, dass du ein Mensch bist – danach siehst du alle Kanäle.', 3);
+  btnMsg.components = [
+    { type: 1, components: [
+      { type: 2, style: 3, label: 'Verifizieren', customId: 'verify' },
+      { type: 2, style: 5, url: 'https://example.com/hilfe', label: 'Mehr Infos' },
+    ] },
+    { type: 1, components: [{ type: 3, placeholder: 'Rolle wählen …' }] },
+  ];
+
   // eigenes Server-Emoji für die Reaktionsauswahl
   guild.emojis = { cache: new Map() };
 
