@@ -5,6 +5,16 @@
 name: Android prüfen
 
 on:
+  # auch nach jedem Merge auf main (JoniMoni #70)
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "mobile/**"
+      - "scripts/build-mobile.js"
+      - "scripts/android-emulator-test.sh"
+      - ".github/workflows/android-check.yml"
   pull_request:
     paths:
       - "src/**"
