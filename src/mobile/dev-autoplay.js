@@ -15,9 +15,11 @@ window.addEventListener('unhandledrejection', (e) => log(`FEHLER ${e.reason?.mes
     /* egal */
   }
   // Schritt 1 (CI-Bild 1): Chatliste – warten, bis verbunden und Chats da sind (Emulator ist unterschiedlich schnell)
-  for (let i = 0; i < 120 && document.querySelectorAll('.chatrow').length === 0; i++) await wait(500);
+  // Nur echte Zeilen zählen: beim Laden stehen kurz Platzhalter (.chatrow--skeleton) da (Lauf 37755403447)
+  const realRows = () => document.querySelectorAll('.chatrow:not(.chatrow--skeleton)').length;
+  for (let i = 0; i < 120 && realRows() === 0; i++) await wait(500);
   await wait(1500);
-  results.chats = document.querySelectorAll('.chatrow').length;
+  results.chats = realRows();
   results.verbunden = /Verbunden/.test($('.chatlist')?.textContent || '');
   log(`schritt 1 liste chats=${results.chats} verbunden=${results.verbunden}`);
   [...document.querySelectorAll('.chatrow')].find((r) => r.textContent.includes('allgemein'))?.click();
