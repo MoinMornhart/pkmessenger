@@ -248,9 +248,14 @@ export default function SetupWizard({ status, onClose = null, onReconnect = null
             <li>Fertig. Sobald der Bot drin ist, springt dieser Schritt hier von selbst auf ✓.</li>
           </ol>
           {invite ? (
-            <button className="btn btn--primary btn--small" onClick={() => ext(invite)}>
-              Einladungslink öffnen ↗
-            </button>
+            <div className="settings__row">
+              <button className="btn btn--primary btn--small" onClick={() => ext(invite)}>
+                Einladungslink öffnen ↗
+              </button>
+              <button className="btn btn--ghost btn--small" onClick={() => window.dispatchEvent(new CustomEvent('pk:invite-dialog'))} title="Kein eigenes Discord-Konto? Eine Admin des Servers kann den Bot einladen.">
+                🤝 Link an eine Admin schicken
+              </button>
+            </div>
           ) : (
             <p className="muted small">Der Link erscheint, sobald der Token gespeichert ist.</p>
           )}

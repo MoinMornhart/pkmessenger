@@ -775,6 +775,17 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     const dmAt = await js(win, `JSON.stringify([...document.querySelectorAll('.suggest .suggest__item, .suggest li, .suggest button')].map(x=>x.textContent.trim().slice(0,30)))`);
     await shoot(win, dir, '82-privatchat-erwaehnen');
     await js(win, `(() => { const el=document.querySelector('.composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,''); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    // Bot einladen lassen, ohne eigenes Konto (Wunsch MoinMornhart 08.10.2026)
+    await js(win, `document.querySelector('.rail [aria-label="Bot einladen"]')?.click()`);
+    await wait(700);
+    const inv = await js(win, `JSON.stringify({ fenster: Boolean(document.querySelector('.invite')), qr: Boolean(document.querySelector('.invite__qr')?.naturalWidth), knoepfe: [...document.querySelectorAll('.invite__actions .btn')].map(b=>b.textContent.trim().slice(0,22)) })`);
+    await shoot(win, dir, '83-bot-einladen-lassen');
+    await js(win, `[...document.querySelectorAll('.invite__actions .btn')][0]?.click()`);
+    await wait(300);
+    const kopiert = String(await require('electron').clipboard.readText());
+    console.log(`[einladen] ${inv} · Nachricht: ${JSON.stringify(kopiert.slice(0, 60))} … enthält Link: ${/discord\.com\/oauth2\/authorize/.test(kopiert)}`);
+    await js(win, `document.querySelector('.invite .icon-btn[aria-label="Schließen"]')?.click()`);
+    await wait(200);
     console.log(`[issue61] Schnellfenster: ${notify} · Abschnitt: ${zu} · Einstellungen: ${nav} · @ im Privatchat: ${dmAt}`);
     await js(win, `document.querySelector('.rail__item:not(.rail__dm):not(.rail__add)')?.click()`);
     await wait(500);

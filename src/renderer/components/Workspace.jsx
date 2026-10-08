@@ -8,6 +8,7 @@ import { systemInfo } from '../../shared/system-messages';
 import ServerRail, { DM_ID } from './ServerRail.jsx';
 import NewDMDialog from './NewDMDialog.jsx';
 import CreateChannelDialog from './CreateChannelDialog.jsx';
+import InviteDialog from './InviteDialog.jsx';
 import ContextMenu from './ContextMenu.jsx';
 import WallpaperDialog from './WallpaperDialog.jsx';
 import { NameDialog } from './SidePanels.jsx';
@@ -74,6 +75,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [joinOpen, setJoinOpen] = useState(false);
   const [newDmOpen, setNewDmOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false); // Bot einladen lassen (ohne eigenes Konto)
   const [chatMenu, setChatMenu] = useState(null); // Rechtsklick auf einen Chat
   const [wallFor, setWallFor] = useState(null); // Hintergrund-Dialog { channelId, guildId, chatName, guildName }
   const [renameFor, setRenameFor] = useState(null); // Kanal umbenennen
@@ -496,9 +498,12 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     return () => window.removeEventListener('focus', onFocus);
   }, [refresh]);
 
-  const invite = useCallback(async () => {
-    const url = await api.getInviteUrl().catch(() => null);
-    if (url) api.openExternal({ url });
+  // Bot auf einen Server holen: Fenster mit Link/QR/Nachricht für eine Server-Admin (kein eigenes Konto nötig)
+  const invite = useCallback(() => setInviteOpen(true), []);
+  useEffect(() => {
+    const onOpen = () => setInviteOpen(true);
+    window.addEventListener('pk:invite-dialog', onOpen);
+    return () => window.removeEventListener('pk:invite-dialog', onOpen);
   }, []);
 
   useEffect(() => {
@@ -722,6 +727,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
             }}
           />
         )}
+        {inviteOpen && <InviteDialog guilds={guilds || []} onClose={() => setInviteOpen(false)} toast={toast} />}
         {newGroupOpen && guild && guildId !== DM_ID && (
           <CreateChannelDialog
             guild={guild}
