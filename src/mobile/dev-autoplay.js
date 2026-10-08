@@ -15,7 +15,7 @@ window.addEventListener('unhandledrejection', (e) => log(`FEHLER ${e.reason?.mes
     /* egal */
   }
   // Schritt 1 (CI-Bild 1): Chatliste – warten, bis verbunden und Chats da sind (Emulator ist unterschiedlich schnell)
-  for (let i = 0; i < 60 && document.querySelectorAll('.chatrow').length === 0; i++) await wait(500);
+  for (let i = 0; i < 120 && document.querySelectorAll('.chatrow').length === 0; i++) await wait(500);
   await wait(1500);
   results.chats = document.querySelectorAll('.chatrow').length;
   results.verbunden = /Verbunden/.test($('.chatlist')?.textContent || '');

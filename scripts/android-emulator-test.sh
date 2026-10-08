@@ -7,6 +7,14 @@ APK=mobile/android/app/build/outputs/apk/debug/app-debug.apk
 PKG=io.github.morniteam.pkmessenger
 mkdir -p "$OUT"
 
+# Frisch gestarteter Emulator: System-Dialoge wie „Pixel Launcher isn't responding“ legten sich über die App
+# (Lauf 37750309993) → Fehler-Dialoge abschalten, System zur Ruhe kommen lassen, offene Dialoge schließen
+adb shell settings put global hide_error_dialogs 1 || true
+until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do sleep 2; done
+sleep 15
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
+adb shell input keyevent KEYCODE_HOME || true
+
 adb install -r "$APK"
 adb logcat -c
 adb shell am start -n "$PKG/.MainActivity"
