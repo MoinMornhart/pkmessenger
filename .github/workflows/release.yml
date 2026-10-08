@@ -289,3 +289,89 @@ jobs:
             echo "Installer und Update-Pakete hängen am Release **$TAG**."
             echo "Automatische Updates werden beim nächsten Start oder innerhalb von 6 Stunden erkannt."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Android-App (Issue #56): signierte APK bauen und an dasselbe Release hängen.
+  # Der Signaturschlüssel liegt nur als Secret vor. Ohne ihn wird nur die APK übersprungen (Windows-Release bleibt gültig).
+  android:
+    name: Android-App (APK) bauen und anhängen
+    needs: [analyze, build]
+    if: needs.analyze.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: write
+
+    env:
+      TAG: ${{ needs.analyze.outputs.tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+
+    steps:
+      - name: Signaturschlüssel vorhanden?
+        id: key
+        shell: bash
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KS" ]; then
+            echo "::warning::Kein Android-Signaturschlüssel (Secret ANDROID_KEYSTORE_B64) – die APK wird für $TAG übersprungen."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Repository auschecken
+        if: steps.key.outputs.ok == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.analyze.outputs.ref }}
+          persist-credentials: false
+
+      - name: Node.js einrichten
+        if: steps.key.outputs.ok == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Java 21 einrichten
+        if: steps.key.outputs.ok == 'true'
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: APK bauen und signieren
+        if: steps.key.outputs.ok == 'true'
+        shell: bash
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          PK_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          PK_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          npm ci
+          npm ci --prefix mobile
+          node scripts/build-mobile.js
+          (cd mobile && npx cap sync android)
+          export PK_KEYSTORE="$RUNNER_TEMP/pk-release.p12"
+          echo "$KS" | base64 -d > "$PK_KEYSTORE"
+          chmod +x mobile/android/gradlew
+          (cd mobile/android && ./gradlew --no-daemon assembleRelease)
+          rm -f "$PK_KEYSTORE"
+          APK=mobile/android/app/build/outputs/apk/release/app-release.apk
+          SIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          "$SIGNER" verify --print-certs "$APK" | head -3
+          cp "$APK" PKMessenger-android.apk
+
+      - name: APK an das Release hängen
+        if: steps.key.outputs.ok == 'true'
+        shell: bash
+        run: |
+          gh release upload "$TAG" PKMessenger-android.apk --clobber -R "$REPO"
+          {
+            echo "## 📱 Android-App $TAG"
+            echo
+            echo "PKMessenger-android.apk hängt am Release. Installierte Apps finden das Update selbst (alle 6 Stunden)."
+          } >> "$GITHUB_STEP_SUMMARY"

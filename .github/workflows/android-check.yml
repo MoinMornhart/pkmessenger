@@ -1,0 +1,94 @@
+# Android-App prüfen (Issue #56): bei jedem Pull Request, der Oberfläche oder Android-Teil ändert.
+# 1. Release-APK bauen (ohne Signatur) → beweist, dass alles kompiliert.
+# 2. Demo-APK (simuliertes Discord, nie veröffentlicht) im echten Android-Emulator starten,
+#    automatisch durchklicken, Screenshots + Protokoll als Artefakt ablegen.
+name: Android prüfen
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "mobile/**"
+      - "scripts/build-mobile.js"
+      - "package.json"
+      - ".github/workflows/android-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: APK bauen und im Emulator testen
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Java 21 einrichten
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Abhängigkeiten installieren
+        run: |
+          npm ci
+          npm ci --prefix mobile
+
+      - name: Tests (Handy-Client)
+        run: node --test --test-timeout=20000 tests/test-mobile-lite.js tests/test-mobile-build.js
+
+      - name: Release-APK bauen (unsigniert)
+        run: |
+          node scripts/build-mobile.js
+          cd mobile
+          npx cap sync android
+          chmod +x android/gradlew
+          cd android && ./gradlew --no-daemon assembleRelease
+          ls -la app/build/outputs/apk/release/
+
+      - name: Demo-APK für den Emulator bauen
+        run: |
+          node scripts/build-mobile.js --autoplay
+          cd mobile
+          npx cap sync android
+          cd android && ./gradlew --no-daemon assembleDebug
+
+      - name: KVM für den Emulator freischalten
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Im Android-Emulator testen
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: false
+          script: bash scripts/android-emulator-test.sh
+
+      - name: Screenshots und Protokoll hochladen
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-test
+          path: android-test/
+          retention-days: 14

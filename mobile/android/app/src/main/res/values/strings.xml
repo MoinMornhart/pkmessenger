@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PKMessenger</string>
+    <string name="title_activity_main">PKMessenger</string>
+    <string name="package_name">io.github.morniteam.pkmessenger</string>
+    <string name="custom_url_scheme">io.github.morniteam.pkmessenger</string>
+</resources>

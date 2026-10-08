@@ -1,0 +1,16 @@
+{
+  "appId": "io.github.morniteam.pkmessenger",
+  "appName": "PKMessenger",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

@@ -1,3 +1,4 @@
+import { pc } from '../platform';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { prefs } from '../prefs';
@@ -99,7 +100,7 @@ export default function NotificationSection({ toast }) {
               </button>
             )}
           </div>
-          <p className="muted small">Töne kommen auch bei minimiertem Fenster. Höchstens ein Ton pro 1,5 Sekunden, nie für eigene Nachrichten. Alles bleibt auf diesem PC.</p>
+          <p className="muted small">{pc('Töne kommen auch bei minimiertem Fenster.', 'Töne kommen, solange die App offen ist.')} Höchstens ein Ton pro 1,5 Sekunden, nie für eigene Nachrichten. Alles bleibt auf {pc('diesem PC', 'diesem Handy')}.</p>
         </>
       )}
     </>

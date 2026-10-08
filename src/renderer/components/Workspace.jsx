@@ -30,6 +30,7 @@ import JoinServerDialog from './JoinServerDialog.jsx';
 import { ThreadsPanel } from './SidePanels.jsx';
 import { useVoice } from '../voice/useVoice';
 import { notify, notifyMessage } from '../sounds';
+import { isAndroid } from '../platform';
 
 const TYPING_MS = 10000;
 // Privatnachrichten werden wie ein eigener „Server“ in der Leiste behandelt
@@ -40,6 +41,8 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
   const [guildId, setGuildId] = useState(null);
   const [channelsByGuild, setChannelsByGuild] = useState({});
   const [channelId, setChannelId] = useState(null);
+  // Handy (Android): 'list' = Chatliste, 'chat' = Unterhaltung im Vollbild
+  const [mobileView, setMobileView] = useState('list');
   const [readMarkers, setReadMarkers] = useState({});
   const [lastIds, setLastIds] = useState({});
   const [liveUnread, setLiveUnread] = useState(() => new Set());
@@ -430,7 +433,25 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
     setActiveThread(null);
     setForum(null);
     setChannelId(id);
+    setMobileView('chat');
   }, []);
+
+  // Zurück-Taste des Handys: erst offene Fenster schließen (wie Esc), dann Thread → Chat → Chatliste → App verlassen
+  useEffect(() => {
+    if (!isAndroid) return undefined;
+    const onBack = (e) => {
+      if (document.querySelector('.modal-backdrop, .ctx-menu, .emoji-panel, .suggest')) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        return;
+      }
+      if (activeThread) return setActiveThread(null);
+      if (forum) return setForum(null);
+      if (mobileView === 'chat') return setMobileView('list');
+      e.detail?.exit?.();
+    };
+    window.addEventListener('pk:back', onBack);
+    return () => window.removeEventListener('pk:back', onBack);
+  }, [activeThread, forum, mobileView]);
 
   const selectGuild = useCallback(
     (gid) => {
@@ -533,7 +554,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
 
   return (
     <NavContext.Provider value={nav}>
-      <div className="layout">
+      <div className={`layout ${isAndroid ? `layout--mobile layout--${mobileView}` : ''}`}>
         {status.demo && (
           <div className="demo-badge" title="Simulierte Daten – keine Verbindung zu Discord">
             DEMO
@@ -770,6 +791,7 @@ export default function Workspace({ status, toast, onReconnect, appInfo }) {
             onOpenSearch={() => setSearchOpen(true)}
             allChannels={flatChannels}
             onOpenThread={openThread}
+            {...(isAndroid ? { onBack: () => setMobileView('list'), parentName: null, backLabel: 'Zurück zur Chatliste' } : {})}
           />
         )}
         {quickOpen && (

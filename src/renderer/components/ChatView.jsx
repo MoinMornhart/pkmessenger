@@ -1,3 +1,4 @@
+import { pc } from '../platform';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { messageStore, randomNonce, useChannelMessages, MessageActionsContext } from '../state';
@@ -58,7 +59,7 @@ function HeaderSubtitle({ names, channel, guild, status }) {
   );
 }
 
-export default function ChatView({ guild, channel, bot, typingNames, onRead, toast, searchOpen, onCloseSearch, onOpenSearch, allChannels, onOpenThread, onBack, parentName, presenceStatus = null }) {
+export default function ChatView({ guild, channel, bot, typingNames, onRead, toast, searchOpen, onCloseSearch, onOpenSearch, allChannels, onOpenThread, onBack, parentName, presenceStatus = null, backLabel = null }) {
   const state = useChannelMessages(channel?.id);
   const listRef = useRef(null);
   const [replyTo, setReplyTo] = useState(null); // F7
@@ -240,7 +241,7 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
       <main className="chat chat--empty">
         <div className="empty">
           <h2>Kein Kanal ausgewählt</h2>
-          <p className="muted">Wähle links einen Kanal – oder drücke Strg+K für die Schnellsuche.</p>
+          <p className="muted">{pc('Wähle links einen Kanal – oder drücke Strg+K für die Schnellsuche.', 'Wähle in der Liste einen Chat.')}</p>
         </div>
       </main>
     );
@@ -250,7 +251,7 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
     <main className="chat" data-wall={wallpaperFor(walls, { channelId: channel.id, guildId: channel.guildId || guild?.id })}>
       <header className="chat__head">
         {onBack && (
-          <button className="icon-btn icon-btn--lg" onClick={onBack} title={`Zurück zu #${parentName || 'Kanal'}`} aria-label="Zurück">
+          <button className="icon-btn icon-btn--lg" onClick={onBack} title={backLabel || `Zurück zu #${parentName || 'Kanal'}`} aria-label="Zurück">
             ←
           </button>
         )}
@@ -272,7 +273,7 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
           <button className={`icon-btn icon-btn--lg ${panel === 'pins' ? 'is-on' : ''}`} onClick={() => setPanel((p) => (p === 'pins' ? null : 'pins'))} title="Angeheftete Nachrichten" aria-label="Angeheftete Nachrichten">
             📌
           </button>
-          <button className="icon-btn icon-btn--lg" onClick={onOpenSearch} title="Suchen (Strg+F)" aria-label="Suchen">
+          <button className="icon-btn icon-btn--lg" onClick={onOpenSearch} title={pc('Suchen (Strg+F)', 'Suchen')} aria-label="Suchen">
             ⌕
           </button>
         </div>

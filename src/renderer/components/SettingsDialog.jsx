@@ -1,3 +1,4 @@
+import { isAndroid, pc } from '../platform';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { prefs } from '../prefs';
@@ -53,7 +54,7 @@ function TokenSection({ toast }) {
       <div className="settings__status">
         {info?.stored ? (
           <span className="ok">
-            🔐 Verschlüsselt gespeichert (Windows-Datenschutz) · Bot-ID{' '}
+            🔐 Verschlüsselt gespeichert ({pc('Windows-Datenschutz', 'Android-Schlüsselspeicher')}) · Bot-ID{' '}
             <button className="link-btn" onClick={() => setShowId((v) => !v)} title={showId ? 'Verstecken' : 'Anzeigen'}>
               {showId ? info.botId : '••••••••'} {showId ? '🙈' : '👁'}
             </button>
@@ -82,7 +83,7 @@ function TokenSection({ toast }) {
         </button>
       </div>
       <p className="muted small">
-        Der Token wird sofort verschlüsselt (an dein Windows-Konto gebunden) und nie wieder angezeigt. Eine alte <code>.env</code> wird automatisch übernommen und gelöscht.
+        {pc('Der Token wird sofort verschlüsselt (an dein Windows-Konto gebunden) und nie wieder angezeigt. Eine alte .env wird automatisch übernommen und gelöscht.', 'Der Token wird sofort verschlüsselt (Android-Schlüsselspeicher, nur in dieser App) und nie wieder angezeigt.')}
       </p>
       {info?.stored &&
         (confirmClear ? (
@@ -129,7 +130,7 @@ function WallpaperButton() {
       <button className="btn btn--small" onClick={() => setOpen(true)}>
         🖼 Standard-Hintergrund wählen
       </button>
-      <p className="muted small">Pro Chat oder Server: Rechtsklick auf einen Chat in der Liste → „Hintergrund …“.</p>
+      <p className="muted small">Pro Chat oder Server: {pc('Rechtsklick', 'lange drücken')} auf einen Chat in der Liste → „Hintergrund …“.</p>
       {open && <WallpaperDialog onClose={() => setOpen(false)} />}
     </>
   );
@@ -338,7 +339,7 @@ function BlocklistStatus() {
       <button className="btn btn--small" disabled={busy} onClick={update}>
         {busy ? 'Lade …' : '↻ Jetzt aktualisieren'}
       </button>
-      <p className="muted small">Die Listen kommen täglich automatisch von GitHub (öffentliche Projekte der Discord-Community). Deine Links werden dabei nie verschickt, geprüft wird nur auf diesem PC.</p>
+      <p className="muted small">Die Listen kommen täglich automatisch von GitHub (öffentliche Projekte der Discord-Community). Deine Links werden dabei nie verschickt, geprüft wird nur auf {pc('diesem PC', 'diesem Handy')}.</p>
     </div>
   );
 }
@@ -443,7 +444,7 @@ function MediaPrivacy() {
       <label className="composer__ping" data-setting="links">
         <input type="checkbox" checked={p.linkWarn} onChange={(e) => prefs.set({ linkWarn: e.target.checked })} /> 🔗 Vor dem Öffnen von Links warnen
       </label>
-      <p className="muted small">🛡 Link-Schutz ist immer an: IP-Grabber, Betrugs-Links („gratis Nitro“) und nachgemachte Adressen werden erkannt, gesperrt und nicht kopierbar gemacht. Geprüft wird nur auf diesem PC, deine Links werden nie an einen Dienst geschickt.</p>
+      <p className="muted small">🛡 Link-Schutz ist immer an: IP-Grabber, Betrugs-Links („gratis Nitro“) und nachgemachte Adressen werden erkannt, gesperrt und nicht kopierbar gemacht. Geprüft wird nur auf {pc('diesem PC', 'diesem Handy')}, deine Links werden nie an einen Dienst geschickt.</p>
       <BlocklistStatus />
       <TrustedDomains />
       <PresenceToggle />
@@ -539,7 +540,7 @@ function AudioSection() {
 }
 
 // Bereiche in sinnvoller Reihenfolge: Alltägliches oben, Technik unten, Beta (experimentell) ganz unten (Issue #1)
-const SECTIONS = [
+const ALL_SECTIONS = [
   { id: 'aussehen', icon: '🎨', title: 'Aussehen', desc: 'Design, Farbe, Animationen, Chat-Hintergrund.', keywords: ['farbe', 'theme', 'hell', 'dunkel', 'hintergrund', 'kompakt', 'animation'] },
   { id: 'schreiben', icon: '✍️', title: 'Schreiben', desc: 'Wie Namensvorschläge beim Schreiben funktionieren.', keywords: ['erwähnen', 'mention', 'namen', 'vorschläge', '@'] },
   { id: 'toene', icon: '🔔', title: 'Benachrichtigungen', desc: 'Töne, eigener Ton, Nicht stören.', keywords: ['ton', 'sound', 'lautstärke', 'nicht stören', 'benachrichtigung'] },
@@ -552,6 +553,10 @@ const SECTIONS = [
   { id: 'hilfe', icon: '❓', title: 'Hilfe & Tour', desc: 'Tour neu starten, Einrichtung prüfen, Tastenkürzel, Fehler melden.', keywords: ['tour', 'hilfe', 'tutorial', 'tasten', 'kürzel', 'einrichtung', 'fehler', 'protokoll', 'log', 'intent'] },
   { id: 'beta', icon: '🧪', title: 'Beta', desc: 'Experimentelle Funktionen wie KI-Agenten. Standardmäßig aus, kann sich noch ändern.', keywords: ['ki', 'ai', 'agent', 'openai', 'claude', 'ollama', 'experimentell'] },
 ];
+// Android-App (Issue #56): Sicherheit & Start (Autostart, Windows Hello, Fernzugang), Audio (Sprachkanäle) und
+// KI-Beta gibt es dort (noch) nicht – ausblenden statt Fehlermeldungen
+const ANDROID_HIDDEN = new Set(['sicherheit', 'audio', 'beta']);
+const SECTIONS = isAndroid ? ALL_SECTIONS.filter((s) => !ANDROID_HIDDEN.has(s.id)) : ALL_SECTIONS;
 
 // Hilfe & Tour
 function HelpSection({ onClose }) {
@@ -594,18 +599,20 @@ function HelpSection({ onClose }) {
           <kbd>Esc</kbd> Fenster schließen, Antworten abbrechen
         </li>
       </ul>
-      <p className="muted small">💡 Fährst du mit der Maus über einen Knopf, steht dort, was er macht.</p>
+      <p className="muted small">{pc('💡 Fährst du mit der Maus über einen Knopf, steht dort, was er macht.', '💡 Drückst du lange auf einen Chat oder eine Nachricht, kommt ein Menü mit allen Möglichkeiten.')}</p>
       <SetupCheck />
       <span className="settings__label">🐞 Fehler melden</span>
       <div className="settings__row">
         <button className="btn btn--small" onClick={() => reportError('manuell (Einstellungen → Hilfe)', 'Fehlerbericht von Hand erstellt')}>
           Fehlerbericht erstellen
         </button>
-        <button className="btn btn--ghost btn--small" onClick={() => api.openLogFolder().catch(() => {})}>
-          Protokoll-Ordner öffnen
-        </button>
+        {!isAndroid && (
+          <button className="btn btn--ghost btn--small" onClick={() => api.openLogFolder().catch(() => {})}>
+            Protokoll-Ordner öffnen
+          </button>
+        )}
       </div>
-      <p className="muted small">Das Protokoll (englisch) liegt nur auf deinem PC und enthält keine Passwörter, Tokens oder Nachrichten. Gesendet wird nichts automatisch.</p>
+      <p className="muted small">Das Protokoll (englisch) liegt nur auf {pc('deinem PC', 'deinem Handy')} und enthält keine Passwörter, Tokens oder Nachrichten. Gesendet wird nichts automatisch.</p>
     </>
   );
 }
@@ -738,7 +745,7 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
         </nav>
         <div className="settings__body" ref={bodyRef} onScroll={onScroll}>
           <div className="settings__head">
-            <span className="muted small">Alles wird nur auf diesem PC gespeichert.</span>
+            <span className="muted small">Alles wird nur auf {pc('diesem PC', 'diesem Handy')} gespeichert.</span>
             <button className="icon-btn" onClick={onClose} aria-label="Schließen" title="Schließen (Esc)">
               ×
             </button>

@@ -1,3 +1,4 @@
+import { pc } from '../platform';
 import { useCallback, useEffect, useState } from 'react';
 
 // Einführungs-Tour (Issue #1): Alles außer dem erklärten Teil wird dunkel und unscharf, um den Teil leuchtet ein Rahmen.
@@ -55,15 +56,15 @@ export function buildSteps() {
   }
   steps.push(
     { target: '.chatlist__items', title: 'Deine Chats', text: 'Neue Nachrichten stehen oben, ein Punkt zeigt Ungelesenes.', task: 'Klick jetzt auf einen Chat.', click: '.chatlist__items .chatrow' },
-    { target: '.chatlist__items .chatrow', title: 'Rechtsklick auf einen Chat', text: 'Mit der rechten Maustaste öffnet sich ein kurzes Menü mit mehr Möglichkeiten.', task: 'Mach jetzt einen Rechtsklick auf einen Chat.', done: () => has('.ctx-menu') },
-    { target: '.ctx-menu', title: 'Das kurze Menü', text: '✓ Als gelesen markieren · 🖼 Hintergrund für diesen Chat oder den ganzen Server · 🔗 Link kopieren · ✏️ Umbenennen und ⬆️⬇️ Verschieben (wenn der Bot darf). Ein Klick daneben schließt es.' },
+    { target: '.chatlist__items .chatrow', title: pc('Rechtsklick auf einen Chat', 'Lange auf einen Chat drücken'), text: pc('Mit der rechten Maustaste öffnet sich ein kurzes Menü mit mehr Möglichkeiten.', 'Drückst du lange auf einen Chat, öffnet sich ein kurzes Menü mit mehr Möglichkeiten.'), task: pc('Mach jetzt einen Rechtsklick auf einen Chat.', 'Drück jetzt lange auf einen Chat.'), done: () => has('.ctx-menu') },
+    { target: '.ctx-menu', title: 'Das kurze Menü', text: '✓ Als gelesen markieren · 🖼 Hintergrund für diesen Chat oder den ganzen Server · 🔗 Link kopieren · ✏️ Umbenennen und ⬆️⬇️ Verschieben (wenn der Bot darf). ' + pc('Ein Klick daneben schließt es.', 'Tippen daneben oder die Zurück-Taste schließt es.') },
     { target: '.chatlist__head [aria-label="Aktualisieren"]|.chatlist__head [aria-label="Sortierung wechseln"]|.chatlist__head [aria-label="Nicht stören"]|.chatlist__head [aria-label="Einstellungen"]', title: 'Oben in der Liste', text: '⟳ neu laden · ☰ sortieren (neueste oder nach Kategorien) · 🔔 Nicht stören (keine Töne) · ⚙ Einstellungen. Töne und eigene Benachrichtigungstöne stellst du in den Einstellungen ein.' },
     { target: '.composer textarea', title: 'Schreiben', text: 'Alles geht als dein Bot raus (mit BOT-Abzeichen). „@“ schlägt Namen vor, „#“ Kanäle, „/“ Befehle wie /münze, /spoiler oder /umfrage. Text markieren → Menü zum Formatieren.', task: 'Tippe ein „/“ ins Feld.', done: () => ($('.composer textarea')?.value || '').startsWith('/') },
     { target: '.composer .tool-btn', all: true, title: 'Die Knöpfe unten', text: '📎 Dateien anhängen (bis 25 MB) · ▤ Embed bauen (Kasten mit Titel, Farbe, Bild) · 😀 Smileys · 📊 Umfrage erstellen.' },
-    { target: '.msglist .msg--in', title: 'Rechtsklick auf eine Nachricht', text: 'Auch Nachrichten haben ein kurzes Menü.', task: 'Mach einen Rechtsklick auf eine Nachricht.', done: () => has('.ctx-menu') },
+    { target: '.msglist .msg--in', title: pc('Rechtsklick auf eine Nachricht', 'Lange auf eine Nachricht drücken'), text: 'Auch Nachrichten haben ein kurzes Menü.', task: pc('Mach einen Rechtsklick auf eine Nachricht.', 'Drück lange auf eine Nachricht.'), done: () => has('.ctx-menu') },
     { target: '.ctx-menu', title: 'Alles zu einer Nachricht', text: '↩ Antworten · 👍❤️ schnell reagieren · 📋 Text kopieren · 🔗 Link kopieren · 🧵 Thread starten · 📌 anheften · ✏️ bearbeiten / 🗑 löschen (eigene) · 👤 Person verwalten.' },
-    { target: '.msglist .msg', title: 'Nachrichten', text: 'Klick auf Bild oder Namen zeigt das Profil. Maus drüber: antworten, reagieren, Thread. Rechtsklick: alle Aktionen, auch kopieren, anheften und Person verwalten. Gefährliche Links werden automatisch gesperrt.' },
-    { target: '.chat__head [aria-label="Threads"]|.chat__head [aria-label="Angeheftete Nachrichten"]|.chat__head [aria-label="Suchen"]', title: 'Threads, Pins, Suche', text: '🧵 Threads (Neben-Unterhaltungen) ansehen und starten · 📌 angeheftete Nachrichten · 🔎 im Chat suchen (Strg+F). Strg+K springt zu jedem Chat, auch mit Tippfehlern.' },
+    { target: '.msglist .msg', title: 'Nachrichten', text: pc('Klick auf Bild oder Namen zeigt das Profil. Maus drüber: antworten, reagieren, Thread. Rechtsklick: alle Aktionen, auch kopieren, anheften und Person verwalten. Gefährliche Links werden automatisch gesperrt.', 'Tippen auf Bild oder Namen zeigt das Profil. Langer Druck: alle Aktionen wie antworten, reagieren, kopieren, anheften und Person verwalten. Gefährliche Links werden automatisch gesperrt.') },
+    { target: '.chat__head [aria-label="Threads"]|.chat__head [aria-label="Angeheftete Nachrichten"]|.chat__head [aria-label="Suchen"]', title: 'Threads, Pins, Suche', text: '🧵 Threads (Neben-Unterhaltungen) ansehen und starten · 📌 angeheftete Nachrichten · 🔎 im Chat suchen' + pc(' (Strg+F). Strg+K springt zu jedem Chat, auch mit Tippfehlern.', '.') },
   );
   if (has('.chatlist__section')) steps.push({ target: '.chatlist__section', title: 'Sprachkanäle', text: 'Klick auf einen Sprachkanal: Der Bot tritt bei und du sprichst über ihn. Alle hören „PK BOT“. Unten erscheint dann die Anrufleiste.' });
   steps.push(
