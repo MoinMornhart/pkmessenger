@@ -32,7 +32,7 @@ function read() {
       spoilerAsk: raw?.spoilerAsk !== false,
       trustedDomains: Array.isArray(raw?.trustedDomains) ? raw.trustedDomains.filter((d) => typeof d === 'string' && /^[a-z0-9.-]{3,253}$/.test(d)).slice(0, 200) : [],
       showWhatsNew: raw?.showWhatsNew !== false,
-      lastSeenVersion: typeof raw?.lastSeenVersion === 'string' && /^d+.d+.d+$/.test(raw.lastSeenVersion) ? raw.lastSeenVersion : '',
+      lastSeenVersion: typeof raw?.lastSeenVersion === 'string' && /^\d+\.\d+\.\d+$/.test(raw.lastSeenVersion) ? raw.lastSeenVersion : '',
       hiddenMessages: Array.isArray(raw?.hiddenMessages) ? raw.hiddenMessages.filter((d) => typeof d === 'string' && /^\d{17,20}$/.test(d)).slice(-500) : [],
       collapsed: raw?.collapsed && typeof raw.collapsed === 'object' && !Array.isArray(raw.collapsed) ? Object.fromEntries(Object.entries(raw.collapsed).filter(([k, v]) => /^\d{17,20}$/.test(k) && v === true)) : {},
     };

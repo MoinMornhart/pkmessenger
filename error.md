@@ -308,3 +308,9 @@ Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zwei
 8. **Kleinigkeiten:** Rechte beim Anlegen in einer Kategorie nach deren Rechten; Geräte-Limit (10) auch beim Koppeln selbst geprüft.
 
 Tests: `test-review-fixes.js`. Nicht geändert: leere Kategorien sind in „Neue Gruppe“ nicht wählbar (Kanalliste liefert nur Kategorien mit sichtbaren Kanälen).
+
+## #26 – v0.13.0: CSP blockierte Capacitors Netzweg; „Das ist neu“ kam nie (08.10.2026)
+
+1. **Android, CSP:** Auf Android schickt Capacitor `fetch` über `https://localhost/_capacitor_http_interceptor_?u=…` (CapacitorHttp). Die CSP erlaubte nur Discord/GitHub direkt → **alle REST-Anfragen der echten App wären blockiert** gewesen. Gefunden im logcat des Emulator-Tests („Refused to connect … _capacitor_http_interceptor_“). Der Demo-Test merkte es nicht, weil das simulierte Discord kein Netz nutzt. **Lösung:** `connect-src 'self'` (v0.13.1); der Emulator-Test prüft jetzt den echten Netzweg (Update-Abfrage bei GitHub). PR #60 wurde von JoniMoni vor dieser Korrektur zusammengeführt → v0.13.0-APK betroffen.
+2. **„Das ist neu“ (Joni #44):** `src/renderer/prefs.js` hatte `/^d+.d+.d+$/` statt `/^\d+\.\d+\.\d+$/` (Backslashes beim Patchen per Shell verloren, siehe frühere Escape-Probleme) → gemerkte Version immer verworfen → jeder Start galt als „erster Start“ → Fenster kam nie. Seit v0.10.4 betroffen. **Lösung:** Muster repariert, Test `test-prefs-whatsnew.js`. Projektweit nach weiteren kaputten Mustern gesucht: keine.
+- **Vorbeugung:** Patches mit Regex nur noch über Skriptdateien mit `String.raw` (nie `node -e`/Heredoc mit Backslashes).
