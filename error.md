@@ -295,3 +295,16 @@ Nebenbei (nur Testumgebung): Der Screenshot-Lauf schaltete die KI-Beta beim zwei
 - **Symptom:** `[fernzugang] Zwischenablage: [object Promise] · QR da: false`. Bild 73 zeigte „Passwort ist gesetzt“ und Toast „Fernzugang aus“.
 - **Ursache:** (1) `clipboard.readText()` lieferte im Screenshot-Code ein Promise und wurde nicht abgewartet. (2) Die Fernzugangs-Einstellungen (Passwort, „an“) blieben aus dem vorigen Demo-Lauf in `settings-dev-demo.json` erhalten; der Schritt schaltete dadurch aus statt ein.
 - **Lösung:** `await` + `String(...)`; der Screenshot-Lauf setzt den Store-Schlüssel `remote` wie `appLock` zurück. Lauf danach: `ipSichtbar:false`, `linkHost:"localhost"`, gekoppelt, gesendet.
+
+## #25 – Code-Prüfung 08.10.2026: 8 Funde, alle behoben (v0.12.1)
+
+1. **Link-Schutz umgehbar:** Mittelklick/Umschalt+Klick auf einen Link → `setWindowOpenHandler` öffnete jede http(s)-Adresse ohne Warnung. Jetzt lehnt der Handler immer ab, Links öffnen nur über den Link-Schutz im Renderer.
+2. **Dialoge zogen den Fokus zurück:** Fokus + Esc-Listener hingen an `[onClose]`, Workspace übergibt Inline-Funktionen → bei jedem Neuzeichnen (Tippen, Status, jede Minute) wurde neu fokussiert/markiert (Umbenennen, Neue Gruppe, Neuer Privatchat, Smileys, Server beitreten, Rückfrage). Jetzt `closeRef` + Effekt mit `[]`.
+3. **Neue Gruppe fand Personen nicht:** Suche lief über alle Server (max. 10) und filterte erst danach nach Servername. Jetzt `searchPeople({ guildId })`.
+4. **Sprache ohne `error`-Listener:** Fehler der Verbindung/des Players → halb offene Sitzung mit „verbunden“. Jetzt sauber auflegen + Status „unterbrochen“.
+5. **Schneller Kanalwechsel:** abgebrochener Beitritt setzte nach 20 s „Verbindung fehlgeschlagen“, obwohl der neue Kanal verbunden war. Jetzt nur `VOICE_ABORTED` ohne Statuswechsel.
+6. **Fernzugangs-Hash in `pk:get-settings`:** Salt/Hash gingen an die Oberfläche. Jetzt entfernt wie `appLock`.
+7. **Ursprungsprüfung:** `RENDERER_URL_PREFIX` ohne abschließendes `/` → auch `…/build/renderer-x/` galt als vertrauenswürdig. Jetzt mit `/`.
+8. **Kleinigkeiten:** Rechte beim Anlegen in einer Kategorie nach deren Rechten; Geräte-Limit (10) auch beim Koppeln selbst geprüft.
+
+Tests: `test-review-fixes.js`. Nicht geändert: leere Kategorien sind in „Neue Gruppe“ nicht wählbar (Kanalliste liefert nur Kategorien mit sichtbaren Kanälen).

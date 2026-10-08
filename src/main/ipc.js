@@ -118,7 +118,7 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:search-people': (p) => service.searchPeople(validators.searchPeople(p)),
     'pk:user-profile': (p) => service.getUserProfile(validators.userProfile(p)),
     'pk:get-settings': () => {
-      const { appLock: _lock, ...rest } = store.get(); // Passwort-Hash nie an die Oberfläche
+      const { appLock: _lock, remote: _remote, ...rest } = store.get(); // Passwort-Hashes nie an die Oberfläche (Status über pk:remote-status)
       return rest;
     },
     // App-Sperre (nur Hash gespeichert; solange gesperrt, sind alle anderen Kanäle zu – siehe wrap())

@@ -10,12 +10,14 @@ export default function NewDMDialog({ guilds, onClose, onOpened, toast }) {
   const [busy, setBusy] = useState(false);
   const inputRef = useRef(null);
 
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     inputRef.current?.focus();
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const onKey = (e) => e.key === 'Escape' && closeRef.current();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   // Suche mit kleiner Verzögerung; nur Personen (keine Rollen)
   useEffect(() => {

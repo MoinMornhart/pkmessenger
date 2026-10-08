@@ -2,12 +2,14 @@ import { useEffect, useRef } from 'react';
 
 export default function ConfirmDialog({ title, children, actions, onClose }) {
   const ref = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     ref.current?.querySelector('button[data-autofocus]')?.focus();
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const onKey = (e) => e.key === 'Escape' && closeRef.current();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal confirm" ref={ref} role="alertdialog" aria-label={title} onMouseDown={(e) => e.stopPropagation()}>

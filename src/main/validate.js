@@ -505,9 +505,9 @@ const validators = {
     return { on };
   },
   searchPeople(p) {
-    const { query } = obj(p);
+    const { query, guildId } = obj(p);
     if (typeof query !== 'string' || query.length > 32) throw new ValidationError('Ungültige Suchanfrage.');
-    return { query: query.trim() };
+    return { query: query.trim(), ...(guildId == null ? {} : { guildId: snowflake(guildId, 'guildId') }) };
   },
   userProfile(p) {
     const { userId, guildId } = obj(p);

@@ -9,13 +9,15 @@ export function NameDialog({ title, label, initial = '', confirmLabel = 'OK', mu
   const [name, setName] = useState(initial);
   const [text, setText] = useState('');
   const ref = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     ref.current?.focus();
     ref.current?.select();
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const onKey = (e) => e.key === 'Escape' && closeRef.current();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
   const ok = name.trim().length > 0 && name.length <= 100 && (!multilineLabel || text.trim().length > 0);
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>

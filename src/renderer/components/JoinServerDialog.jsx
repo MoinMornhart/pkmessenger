@@ -12,12 +12,14 @@ export default function JoinServerDialog({ onClose, onRefresh, toast }) {
   const [step, setStep] = useState(1);
   const inputRef = useRef(null);
 
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     inputRef.current?.focus();
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const onKey = (e) => e.key === 'Escape' && closeRef.current();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   const code = parseInviteCode(value);
 

@@ -8,17 +8,19 @@ export default function EmojiPicker({ onPick, onClose, customEmojis = [], classN
   const ref = useRef(null);
   const inputRef = useRef(null);
 
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     inputRef.current?.focus();
-    const close = (e) => !ref.current?.contains(e.target) && onClose();
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const close = (e) => !ref.current?.contains(e.target) && closeRef.current();
+    const onKey = (e) => e.key === 'Escape' && closeRef.current();
     window.addEventListener('mousedown', close);
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('mousedown', close);
       window.removeEventListener('keydown', onKey);
     };
-  }, [onClose]);
+  }, []);
 
   const found = query ? searchEmojis(query) : null;
   const current = CATEGORIES.find((c) => c.id === cat);
