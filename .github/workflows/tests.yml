@@ -1,0 +1,52 @@
+# Tests bei JEDEM Push auf main und jedem Pull Request (JoniMoni #70: „CI auf main nicht zuverlässig“).
+# Vorher liefen die Tests nur beim Release (package.json geändert) – ein normaler Merge wurde nicht geprüft.
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: npm test (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: |
+          npm ci
+          npm ci --prefix mobile
+
+      - name: Syntax prüfen (Hauptprozess)
+        shell: bash
+        run: for f in src/main/*.js; do node --check "$f"; done
+
+      - name: Tests ausführen
+        run: npm test
+
+      - name: Oberfläche bauen (PC + Android)
+        run: |
+          npm run build:renderer
+          node scripts/build-mobile.js
