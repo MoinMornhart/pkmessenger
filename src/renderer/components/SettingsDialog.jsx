@@ -1,4 +1,5 @@
 import { isAndroid, pc } from '../platform';
+import { ShareLoginDialog } from './LoginLink.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { prefs } from '../prefs';
@@ -15,6 +16,7 @@ import { openSetupWizard } from './SetupWizard.jsx';
 import { fuzzyFilter } from '../../shared/fuzzy';
 
 function TokenSection({ toast }) {
+  const [shareOpen, setShareOpen] = useState(false);
   const [info, setInfo] = useState(null);
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -64,6 +66,14 @@ function TokenSection({ toast }) {
         )}
         {info?.warning && <span className="warn small">⚠ {info.warning}</span>}
       </div>
+      {info?.stored && (
+        <div className="settings__row">
+          <button className="btn btn--small" onClick={() => setShareOpen(true)}>
+            📱 Anderes Gerät anmelden (QR-Code / Link)
+          </button>
+        </div>
+      )}
+      {shareOpen && <ShareLoginDialog onClose={() => setShareOpen(false)} toast={toast} />}
       <label className="settings__label" htmlFor="token-input">
         {info?.stored ? 'Token ersetzen' : 'Token einfügen'}
       </label>
@@ -83,7 +93,7 @@ function TokenSection({ toast }) {
         </button>
       </div>
       <p className="muted small">
-        {pc('Der Token wird sofort verschlüsselt (an dein Windows-Konto gebunden) und nie wieder angezeigt. Eine alte .env wird automatisch übernommen und gelöscht.', 'Der Token wird sofort verschlüsselt (Android-Schlüsselspeicher, nur in dieser App) und nie wieder angezeigt.')}
+        {pc('Der Token wird sofort verschlüsselt (an diesen PC gebunden) und nie wieder angezeigt. Eine alte .env wird automatisch übernommen und gelöscht.', 'Der Token wird sofort verschlüsselt (Android-Schlüsselspeicher, nur in dieser App) und nie wieder angezeigt.')}
       </p>
       {info?.stored &&
         (confirmClear ? (

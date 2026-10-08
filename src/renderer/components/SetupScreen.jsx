@@ -1,5 +1,6 @@
 import { isAndroid } from '../platform';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { LoginLinkForm } from './LoginLink.jsx';
 import { pc } from '../platform';
 import { api } from '../api';
 import Logo from './Logo.jsx';
@@ -17,6 +18,19 @@ const REASONS = {
 // Wer noch keinen Bot hat, findet den ausführlichen Assistenten (Bot neu anlegen) darunter.
 function TokenQuickStart({ onDone }) {
   const [token, setToken] = useState('');
+  // Anmelde-Link (JoniMoni #77): eingefügt oder per Kamera-QR (Android) → Code abfragen statt Token
+  const [link, setLink] = useState(() => window.pkPendingLoginLink?.() || null);
+  useEffect(() => {
+    const on = (e) => e.detail?.url && setLink(e.detail.url);
+    window.addEventListener('pk:login-link', on);
+    return () => window.removeEventListener('pk:login-link', on);
+  }, []);
+  useEffect(() => {
+    if (token.trim().startsWith('pkmessenger://login')) {
+      setLink(token.trim());
+      setToken('');
+    }
+  }, [token]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const save = async () => {
@@ -33,6 +47,13 @@ function TokenQuickStart({ onDone }) {
       setBusy(false);
     }
   };
+  if (link)
+    return (
+      <div className="token-quick">
+        <h2>📱 Mit Anmelde-Link anmelden</h2>
+        <LoginLinkForm link={link} onCancel={() => setLink(null)} onDone={onDone} />
+      </div>
+    );
   return (
     <div className="token-quick">
       <h2>🔑 Bot-Token eingeben – mehr brauchst du nicht</h2>
@@ -40,7 +61,7 @@ function TokenQuickStart({ onDone }) {
         Den Token bekommst du von der Person, der der Bot gehört. Danach bist du sofort drin und schreibst als dieser Bot.
       </p>
       <div className="token-quick__row">
-        <input type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && token && !busy && save()} placeholder="Bot-Token einfügen" aria-label="Bot-Token" autoFocus />
+        <input type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && token && !busy && save()} placeholder="Bot-Token oder Anmelde-Link einfügen" aria-label="Bot-Token" autoFocus />
         <button className="btn btn--primary" disabled={!token.trim() || busy} onClick={save}>
           {busy ? 'Verbinde …' : 'Verbinden'}
         </button>
@@ -51,7 +72,7 @@ function TokenQuickStart({ onDone }) {
         </p>
       )}
       <p className="muted small">
-        🔒 Der Token wird sofort verschlüsselt {pc('(an dein Windows-Konto gebunden)', '(im Android-Schlüsselspeicher)')} und nie wieder angezeigt. Einfügen: {pc('Strg+V', 'lange ins Feld drücken → Einfügen')}.
+        🔒 Der Token wird sofort verschlüsselt {pc('(an diesen PC gebunden)', '(im Android-Schlüsselspeicher)')} und nie wieder angezeigt. Ist schon ein anderes Gerät angemeldet, geht es auch ohne Abtippen: dort „Anderes Gerät anmelden“ wählen und den QR-Code scannen bzw. den Link hier einfügen. Einfügen: {pc('Strg+V', 'lange ins Feld drücken → Einfügen')}.
       </p>
     </div>
   );

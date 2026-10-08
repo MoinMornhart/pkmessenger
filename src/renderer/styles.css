@@ -4690,3 +4690,13 @@ kbd {
   color: var(--muted);
   padding: 8px 0;
 }
+
+/* ---------- Anmelden per Link/QR (JoniMoni #77) ---------- */
+.login-code {
+  font-size: 30px;
+  letter-spacing: 0.12em;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+.login-link p {
+  margin: 0 0 6px;
+}

@@ -2,7 +2,7 @@
 // Dahinter laufen dieselben Bausteine wie im Electron-Hauptprozess: Validierung (validate.js), Fehlertexte
 // (errors.js), Kanal-Tabelle (ipc.js) und der Discord-Service (discord.js) – nur mit dem schlanken Client.
 import { Buffer } from './buffer-shim';
-import { secure, openExternal, onResume, onBackButton } from './platform';
+import { secure, openExternal, onResume, onBackButton, onLoginLink } from './platform';
 
 globalThis.Buffer ||= Buffer;
 
@@ -148,6 +148,13 @@ document.documentElement.dataset.platform = 'android';
 })();
 // Zurück-Taste → Oberfläche (Workspace) entscheidet; ganz oben verlässt sie die App
 onBackButton((exit) => window.dispatchEvent(new CustomEvent('pk:back', { detail: { exit } })));
+// QR-Code mit der Kamera gescannt → Link an die Einrichtung weitergeben (auch wenn die App gerade erst startet)
+let pendingLoginLink = null;
+onLoginLink((url) => {
+  pendingLoginLink = url;
+  window.dispatchEvent(new CustomEvent('pk:login-link', { detail: { url } }));
+});
+window.pkPendingLoginLink = () => pendingLoginLink;
 onResume(() => {
   const s = service.getStatus().state;
   if (s !== 'ready' && s !== 'connecting' && s !== 'setup') service.connect().catch(() => {});
