@@ -17,7 +17,7 @@ const API_ERRORS = {
 };
 
 function describeError(err) {
-  if (!err) return { code: 'UNKNOWN', message: 'Unbekannter Fehler.', hint: 'Versuche es erneut. Wenn es bleibt: Details stehen in error.md.' };
+  if (!err) return { code: 'UNKNOWN', message: 'Unbekannter Fehler.', hint: 'Versuche es erneut. Wenn es bleibt: Einstellungen → Hilfe & Tour → „Fehlerbericht erstellen“.' };
   if (err.code === 'VALIDATION') return { code: 'VALIDATION', message: err.message, hint: err.hint || 'Eingabe prüfen und erneut versuchen.' };
   // KI-Agenten (Beta): Meldungen sind bereits deutsch und enthalten nie den API-Schlüssel
   if (err.code === 'AI') return { code: 'AI', message: err.message, hint: err.hint || '' };
@@ -49,7 +49,7 @@ function describeError(err) {
   return {
     code: 'UNKNOWN',
     message: `Unerwarteter Fehler: ${String(err.message || err).slice(0, 200)}`,
-    hint: 'Versuche es erneut. Wenn es bleibt, notiere die Meldung – sie gehört in error.md.',
+    hint: 'Versuche es erneut. Wenn es bleibt: Einstellungen → Hilfe & Tour → „Fehlerbericht erstellen“.',
   };
 }
 

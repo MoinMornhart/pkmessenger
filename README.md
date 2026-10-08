@@ -258,7 +258,7 @@ Sprache läuft ohne FFmpeg und ohne native Opus-Module: Kodiert wird mit WebCode
 
 **Sicherheit:** Der Token bleibt im Hauptprozess, die Oberfläche läuft in einer Sandbox mit strenger Content-Security-Policy, und jede Anfrage zwischen Oberfläche und Hauptprozess wird geprüft.
 
-Mehr Details: [AGENTS.md](AGENTS.md) (Architektur, Entscheidungen, Teststand) · [error.md](error.md) (Fehlerprotokoll)
+Fehler gefunden? In der App: Einstellungen → Hilfe & Tour → „Fehlerbericht erstellen“, dann als [Issue](https://github.com/Morni-Team/pkmessenger/issues) melden.
 
 ---
 
