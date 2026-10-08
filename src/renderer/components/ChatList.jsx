@@ -108,12 +108,32 @@ function CallBar({ voice, onOpen, onToggleMic, onLeave }) {
   );
 }
 
-function VoiceRows({ channels, members, speaking, activeId, voice, onSelect }) {
+// Abschnitts-Kopf (Sprachkanäle, Weitere Kanäle): einklappbar wie Kategorien (JoniMoni #61)
+function SectionHeader({ title, count, collapsed, onToggle }) {
+  return (
+    <button className={`chatlist__category chatlist__section-btn ${collapsed ? 'is-collapsed' : ''}`} onClick={onToggle} aria-expanded={!collapsed}>
+      <span className="chatlist__chevron" aria-hidden="true">
+        ▾
+      </span>
+      <span className="chatlist__category-name">{title}</span>
+      {collapsed && <span className="badge badge--soft">{count}</span>}
+    </button>
+  );
+}
+
+const toggleSection = (key) => {
+  const cur = prefs.get().collapsedSections || {};
+  prefs.set({ collapsedSections: { ...cur, [key]: !cur[key] } });
+};
+
+function VoiceRows({ channels, members, speaking, activeId, voice, onSelect, collapsed }) {
   if (!channels.length) return null;
+  // Eingeklappt bleibt der Kanal sichtbar, in dem der Bot gerade ist oder der offen ist
+  const shownChannels = collapsed ? channels.filter((c) => c.id === activeId || c.id === voice.channelId) : channels;
   return (
     <>
-      <div className="chatlist__section">Sprachkanäle</div>
-      {channels.map((c) => {
+      <SectionHeader title="Sprachkanäle" count={channels.length} collapsed={collapsed} onToggle={() => toggleSection('voice')} />
+      {shownChannels.map((c) => {
         const people = members[c.id] || [];
         const live = voice.channelId === c.id && voice.state === 'connected';
         const talking = people.filter((p) => speaking.has(p.id)).map((p) => p.name);
@@ -143,12 +163,12 @@ function VoiceRows({ channels, members, speaking, activeId, voice, onSelect }) {
 const OTHER_LABEL = { forum: ['🗂', 'Forum – Beiträge kommen mit Threads (F12)'], media: ['🖼', 'Medienkanal – kommt mit Threads (F12)'], stage: ['🎙', 'Stage-Kanal – noch nicht unterstützt'] };
 
 // Erkannte, aber noch nicht bedienbare Kanäle: sichtbar statt "verschwunden" (Issue #1)
-function OtherRows({ channels, activeId, onOpenForum }) {
+function OtherRows({ channels, activeId, onOpenForum, collapsed }) {
   if (!channels.length) return null;
   return (
     <>
-      <div className="chatlist__section">Weitere Kanäle</div>
-      {channels.map((c) => {
+      <SectionHeader title="Weitere Kanäle" count={channels.length} collapsed={collapsed} onToggle={() => toggleSection('other')} />
+      {(collapsed ? channels.filter((c) => c.id === activeId) : channels).map((c) => {
         const [icon, text] = c.type === 'forum' ? ['🗂', 'Forum – Beiträge ansehen und erstellen'] : OTHER_LABEL[c.type] || ['#', 'noch nicht unterstützt'];
         if (c.type === 'forum')
           return (
@@ -209,6 +229,16 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
   // Sortierung „Neueste zuerst“ oder „Nach Kategorien“ (einklappbar) – wird pro PC gemerkt
   const [sort, setSort] = useState(() => ({ mode: prefs.get().chatSort, collapsed: prefs.get().collapsed }));
   const [dnd, setDnd] = useState(() => prefs.get().dnd);
+  const [sections, setSections] = useState(() => prefs.get().collapsedSections || {});
+  const [chatNotify, setChatNotify] = useState(() => prefs.get().chatNotify || {});
+  useEffect(
+    () =>
+      prefs.subscribe((p) => {
+        setSections(p.collapsedSections || {});
+        setChatNotify(p.chatNotify || {});
+      }),
+    [],
+  );
   useEffect(
     () =>
       prefs.subscribe((p) => {
@@ -259,6 +289,11 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
                   )}
                 </span>
                 {!c.canSend && <span className="chatrow__lock" title="Der Bot darf hier nur lesen">🔒</span>}
+                {(chatNotify[c.id]?.mode === 'aus' || (!chatNotify[c.id] && chatNotify[c.guildId || '@dm']?.mode === 'aus')) && (
+                  <span className="chatrow__lock" title="Stumm: keine Töne für diesen Chat">
+                    🔕
+                  </span>
+                )}
                 {unread && <span className="badge">{count > 0 ? (count > 99 ? '99+' : count) : ''}</span>}
               </div>
             </div>
@@ -362,9 +397,9 @@ function ChatList({ guild, chats, chatGroups = [], previews, activeId, isUnread,
           </button>
         )}
         {!loading && !filter && (
-          <VoiceRows channels={voiceChannels} members={voiceMembers} speaking={speaking} activeId={activeId} voice={voice} onSelect={onSelect} />
+          <VoiceRows channels={voiceChannels} members={voiceMembers} speaking={speaking} activeId={activeId} voice={voice} onSelect={onSelect} collapsed={Boolean(sections.voice)} />
         )}
-        {!loading && !filter && <OtherRows channels={otherChannels} activeId={activeId} onOpenForum={onOpenForum} />}
+        {!loading && !filter && <OtherRows channels={otherChannels} activeId={activeId} onOpenForum={onOpenForum} collapsed={Boolean(sections.other)} />}
       </div>
       <CallBar voice={voice} onOpen={() => onSelect(voice.channelId)} onToggleMic={onToggleMic} onLeave={onLeaveVoice} />
       <BotFooter status={status} />

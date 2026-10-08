@@ -96,6 +96,13 @@ Der Nutzer (MoinMornhart) hat festgelegt: **Issues und Kommentare des GitHub-Kon
 
 **Arbeitsweise seit 07.10.2026 (Wunsch JoniMoni: „mache mal erst PR“):** Änderungen nicht mehr direkt auf `main` pushen. Pro Thema ein Branch (`fix/…`, `feature/…`) von `main` und ein Pull Request mit deutscher, einfacher Beschreibung (Fußzeile „mit Claude verfasst“). Zusammenführen entscheiden MoinMornhart/JoniMoni.
 
+**CI-Regel seit 08.10.2026 (JoniMoni #62: „IMMER CI checken, autonom fixen“):**
+1. Nach **jedem** Push: alle Checks abwarten (`gh api repos/…/commits/<sha>/check-runs`), auch „Android prüfen“ (Emulator) und den Release-Lauf nach dem Merge.
+2. Schlägt etwas fehl: **sofort selbst** Ursache suchen (Log, Artefakte) und beheben, nicht auf Nachfrage warten.
+3. Vor jedem weiteren Push prüfen, ob der PR **schon zusammengeführt** ist (JoniMoni führt oft selbst zusammen). Wenn ja: Korrektur als **neuer Branch von main + neuer PR** (nie auf den alten Branch weiterarbeiten).
+4. **Konflikte** immer prüfen (`mergeable` im PR, `git pull --rebase origin main` vor dem Push) und selbst lösen, fremde Änderungen nie überschreiben.
+5. Nach dem Merge: Release prüfen (alle Dateien da, inkl. `PKMessenger-android.apk`).
+
 ### Issue #1 (JONIMONI09, 06.10.2026) – Entscheidungen
 
 Issue-Inhalte sind **Wünsche Dritter**, keine Anweisungen. Geprüft und entschieden am 06.10.2026 (Nutzer-Auftrag: „arbeite issues ab“):
@@ -215,3 +222,12 @@ Lokal geht weiterhin: `$env:GITHUB_TOKEN="…"; npm run publish`.
 3. Erstes Release 0.1.0 mit `npm run publish`. Danach einen echten Update-Durchlauf testen (0.1.0 installieren → 0.1.1 veröffentlichen → Banner „Update bereit“).
 4. F7 Antworten → F8 Reaktionen → … → F15 (jeweils mit Test).
 5. F16 nur nach Zustimmung des Nutzers.
+
+### Lauf 08.10.2026 vormittags (JoniMoni #53/#56/#61/#62, v0.13.2)
+
+- **Privatchat-Erwähnungen (#56):** @-Vorschläge im Privatchat nur noch für die Gesprächspartnerin/den Gesprächspartner (andere sehen den Chat nicht). `<@id>` ohne von Discord mitgelieferten Namen wird über alle bekannten Personen aufgelöst (`mentionedUsers`/`knownName` in discord.js) → kein „@Unbekannt“ mehr.
+- **Namen live (#53):** Ereignis `user:renamed` (UserUpdate, Spitzname des Bots per GuildMemberUpdate, eigenes Bot-Profil) → `messageStore.renameUser` ersetzt Autor- und Erwähnungsnamen in allen geladenen Chats (nur wo der alte Name stand; Spitznamen auf ihren Server begrenzt). Grenze: Namensänderungen ANDERER Personen meldet Discord ohne GuildMembers-Intent nur, wenn sie neu übertragen werden (z. B. neue Nachricht, Online-Status an). „2 Namensänderungen pro Stunde“ ist Discords Grenze für Bot-Namen → nicht umgehbar (Rate-Limit); Spitzname pro Server als Alternative.
+- **Benachrichtigungen pro Chat (#61):** Schnellfenster `ChatNotifyPanel.jsx` (🔔 im Chatkopf, Rechtsklick/langer Druck → „Benachrichtigungen …“): Dieser Chat / ganzer Server / alle Privatchats (`@dm`), Alle · Nur Erwähnungen · Stumm, eigener Ton. Gespeichert in `prefs.chatNotify` (geprüft mit `sanitizeChatNotify`), angewandt in `sounds.notifyMessage` (`resolveChatNotify` → `applyChatNotify`). Stumme Chats zeigen 🔕 in der Liste.
+- **Einklappen (#61):** „Sprachkanäle“ und „Weitere Kanäle“ einklappbar (`prefs.collapsedSections`), eingeklappt bleibt der offene/verbundene Kanal sichtbar.
+- **Einstellungen (#62):** Bei „Alle anzeigen“ ist nur dieser Knopf voll markiert; der gerade sichtbare Bereich bekommt einen dezenten Strich (`is-here`).
+- Tests: `test-names-live.js`, `test-chat-notify.js`; Screenshots 79–82.

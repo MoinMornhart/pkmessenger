@@ -1,6 +1,6 @@
 // Benachrichtigungstöne (Issue #12): Klänge werden per WebAudio erzeugt – keine Dateien, kein Internet.
 // Eigene WAV-Datei: liegt geprüft im App-Ordner (Main-Prozess), wird hier nur abgespielt.
-import { classifyMessage, decideSound } from '../shared/notify-sounds';
+import { classifyMessage, decideSound, resolveChatNotify, applyChatNotify } from '../shared/notify-sounds';
 import { prefs } from './prefs';
 import { api } from './api';
 
@@ -81,9 +81,11 @@ export function playPreset(preset, volume = prefs.get().sound.volume, event = 't
 }
 
 /** Ereignis melden ('ai', 'error', …) → spielt höchstens einen Ton, wenn die Einstellungen es erlauben. */
-export function notify(event) {
+export function notify(event, presetOverride = null) {
   if (prefs.get().dnd) return null; // Nicht stören: keine Töne
-  const s = prefs.get().sound;
+  const base = prefs.get().sound;
+  // eigener Ton für diesen Chat (Schnellfenster): Ereignis dafür einschalten und Ton ersetzen
+  const s = presetOverride && event && base.events[event] ? { ...base, events: { ...base.events, [event]: { on: true, preset: presetOverride } } } : base;
   const d = decideSound(event, s, { lastPlayedAt, now: Date.now() });
   if (!d) return null;
   lastPlayedAt = Date.now();
@@ -92,7 +94,9 @@ export function notify(event) {
 }
 
 export function notifyMessage(m, info) {
-  return notify(classifyMessage(m, info));
+  const rule = resolveChatNotify(prefs.get().chatNotify, { channelId: m?.channelId, guildId: m?.guildId });
+  const { event, preset } = applyChatNotify(classifyMessage(m, info), rule);
+  return notify(event, preset);
 }
 
 export function forgetCustomSound() {

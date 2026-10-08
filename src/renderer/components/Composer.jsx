@@ -164,10 +164,12 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
       await new Promise((r) => setTimeout(r, 120));
       if (seq !== searchSeq.current) return undefined;
       try {
-        // Privatchat (Issue #1): Personen von allen Servern des Bots + bekannte Privatchats
+        // Privatchat (JoniMoni #56): nur wer WIRKLICH im Chat ist – die Gesprächspartnerin/der Gesprächspartner.
+        // Andere zu erwähnen ergibt hier keinen Sinn (sie sehen den Privatchat nicht und bekommen keinen Ping).
         if (guild.isDM) {
-          const people = await api.searchPeople({ query: q.query });
-          if (seq === searchSeq.current) setSuggest(people.length ? { ...q, items: people.map((p) => ({ ...p, sub: p.guilds?.length ? `${p.sub} · ${p.guilds[0]}` : p.sub })), sel: 0 } : null);
+          const partner = channel.userId ? [{ kind: 'user', id: channel.userId, display: channel.name, sub: 'in diesem Privatchat', avatarUrl: channel.avatarUrl || null, status: channel.status || null }] : [];
+          const items = q.query ? fuzzyFilter(partner, q.query, (p) => [p.display]) : partner;
+          if (seq === searchSeq.current) setSuggest(items.length ? { ...q, items, sel: 0 } : null);
           return undefined;
         }
         let items = await api.searchMentionables({ guildId: guild.id, query: q.query });
@@ -187,7 +189,7 @@ export default function Composer({ guild, channel, bot, allChannels, onSend, rep
       }
       return undefined;
     },
-    [allChannels, guild.id, guild.isDM, editing],
+    [allChannels, guild.id, guild.isDM, editing, channel.userId, channel.name, channel.avatarUrl, channel.status],
   );
 
   const lastSuggest = useRef(null);

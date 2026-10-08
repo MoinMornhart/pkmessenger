@@ -16,6 +16,7 @@ const EVENT_TYPES = new Set([
   'ai:replied',
   'ai:busy',
   'presence',
+  'user:renamed',
   'blocklist',
   'remote:activity',
   'remote:pending',
