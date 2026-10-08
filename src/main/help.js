@@ -29,6 +29,8 @@ const DEFAULT_PORT = 47816; // ein anderer Port als der Fernzugang (47815)
 
 const b64 = (u8) => Buffer.from(u8).toString('base64');
 const unb64 = (s) => new Uint8Array(Buffer.from(String(s || ''), 'base64'));
+// URL-sicher (für den Schlüssel im Link-Fragment: kein +,/,= das URLSearchParams verfälscht). Die Helfer-Seite wandelt zurück.
+const b64url = (u8) => Buffer.from(u8).toString('base64url');
 const rid = (n = 16) => crypto.randomBytes(n).toString('base64url');
 // Kurzer, gut ablesbarer Einmal-Code (ohne 0/O/1/I)
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -62,7 +64,7 @@ const isPrivateIp = (ip) => ip === '::1' || isLocalAddress(`http://${ip.includes
  * @param {() => string[]} o.lanAddresses
  * @param {string|null} o.hostName  mDNS-Name (kein IP im Link)
  */
-function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () => {}, now = () => Date.now(), lanAddresses = () => [], bindHost = '0.0.0.0', hostName = null, logger = null, port = DEFAULT_PORT, webDir = null, naclPath = null }) {
+function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () => {}, now = () => Date.now(), lanAddresses = () => [], bindHost = '0.0.0.0', hostName = null, logger = null, port = DEFAULT_PORT, webDir = null, naclPath = null, getRelay = () => null, WebSocketImpl = null }) {
   let server = null;
   let pairing = null; // { code, key, expires } – ein offener Einmal-Code
   let session = null; // { key, expires, approved, control } – der eine verbundene Helfer
@@ -90,6 +92,7 @@ function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () =>
       host: hostName || null,
       addresses: lanAddresses(),
       port: server?.address()?.port || DEFAULT_PORT,
+      relay: getRelay()?.httpBase || null,
       activity: activity.slice(0, 20),
     };
   }
@@ -153,8 +156,68 @@ function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () =>
     return data;
   }
 
-  const STATIC = { '/help/': ['index.html', 'text/html; charset=utf-8'], '/help/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/help/nacl.js': [null, 'text/javascript; charset=utf-8'] };
+  const STATIC = { '/help/': ['index.html', 'text/html; charset=utf-8'], '/help/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/help/nacl.js': ['nacl.js', 'text/javascript; charset=utf-8'] };
   const CSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
+  // Gemeinsame Logik für LAN (HTTP) und Relay (WebSocket) → { code, obj } (code nur für HTTP relevant).
+  async function rpc(path, body, { ip = 'relay' } = {}) {
+    if (path === '/pair') {
+      if (!pairing || pairing.expires < now()) return { code: 403, obj: { error: 'Code abgelaufen. Am PC „Hilfe anfordern“ neu starten.' } };
+      if (String(body?.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '') !== pairing.code) return { code: 403, obj: { error: 'Falscher Code.' } };
+      if (session) return { code: 409, obj: { error: 'Es hilft bereits jemand.' } };
+      const payload = unseal(body, pairing.key);
+      const helperName = String(payload?.name || 'Helfer').slice(0, 40);
+      const ok = await askUser({ helper: helperName, ip });
+      if (!ok) return { code: 200, obj: seal({ error: 'Am PC abgelehnt oder keine Antwort.' }, pairing.key) };
+      session = { key: pairing.key, expires: now() + SESSION_TTL_MS, approved: true, control: controlAllowed, name: helperName };
+      pairing = null;
+      log('Helfer verbunden', { helper: helperName });
+      emitStatus();
+      return { code: 200, obj: seal({ ok: true, ttl: SESSION_TTL_MS }, session.key) };
+    }
+    if (!session || session.expires < now()) return { code: 401, obj: { error: 'Nicht verbunden.' } };
+    const data = openBody(body, session.key);
+    if (!data) return { code: 400, obj: { error: 'Ungültige oder wiederholte Anfrage.' } };
+    if (path === '/view') return { code: 200, obj: seal({ view: redactView(getView()), control: controlAllowed }, session.key) };
+    if (path === '/act') {
+      const verdict = allowHelperAction(data.action, { view: getView(), enabled: true, controlAllowed });
+      if (!verdict.ok) return { code: 200, obj: seal({ rejected: verdict.reason }, session.key) };
+      applyAction(data.action);
+      log('Helfer-Aktion', { kind: data.action?.type });
+      return { code: 200, obj: seal({ ok: true }, session.key) };
+    }
+    return { code: 404, obj: { error: 'Unbekannt.' } };
+  }
+
+  // Relay-Client (außerhalb des WLANs): verbindet sich AUSGEHEND zum Relay, empfängt Helfer-Pakete, antwortet.
+  let relayWs = null;
+  function stopRelay() {
+    const w = relayWs;
+    relayWs = null;
+    if (w) try { w.close(); } catch { /* egal */ }
+  }
+  function startRelay(roomId) {
+    const relay = getRelay();
+    const WS = WebSocketImpl || (() => { try { return require('ws'); } catch { return null; } })();
+    if (!relay?.wss || !WS) return;
+    stopRelay();
+    const ws = new WS(relay.wss);
+    relayWs = ws;
+    ws.on('open', () => { try { ws.send(JSON.stringify({ room: roomId, role: 'host' })); } catch { /* egal */ } });
+    ws.on('message', async (rawMsg) => {
+      let m = null;
+      try { m = JSON.parse(rawMsg.toString()); } catch { return; }
+      if (m.relay) {
+        if (m.relay === 'peer') { log(m.connected ? 'Helfer (über Relay) da' : 'Helfer (über Relay) weg'); emitStatus(); }
+        return;
+      }
+      if (!m.path || typeof m.id !== 'string') return;
+      const { obj } = await rpc(m.path, m.body, { ip: 'relay' });
+      try { ws.send(JSON.stringify({ id: m.id, reply: obj })); } catch { /* egal */ }
+    });
+    ws.on('close', () => { if (relayWs === ws) relayWs = null; });
+    ws.on('error', (err) => logger?.warn?.('help', `relay: ${err?.message || err}`));
+  }
 
   async function handle(req, res) {
     const ip = remoteIp(req);
@@ -183,48 +246,19 @@ function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () =>
       return json(res, 400, { error: 'Ungültig.' });
     }
 
-    // 1) Koppeln: Einmal-Code → Session (nach Bestätigung am PC)
-    if (url === '/pair' && req.method === 'POST') {
-      if (!pairing || pairing.expires < now()) return json(res, 403, { error: 'Code abgelaufen. Am PC „Hilfe anfordern“ neu starten.' });
-      if (String(body.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '') !== pairing.code) return json(res, 403, { error: 'Falscher Code.' });
-      if (session) return json(res, 409, { error: 'Es hilft bereits jemand.' });
-      const payload = unseal(body, pairing.key);
-      const helperName = String(payload?.name || 'Helfer').slice(0, 40);
-      const ok = await askUser({ helper: helperName, ip });
-      if (!ok) return json(res, 200, seal({ error: 'Am PC abgelehnt oder keine Antwort.' }, pairing.key));
-      session = { key: pairing.key, expires: now() + SESSION_TTL_MS, approved: true, control: controlAllowed, name: helperName };
-      pairing = null; // Code verbraucht
-      log('Helfer verbunden', { helper: helperName });
-      emitStatus();
-      return json(res, 200, seal({ ok: true, ttl: SESSION_TTL_MS }, session.key));
-    }
-
-    // alle weiteren Anfragen brauchen die Session
-    if (!session || session.expires < now()) return json(res, 401, { error: 'Nicht verbunden.' });
-    const data = openBody(body, session.key);
-    if (!data) return json(res, 400, { error: 'Ungültige oder wiederholte Anfrage.' });
-
-    // 2) Aktuellen (geschwärzten) Bildschirm abholen
-    if (url === '/view' && req.method === 'POST') {
-      return json(res, 200, seal({ view: redactView(getView()), control: controlAllowed }, session.key));
-    }
-    // 3) Aktion ausführen (geprüft)
-    if (url === '/act' && req.method === 'POST') {
-      const verdict = allowHelperAction(data.action, { view: getView(), enabled: true, controlAllowed });
-      if (!verdict.ok) return json(res, 200, seal({ rejected: verdict.reason }, session.key));
-      applyAction(data.action);
-      log('Helfer-Aktion', { kind: data.action?.type });
-      return json(res, 200, seal({ ok: true }, session.key));
-    }
-    return json(res, 404, { error: 'Unbekannt.' });
+    const { code, obj } = await rpc(url, body, { ip });
+    return json(res, code, obj);
   }
 
   /** „Hilfe anfordern“: Server starten (falls nötig), Einmal-Code erzeugen. */
   function request() {
     const key = nacl.randomBytes(nacl.secretbox.keyLength);
     const code = newCode();
+    const roomId = rid(18).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32);
     pairing = { code, key, expires: now() + CODE_TTL_MS };
     session = null;
+    const relay = getRelay();
+    if (relay?.wss) startRelay(roomId);
     const startServer = () =>
       new Promise((resolve) => {
         if (server?.listening) return resolve();
@@ -236,13 +270,15 @@ function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () =>
         server.listen(port, bindHost, resolve);
       });
     return startServer().then(() => {
-      const port = server?.address()?.port || DEFAULT_PORT;
-      const hash = `#c=${b64(key)}`;
-      // Kein IP im Link (wie Fernzugang): nur der PC-Name. Der Code wird separat angezeigt.
-      const url = hostName ? `http://${hostName}:${port}/help/${hash}` : null;
+      const prt = server?.address()?.port || DEFAULT_PORT;
+      const hash = `#c=${b64url(key)}`;
+      // LAN: nur der PC-Name, kein IP im Link. Code wird separat angezeigt.
+      const url = hostName ? `http://${hostName}:${prt}/help/${hash}` : null;
+      // Außerhalb des WLANs: Link über den Relay – der Helfer öffnet ihn überall im Browser (kein QR-Scan nötig).
+      const relayUrl = relay?.httpBase ? `${relay.httpBase}/help/#r=${roomId}&c=${b64url(key)}` : null;
       log('Hilfe angefordert');
       emitStatus();
-      return { code, url, port, host: hostName, expires: pairing.expires };
+      return { code, url, relayUrl, port: prt, host: hostName, expires: pairing.expires, relay: Boolean(relayUrl) };
     });
   }
 
@@ -266,6 +302,7 @@ function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () =>
   function stop() {
     pairing = null;
     session = null;
+    stopRelay();
     if (pendingApproval) {
       pendingApproval.resolve(false);
       pendingApproval = null;

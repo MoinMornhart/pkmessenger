@@ -202,13 +202,21 @@ const help = createHelp({
   hostName: demo ? 'localhost' : /^[a-z0-9-]{1,63}$/i.test(os.hostname()) ? `${os.hostname().toLowerCase()}.local` : null,
   webDir: path.join(__dirname, '..', 'help-web'),
   naclPath: require.resolve('tweetnacl/nacl-fast.min.js'),
+  // Relay-Adresse (für Fernhilfe außerhalb des WLANs): wss://<domain>/ws, selbst gehostet (relay/)
+  getRelay: () => {
+    const u = store.get().helpRelay;
+    if (typeof u !== 'string' || !/^wss:\/\//i.test(u)) return null;
+    const httpBase = u.replace(/^wss:/i, 'https:').replace(/\/ws\/?$/i, '').replace(/\/+$/, '');
+    return { wss: u, httpBase };
+  },
 });
 /** „Hilfe anfordern“: Einmal-Code + QR-Code (als Bild) für die Oberfläche */
 help.requestWithQr = async () => {
   const p = await help.request();
-  if (!p.url) return p;
+  const linkForQr = p.relayUrl || p.url;
+  if (!linkForQr) return p;
   const qr = qrcode(0, 'M');
-  qr.addData(p.url);
+  qr.addData(linkForQr);
   qr.make();
   return { ...p, qr: qr.createDataURL(6, 2) };
 };

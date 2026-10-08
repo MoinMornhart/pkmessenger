@@ -1,7 +1,7 @@
 {
   "name": "pkmessenger",
   "productName": "PKMessenger",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "PKMessenger – Bot-Control-Center für Discord über die offizielle Bot-API",
   "main": "src/main/main.js",
   "private": true,
@@ -27,7 +27,8 @@
     "@discordjs/voice": "0.19.2",
     "discord.js": "14.27.0",
     "qrcode-generator": "2.0.4",
-    "tweetnacl": "1.0.3"
+    "tweetnacl": "1.0.3",
+    "ws": "8.22.0"
   },
   "devDependencies": {
     "@electron-forge/cli": "8.0.1",

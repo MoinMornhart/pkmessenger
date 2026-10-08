@@ -549,6 +549,12 @@ const validators = {
     if (!code) throw new ValidationError('Das ist kein gültiger Discord-Einladungslink (z. B. discord.gg/abc123).');
     return { code };
   },
+  helpRelay(p) {
+    const { url } = obj(p);
+    if (url === '' || url == null) return { url: '' };
+    if (typeof url !== 'string' || url.length > 300 || !/^wss:\/\/[a-z0-9.-]+(:\d+)?(\/[\w./-]*)?$/i.test(url)) throw new ValidationError('Bitte eine Adresse wie wss://relay.deine-domain.de/ws eintragen.');
+    return { url: url.trim() };
+  },
   tokenImport(p) {
     const { link, code } = obj(p);
     if (typeof link !== 'string' || link.length > 2000 || !link.trim().startsWith('pkmessenger://login')) throw new ValidationError('Das ist kein gültiger Anmelde-Link.');

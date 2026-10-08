@@ -568,6 +568,46 @@ const ALL_SECTIONS = [
 const ANDROID_HIDDEN = new Set(['sicherheit', 'audio', 'beta']);
 const SECTIONS = isAndroid ? ALL_SECTIONS.filter((s) => !ANDROID_HIDDEN.has(s.id)) : ALL_SECTIONS;
 
+// Relay-Adresse für Fernhilfe/Fernzugang außerhalb des WLANs (selbst gehostet, siehe docs/proxmox-quickstart.md)
+function HelpRelayField() {
+  const [url, setUrl] = useState('');
+  const [saved, setSaved] = useState('');
+  const [msg, setMsg] = useState(null);
+  useEffect(() => {
+    api.helpStatus().then((s) => {
+      setSaved(s?.relay || '');
+      setUrl(s?.relay ? `${s.relay.replace(/^https:/, 'wss:')}/ws` : '');
+    }).catch(() => {});
+  }, []);
+  const save = async (value) => {
+    try {
+      const s = await api.helpSetRelay({ url: value });
+      setSaved(s?.relay || '');
+      setMsg(value ? { ok: true, text: 'Relay gespeichert – Hilfe geht jetzt auch von außerhalb.' } : { ok: true, text: 'Relay entfernt – wieder nur im WLAN.' });
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    }
+  };
+  return (
+    <div className="settings__field" data-setting="help-relay">
+      <span className="settings__label">🌍 Relay-Adresse (für Hilfe von außerhalb)</span>
+      <div className="settings__row">
+        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="wss://relay.deine-domain.de/ws" aria-label="Relay-Adresse" spellCheck={false} />
+        <button className="btn btn--small" onClick={() => save(url.trim())} disabled={!url.trim()}>
+          Speichern
+        </button>
+        {saved && (
+          <button className="btn btn--ghost btn--small" onClick={() => (setUrl(''), save(''))}>
+            Entfernen
+          </button>
+        )}
+      </div>
+      {msg && <p className={`small ${msg.ok ? 'ok' : 'warn'}`}>{msg.text}</p>}
+      <p className="muted small">Ohne Relay geht Hilfe nur im selben WLAN. Den Relay hostest du selbst (kostenlos, z. B. auf Proxmox) – er leitet nur verschlüsselt weiter und sieht nie deinen Token. Anleitung: docs/proxmox-quickstart.md.</p>
+    </div>
+  );
+}
+
 // Hilfe & Tour
 function HelpSection({ onClose }) {
   const t = tourState();
@@ -618,6 +658,7 @@ function HelpSection({ onClose }) {
         </button>
       </div>
       <p className="muted small">Ein Helfer im selben WLAN sieht nur die Einrichtung – deine Chats und Nachrichten bleiben verborgen. Beenden jederzeit mit Strg+C.</p>
+      <HelpRelayField />
       <span className="settings__label">🐞 Fehler melden</span>
       <div className="settings__row">
         <button className="btn btn--small" onClick={() => reportError('manuell (Einstellungen → Hilfe)', 'Fehlerbericht von Hand erstellt')}>

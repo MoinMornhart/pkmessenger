@@ -65,6 +65,19 @@ export function HelpDialog({ onClose, toast }) {
               <div className="invite__actions">
                 <span className="muted small">Code für den Helfer (nur hier sichtbar):</span>
                 <b className="login-code">{info.code}</b>
+                {info.relayUrl || info.url ? (
+                  <>
+                    <span className="muted small">{info.relayUrl ? '🌍 Link (funktioniert überall):' : '🏠 Link (nur im selben WLAN):'}</span>
+                    <button className="btn btn--ghost btn--small" onClick={() => api.copyText({ text: info.relayUrl || info.url }).then(() => toast?.({ kind: 'info', title: 'Link kopiert', text: 'An den Helfer schicken.', duration: 2500 }))}>
+                      🔗 Link kopieren
+                    </button>
+                  </>
+                ) : null}
+                {!info.relayUrl && (
+                  <span className="muted small">
+                    Für Hilfe von außerhalb: Relay-Adresse unter Einstellungen → Hilfe &amp; Tour eintragen.
+                  </span>
+                )}
                 {connected ? <span className="ok">✅ Helfer verbunden</span> : <span className="muted small">Warte auf den Helfer …</span>}
                 <label className="composer__ping">
                   <input type="checkbox" defaultChecked={status?.controlAllowed !== false} onChange={(e) => api.helpControl({ on: e.target.checked }).catch(() => {})} /> Helfer darf mithelfen (sonst nur zusehen)
