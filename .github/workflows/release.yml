@@ -16,8 +16,8 @@ on:
   push:
     branches:
       - main
-    paths:
-      - package.json
+    # #107: kein paths-Filter mehr. Der analyze-Job hat eine vollständige Doppel-Release-Sperre (Tag existiert →
+    # überspringen) und warnt sichtbar, wenn Code ohne Versionserhöhung auf main landet.
     tags:
       - "v*.*.*"
 
@@ -113,6 +113,15 @@ jobs:
               if [ "$EXISTING_SHA" != "$TARGET_SHA" ]; then
                 echo "ℹ Version $VERSION ist schon veröffentlicht (Tag $TAG auf $EXISTING_SHA) – nichts zu tun."
                 echo "ℹ Für ein neues Update die Version in package.json erhöhen."
+                # #107: Laut warnen, wenn seit dem letzten Release App-Code geändert wurde – sonst merkt keiner,
+                # dass gemergte Fixes nie veröffentlicht werden.
+                CHANGED="$(gh api "repos/$REPO/compare/$TAG...$TARGET_SHA" --jq '[.files[]?.filename | select(startswith("src/") or startswith("mobile/") or startswith("relay/"))] | length' 2>/dev/null || echo 0)"
+                if [ "${CHANGED:-0}" -gt 0 ]; then
+                  MSG="$CHANGED App-Datei(en) seit $TAG geändert, aber Version in package.json nicht erhöht – es wird KEIN Update veröffentlicht. Version erhöhen (z. B. per Bump-PR), dann baut dieser Workflow automatisch."
+                  echo "::warning title=Kein Release – Version nicht erhöht::$MSG"
+                  echo "### ⚠️ Kein Release" >> "$GITHUB_STEP_SUMMARY"
+                  echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+                fi
                 {
                   echo "skip=true"
                   echo "tag=$TAG"
