@@ -11,9 +11,12 @@ const onMouse = (e) => {
 };
 
 function currentScreen() {
-  if (document.querySelector('.layout')) return 'workspace';
+  // #104: Die Einstellungen öffnen als Modal ÜBER dem Workspace (.layout bleibt dahinter). Darum zuerst auf die
+  // Einstellungen/Einrichtung prüfen – sonst sähe der Helfer nie die Settings. Der Helfer bekommt dann NUR die
+  // Felder des Einstellungs-Dialogs (collectFields grenzt auf .modal.settings ein); die Chats dahinter bleiben verborgen.
   if (document.querySelector('.modal.settings')) return 'settings';
   if (document.querySelector('.token-quick, .setup-head, .wizard')) return 'setup';
+  if (document.querySelector('.layout')) return 'workspace';
   return 'other';
 }
 
