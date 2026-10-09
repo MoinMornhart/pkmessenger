@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { prefs } from '../prefs';
-import { micConstraints, gateStep } from '../../shared/voice-settings';
+import { micConstraints, gateStep, gateGain, HIGHPASS_HZ } from '../../shared/voice-settings';
 import { rms } from '../../shared/audio-frames';
 
 // Sprachkanal-Audio (Issue #1): Filter, Audio-Test, Hilfe bei Problemen
@@ -37,16 +37,22 @@ export default function VoiceFxSection() {
       const gate = ctx.createGain();
       const delay = ctx.createDelay(1);
       delay.delayTime.value = 0.25; // leicht verzögert, damit man sich nicht „im Kopf“ hört
-      src.connect(analyser);
-      src.connect(gate).connect(delay);
+      // #108: wie im Anruf – Hochpass gegen Brummen, dann Gate
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = HIGHPASS_HZ;
+      src.connect(hp);
+      hp.connect(analyser);
+      hp.connect(gate).connect(delay);
       const buf = new Float32Array(analyser.fftSize);
-      const r = { stream, ctx, delay, raf: 0, openUntil: 0 };
+      const r = { stream, ctx, delay, raf: 0, openUntil: 0, gain: 1 };
       const tick = () => {
         analyser.getFloatTimeDomainData(buf);
         const level = rms(buf);
         const g = gateStep(level, prefs.get().voiceFx.gate, performance.now(), r.openUntil);
         r.openUntil = g.openUntil;
-        gate.gain.value = g.open ? 1 : 0;
+        r.gain = gateGain(r.gain, g.open);
+        gate.gain.value = r.gain; // weich absenken statt harter Stille (wie im Anruf)
         setTest({ level: Math.min(1, level * 4), open: g.open });
         r.raf = requestAnimationFrame(tick);
       };
@@ -141,7 +147,7 @@ export default function VoiceFxSection() {
             <b>Du hörst dich doppelt?</b> Dann bist du wahrscheinlich zusätzlich mit deinem Discord-Account im selben Sprachkanal. Im Anruf bei deinem Namen auf „🔈 hören“ klicken → „🔇 für mich stumm“.
           </li>
           <li>
-            <b>Rauschen oder Brummen?</b> Geräuschsperre auf „Stark“ stellen und Rauschunterdrückung anlassen.
+            <b>Rauschen oder Brummen?</b> Rauschunterdrückung anlassen; Geräuschsperre zuerst auf „Normal“. Nur bei lauter Umgebung „Stark“ – und im Mikro-Test prüfen, dass deine Stimme als „● wird gesendet“ erscheint.
           </li>
           <li>
             <b>Andere hören ein Echo?</b> Echo-Unterdrückung einschalten oder ein Headset benutzen.

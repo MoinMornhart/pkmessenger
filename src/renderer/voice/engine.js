@@ -5,7 +5,7 @@
 import { voicePacket, onVoiceAudio } from '../api';
 import { prefs } from '../prefs';
 import { SAMPLE_RATE, FRAME_SAMPLES, CHANNELS, createFrameAssembler, rms, nextPlayTime } from '../../shared/audio-frames';
-import { micConstraints, gateStep, userGain } from '../../shared/voice-settings';
+import { micConstraints, gateStep, gateGain, userGain, HIGHPASS_HZ } from '../../shared/voice-settings';
 
 const OPUS_CONFIG = { codec: 'opus', sampleRate: SAMPLE_RATE, numberOfChannels: CHANNELS, bitrate: 64000, opus: { frameDuration: 20000 } };
 
@@ -80,6 +80,7 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
     let ts = 0;
     let levelTick = 0;
     let gateOpenUntil = 0; // Noise-Gate (Issue #1: „Rauschen entfernen“)
+    let gateLevel = 1; // #108: weiches Absenken statt harter Stille
     const encoder = new AudioEncoder({
       output: (chunk) => {
         const bytes = new Uint8Array(chunk.byteLength);
@@ -97,18 +98,27 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
         if (encoder.state !== 'configured') return;
         const g = gateStep(rms(frame), prefs.get().voiceFx.gate, performance.now(), gateOpenUntil);
         gateOpenUntil = g.openUntil;
-        if (!g.open) {
-          frame.fill(0); // Rauschen → Stille senden
-          stats.gated++;
+        const target = gateGain(gateLevel, g.open);
+        if (target < 1 || gateLevel < 1) {
+          // linear vom alten zum neuen Faktor über den Block → keine Klicks
+          const n = frame.length;
+          for (let i = 0; i < n; i++) frame[i] *= gateLevel + ((target - gateLevel) * i) / n;
         }
+        gateLevel = target;
+        if (!g.open) stats.gated++;
         const data = new AudioData({ format: 'f32-planar', sampleRate: SAMPLE_RATE, numberOfFrames: FRAME_SAMPLES, numberOfChannels: CHANNELS, timestamp: ts, data: frame });
         ts += 20000;
         encoder.encode(data);
         data.close();
       }
     };
-    source.connect(node);
-    mic = { stream, source, node, encoder, assembler };
+    // #108: Hochpass gegen Brummen/Trittschall/Lüfter unterhalb der Stimme
+    const highpass = c.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = HIGHPASS_HZ;
+    source.connect(highpass);
+    highpass.connect(node);
+    mic = { stream, source, highpass, node, encoder, assembler };
   }
 
   function stopMic() {
@@ -118,6 +128,7 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
     m.node.port.onmessage = null;
     try {
       m.source.disconnect();
+      m.highpass?.disconnect();
       m.node.disconnect();
     } catch {
       /* egal */

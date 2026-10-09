@@ -3,8 +3,15 @@
 // Sprach-Einstellungen (Issue #1: „Rauschen entfernen“, „man hört sich doppelt“, „alles muten“).
 // Reine Logik, getestet in tests/test-voice-settings.js. Audio selbst: src/renderer/voice/engine.js.
 
-const GATE_LEVELS = { aus: 0, normal: 0.012, stark: 0.035 }; // RMS-Schwelle des Noise-Gates
-const GATE_HOLD_MS = 300; // nach dem Sprechen kurz offen lassen → keine abgeschnittenen Silben
+// RMS-Schwelle des Noise-Gates. #108: „stark“ lag bei 0.035 – zusammen mit der Rauschunterdrückung des Browsers
+// (die den Pegel schon absenkt) blieb normale Sprache (RMS ~0.01–0.03) dauerhaft darunter → man hörte niemanden mehr.
+const GATE_LEVELS = { aus: 0, normal: 0.006, stark: 0.012 };
+const GATE_HOLD_MS = 450; // nach dem Sprechen offen lassen → keine abgeschnittenen Silben/Satzenden
+// Geschlossenes Gate dämpft nur stark (~-22 dB) statt hart auf Stille – wird Sprache falsch eingestuft, ist sie
+// trotzdem noch hörbar. Öffnen sofort, Schließen weich über ~80 ms (keine Klickgeräusche).
+const GATE_FLOOR = 0.08;
+const GATE_RELEASE_STEP = 0.25; // pro 20-ms-Block
+const HIGHPASS_HZ = 80; // Trittschall/Brummen/Lüfter unterhalb der Stimme entfernen
 const SNOWFLAKE = /^\d{17,20}$/;
 
 const DEFAULT_VOICE_FX = Object.freeze({ echo: true, noise: true, agc: true, gate: 'normal', userMuted: {}, userVolume: {} });
@@ -30,7 +37,9 @@ function userGain(fx, userId) {
 
 /** Mikrofon-Optionen für getUserMedia. */
 function micConstraints(fx, micId) {
-  return { echoCancellation: fx.echo, noiseSuppression: fx.noise, autoGainControl: fx.agc, channelCount: 1, ...(micId ? { deviceId: { ideal: micId } } : {}) };
+  // voiceIsolation (W3C mediacapture-extensions, #108): trennt die Stimme vom Hintergrund, wo der Browser es kann –
+  // sonst wird die Option einfach ignoriert. Hängt an „Rauschunterdrückung“.
+  return { echoCancellation: fx.echo, noiseSuppression: fx.noise, autoGainControl: fx.agc, voiceIsolation: fx.noise, channelCount: 1, ...(micId ? { deviceId: { ideal: micId } } : {}) };
 }
 
 /**
@@ -44,4 +53,13 @@ function gateStep(level, gate, now, openUntil) {
   return { open: now < openUntil, openUntil };
 }
 
-module.exports = { GATE_LEVELS, GATE_HOLD_MS, DEFAULT_VOICE_FX, sanitizeVoiceFx, userGain, micConstraints, gateStep };
+/**
+ * Verstärkung für den nächsten Block: offen → sofort 1, geschlossen → weich bis GATE_FLOOR absenken (nie 0).
+ * @returns {number} Faktor 0..1
+ */
+function gateGain(prev, open) {
+  if (open) return 1;
+  return Math.max(GATE_FLOOR, (Number.isFinite(prev) ? prev : 1) - GATE_RELEASE_STEP);
+}
+
+module.exports = { GATE_LEVELS, GATE_HOLD_MS, GATE_FLOOR, HIGHPASS_HZ, DEFAULT_VOICE_FX, sanitizeVoiceFx, userGain, micConstraints, gateStep, gateGain };
