@@ -73,6 +73,8 @@ function createDemo() {
   add(a, chiara, 'Hier ein Code-Beispiel aus dem Bot:\n```js\nchannel.send({ content: "Hallo", allowedMentions: { parse: [] } });\n```', 12);
   add(a, bernd, 'Sieht gut aus. `allowedMentions` ist wichtig, damit niemand aus Versehen gepingt wird.', 9);
   const last = add(a, anna, 'Genau, und @everyone nur mit Bestätigung 😄', 8);
+  // #93: Spoiler, der eine Erwähnung umschließt – muss als Spoiler verdeckt werden (nicht als roher ||…||-Text)
+  add(a, bernd, `Gewinner (nicht spoilern!): ||<@${chiara.id}>|| 🏆`, 7, { users: [chiara] });
 
   // F7–F13 in der Demo: Rechte, Reaktionen, Antwort, Embed, Pin, Thread
   const extra = new Set([PF.AddReactions, PF.AttachFiles, PF.EmbedLinks, PF.PinMessages, PF.CreatePublicThreads, PF.SendMessagesInThreads, PF.ManageMessages]);

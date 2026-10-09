@@ -1,5 +1,6 @@
 import { memo, useContext, useState, createContext } from 'react';
 import { tokenizeMentions } from '../../shared/mentions';
+import { splitSpoilerParts } from '../../shared/spoiler';
 import { NavContext } from '../state';
 import { createPortal } from 'react-dom';
 import { prefs } from '../prefs';
@@ -189,13 +190,29 @@ function MentionChip({ seg, mentions }) {
 
 const EMPTY_MENTIONS = { users: [], roles: [], channels: [] };
 
+// Erwähnungen + Text eines Abschnitts rendern (Zeilenanfang für Zitate „> “ wird vom Aufrufer gesetzt).
+function renderSegments(text, mentions, keyBase, atLineStart) {
+  const segs = tokenizeMentions(text);
+  return segs.map((seg, i) =>
+    seg.type === 'text'
+      ? renderText(seg.value, `${keyBase}-${i}`, i === 0 ? atLineStart : segs[i - 1].type === 'text' && segs[i - 1].value.endsWith('\n'))
+      : <MentionChip key={`${keyBase}-m${i}`} seg={seg} mentions={mentions} />,
+  );
+}
+
 function MessageContent({ content, mentions = EMPTY_MENTIONS }) {
-  const segs = tokenizeMentions(content);
+  // #93: Spoiler, die eine Erwähnung umschließen (||<@123>||), zuerst auf oberster Ebene erkennen – sonst würde
+  // tokenizeMentions die Erwähnung vorher heraustrennen und das ||…|| zerbrechen (dann erscheint roher Pipe-Text).
+  const parts = splitSpoilerParts(content);
+  const atStart = (idx) => idx === 0 || content[idx - 1] === '\n';
   return (
     <div className="msg__content">
-      {segs.map((seg, i) =>
-        // Zeilenanfang? (für Zitate „> “): erster Abschnitt oder vorheriger Abschnitt endet mit Zeilenumbruch
-        seg.type === 'text' ? renderText(seg.value, `s${i}`, i === 0 || (segs[i - 1].type === 'text' && segs[i - 1].value.endsWith('\n'))) : <MentionChip key={`m${i}`} seg={seg} mentions={mentions} />,
+      {parts.map((p, pi) =>
+        p.spoiler ? (
+          <Spoiler key={`sp${pi}`}>{renderSegments(p.text, mentions, `sp${pi}`, false)}</Spoiler>
+        ) : (
+          <span key={`p${pi}`}>{renderSegments(p.text, mentions, `p${pi}`, atStart(p.start))}</span>
+        ),
       )}
     </div>
   );
