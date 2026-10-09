@@ -5,7 +5,7 @@
 import { voicePacket, onVoiceAudio } from '../api';
 import { prefs } from '../prefs';
 import { SAMPLE_RATE, FRAME_SAMPLES, CHANNELS, createFrameAssembler, rms, nextPlayTime } from '../../shared/audio-frames';
-import { micConstraints, gateStep, gateGain, userGain, HIGHPASS_HZ } from '../../shared/voice-settings';
+import { micConstraints, gateStep, gateGain, userGain, applyMicGain, HIGHPASS_HZ } from '../../shared/voice-settings';
 
 const OPUS_CONFIG = { codec: 'opus', sampleRate: SAMPLE_RATE, numberOfChannels: CHANNELS, bitrate: 64000, opus: { frameDuration: 20000 } };
 
@@ -96,7 +96,9 @@ export function createVoiceEngine({ onLevel = () => {} } = {}) {
       if (++levelTick % 8 === 0) onLevel(Math.min(1, rms(block) * 4));
       for (const frame of assembler.push(block)) {
         if (encoder.state !== 'configured') return;
-        const g = gateStep(rms(frame), prefs.get().voiceFx.gate, performance.now(), gateOpenUntil);
+        const fxNow = prefs.get().voiceFx;
+        applyMicGain(frame, fxNow.micGain); // #110: eigenes Mikrofon lauter/leiser
+        const g = gateStep(rms(frame), fxNow.gate, performance.now(), gateOpenUntil);
         gateOpenUntil = g.openUntil;
         const target = gateGain(gateLevel, g.open);
         if (target < 1 || gateLevel < 1) {

@@ -14,7 +14,8 @@ const GATE_RELEASE_STEP = 0.25; // pro 20-ms-Block
 const HIGHPASS_HZ = 80; // Trittschall/Brummen/Lüfter unterhalb der Stimme entfernen
 const SNOWFLAKE = /^\d{17,20}$/;
 
-const DEFAULT_VOICE_FX = Object.freeze({ echo: true, noise: true, agc: true, gate: 'normal', userMuted: {}, userVolume: {} });
+const MIC_GAIN_MAX = 3; // #110: eigenes Mikrofon bis 300 % (andere Teilnehmer gehen bis 200 %)
+const DEFAULT_VOICE_FX = Object.freeze({ echo: true, noise: true, agc: true, gate: 'normal', micGain: 1, userMuted: {}, userVolume: {} });
 
 function sanitizeVoiceFx(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
@@ -24,6 +25,7 @@ function sanitizeVoiceFx(raw) {
     noise: typeof r.noise === 'boolean' ? r.noise : true,
     agc: typeof r.agc === 'boolean' ? r.agc : true,
     gate: Object.hasOwn(GATE_LEVELS, r.gate) ? r.gate : 'normal',
+    micGain: Number.isFinite(r.micGain) ? Math.min(MIC_GAIN_MAX, Math.max(0, r.micGain)) : 1,
     userMuted: ids(r.userMuted, (v) => v === true),
     userVolume: Object.fromEntries(Object.entries(ids(r.userVolume, (v) => Number.isFinite(v))).map(([k, v]) => [k, Math.min(2, Math.max(0, v))])),
   };
@@ -53,6 +55,13 @@ function gateStep(level, gate, now, openUntil) {
   return { open: now < openUntil, openUntil };
 }
 
+/** #110: eigene Mikrofon-Verstärkung auf einen Block anwenden (mit Begrenzung gegen Übersteuern). */
+function applyMicGain(frame, gain) {
+  if (!Number.isFinite(gain) || gain === 1) return frame;
+  for (let i = 0; i < frame.length; i++) frame[i] = Math.max(-1, Math.min(1, frame[i] * gain));
+  return frame;
+}
+
 /**
  * Verstärkung für den nächsten Block: offen → sofort 1, geschlossen → weich bis GATE_FLOOR absenken (nie 0).
  * @returns {number} Faktor 0..1
@@ -62,4 +71,4 @@ function gateGain(prev, open) {
   return Math.max(GATE_FLOOR, (Number.isFinite(prev) ? prev : 1) - GATE_RELEASE_STEP);
 }
 
-module.exports = { GATE_LEVELS, GATE_HOLD_MS, GATE_FLOOR, HIGHPASS_HZ, DEFAULT_VOICE_FX, sanitizeVoiceFx, userGain, micConstraints, gateStep, gateGain };
+module.exports = { GATE_LEVELS, GATE_HOLD_MS, GATE_FLOOR, HIGHPASS_HZ, MIC_GAIN_MAX, DEFAULT_VOICE_FX, sanitizeVoiceFx, userGain, micConstraints, gateStep, gateGain, applyMicGain };
