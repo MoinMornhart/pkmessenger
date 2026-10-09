@@ -6,7 +6,28 @@ Verschlüsselnder WebSocket-Vermittler, damit **Fernzugang** und **Fernhilfe** v
 - **Speichert nichts.** Ein Raum verbindet genau zwei Geräte; er verschwindet, sobald beide weg sind oder nach 30 Minuten.
 - Höchstens 2 Geräte pro Raum, Größen-/Rate-Limits, systemd-Hardening.
 
-## Betrieb auf dem Proxmox
+## Betrieb mit Docker (empfohlen, „integrierter Server")
+
+Turnkey: Relay **plus automatisches HTTPS** (Caddy) in zwei Containern. Du brauchst nur Docker + eine Domain.
+
+1. **DNS:** Einen A-/AAAA-Eintrag deiner Domain (z. B. `relay.deine-domain.de`) auf den Server zeigen lassen.
+2. **Domain eintragen:**
+   ```bash
+   cd relay
+   cp .env.example .env     # dann RELAY_DOMAIN=... in .env setzen
+   ```
+3. **Starten:**
+   ```bash
+   docker compose up -d
+   ```
+   Caddy holt das TLS-Zertifikat automatisch (Let's Encrypt). Nach außen sind nur 80/443 offen; der Relay läuft nur im internen Docker-Netz.
+4. **In PKMessenger** → Einstellungen → Hilfe & Tour: `wss://relay.deine-domain.de/ws` eintragen.
+
+Updaten: `cd relay && docker compose build --pull && docker compose up -d`. Logs: `docker compose logs -f relay`.
+
+> Der Build-Kontext ist das Repo-Wurzelverzeichnis (die `docker-compose.yml` setzt das automatisch), weil der Relay die Helfer-Oberfläche aus `src/help-web` mit ausliefert.
+
+## Betrieb auf dem Proxmox (ohne Docker)
 
 Siehe **[docs/proxmox-quickstart.md](../docs/proxmox-quickstart.md)** – Einzeiler-Install, Reverse-Proxy (Caddy/Nginx) für TLS + Domain, `update`-Befehl.
 

@@ -1,0 +1,12 @@
+# Hält den Docker-Build-Kontext für den Relay klein (nur relay/ + src/help-web werden gebraucht).
+.git
+node_modules
+**/node_modules
+out
+build
+screenshots
+docs
+mobile
+*.log
+.env
+token.enc
