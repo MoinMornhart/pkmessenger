@@ -3,7 +3,7 @@
 // #93: Spoiler, die eine Erwähnung umschließen (z. B. ||<@123>||), müssen ZUERST erkannt werden – sonst trennt die
 // Erwähnungs-Zerlegung die Erwähnung heraus und das ||…|| zerbricht (dann erscheint der rohe Pipe-Text wie im Bild).
 // Reine Spoiler ohne Erwähnung bleiben der normalen Inline-Darstellung überlassen (damit z. B. **||x||** heil bleibt).
-const SPOILER_WITH_MENTION = /\|\|([^|\n]*(?:<@!?\d{17,20}>|<@&\d{17,20}>|<#\d{17,20}>|@(?:everyone|here)\b)[^|\n]*)\|\|/g;
+const SPOILER_WITH_MENTION = /\|\|((?:(?!\|\|)[\s\S])*?(?:<@!?\d{17,20}>|<@&\d{17,20}>|<#\d{17,20}>|@(?:everyone|here)\b)(?:(?!\|\|)[\s\S])*?)\|\|/g;
 
 /**
  * Zerlegt einen Nachrichtentext in Abschnitte: { text, start, spoiler? }.

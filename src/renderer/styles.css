@@ -4758,3 +4758,12 @@ kbd {
 /* ---------- Fernhilfe (Issue #79) ---------- */
 .help-bar { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 22%, var(--panel)); border: 1px solid var(--accent); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); font-size: 13px; font-weight: 600; }
 .setup-help { text-align: center; margin-top: 10px; }
+
+body.help-active .rail,
+body.help-active .chatlist,
+body.help-active .chat {
+  filter: blur(10px);
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.8;
+}

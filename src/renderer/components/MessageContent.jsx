@@ -11,7 +11,7 @@ import { getLists } from '../linkLists';
 const CODE_BLOCK = /```(?:[a-zA-Z0-9_+-]*\n)?([\s\S]*?)```/g;
 // 1 Escape (\* \_ …) · 2 `code` · 3 **fett** · 4 __unterstrichen__ · 5 ~~durch~~ · 6/7 kursiv · 8 Link · 9 ||Spoiler||
 const INLINE =
-  /(\\[\\*_~`|>])|(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(~~[^~\n]+~~)|(\*[^*\s][^*\n]*\*)|(\b_[^_\n]+_\b)|(https?:\/\/[^\s<>"']+[^\s<>"'.,:;!?)\]])|(\|\|[^|\n]+\|\|)/g;
+  /(\\[\\*_~`|>])|(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(~~[^~\n]+~~)|(\*[^*\s][^*\n]*\*)|(\b_[^_\n]+_\b)|(https?:\/\/[^\s<>"']+[^\s<>"'.,:;!?)\]])|(\|\|(?:(?!\|\|)[\s\S])+?\|\|)/g;
 
 // Spoiler: verdeckt, Klick deckt auf (wie in Discord)
 // Fremde Spoiler: erst fragen („Wirklich aufdecken?“ mit „Nicht mehr fragen“, Issue #35); eigene sofort

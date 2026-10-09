@@ -51,6 +51,10 @@ function pushView() {
 
 function applyAction(action) {
   if (currentScreen() === 'workspace') return; // im Chat nie etwas ausführen
+  if (action.type === 'cursor') {
+    window.dispatchEvent(new CustomEvent('help:cursor', { detail: action }));
+    return;
+  }
   const sel = `[data-help-id="${String(action.target || '').replace(/[^a-z0-9]/gi, '')}"]`;
   const el = document.querySelector(sel);
   if (!el) return;
