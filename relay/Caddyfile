@@ -1,0 +1,5 @@
+# Automatisches HTTPS für deine Domain; leitet alles (inkl. /ws und /help/) an den Relay-Container weiter.
+# RELAY_DOMAIN kommt aus relay/.env (siehe docker-compose.yml).
+{$RELAY_DOMAIN} {
+	reverse_proxy relay:8787
+}

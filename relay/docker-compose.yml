@@ -1,0 +1,41 @@
+# Turnkey „integrierter Server": Relay + automatisches HTTPS (Caddy). Einmal einrichten, dann läuft er dauerhaft.
+#
+# Schritt für Schritt:
+#   1) DNS: Einen A-/AAAA-Eintrag deiner Domain (z. B. relay.deine-domain.de) auf diesen Server zeigen lassen.
+#   2) relay/.env anlegen mit:   RELAY_DOMAIN=relay.deine-domain.de
+#   3) Im Ordner relay/:         docker compose up -d
+#   4) In PKMessenger -> Einstellungen -> Hilfe & Tour:  wss://relay.deine-domain.de/ws eintragen.
+#
+# Caddy holt das TLS-Zertifikat automatisch (Let's Encrypt). Der Relay selbst ist nur im internen Docker-Netz
+# erreichbar; nach außen gehen nur 80/443 über Caddy. Es wird nichts gespeichert, kein Token gesehen.
+services:
+  relay:
+    build:
+      context: ..
+      dockerfile: relay/Dockerfile
+    image: pkmessenger-relay
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8787"
+    expose:
+      - "8787"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      RELAY_DOMAIN: ${RELAY_DOMAIN:?Bitte RELAY_DOMAIN in relay/.env setzen, z. B. relay.deine-domain.de}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - relay
+
+volumes:
+  caddy_data:
+  caddy_config:

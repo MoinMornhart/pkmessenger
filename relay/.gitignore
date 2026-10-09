@@ -1,1 +1,4 @@
 node_modules/
+
+# Eigene Relay-Konfig (Domain) – nicht committen
+.env
