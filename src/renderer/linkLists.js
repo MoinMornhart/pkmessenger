@@ -1,7 +1,7 @@
 // Öffentliche Sperrlisten für den Link-Schutz (geladen vom Hauptprozess, täglich aktualisiert).
 import { api, onEvent } from './api';
 
-let lists = null; // { danger: Set, warn: Set }
+let lists = null; // { danger: Set, warn: Set, miner: Set, extra: {ipLoggers, shorteners, trusted, miners} | null }
 let loading = null;
 const listeners = new Set();
 
@@ -14,7 +14,7 @@ export function loadLists() {
   loading = api
     .blocklistGet()
     .then((r) => {
-      lists = { danger: new Set(r.danger || []), warn: new Set(r.warn || []) };
+      lists = { danger: new Set(r.danger || []), warn: new Set(r.warn || []), miner: new Set(r.miner || []), extra: r.extra || null };
       for (const l of listeners) l(lists);
     })
     .catch(() => {})
