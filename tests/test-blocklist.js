@@ -11,7 +11,7 @@ const { checkLink } = require('../src/shared/link-safety');
 
 const fakeFetch = (fail = {}) => async (url) => {
   if (fail.all || (fail.txt && url.endsWith('.txt'))) throw new Error('offline');
-  return { ok: true, status: 200, text: async () => (url.endsWith('.txt') ? '# Kommentar\nevil-grab.example\nWWW.Nitro-Scam.example\n*.wild.example\n' : url.includes('suspicious') ? '{"domains":["odd.example","evil-grab.example"]}' : '{"domains":["steam-fake.example","kaputt domain"]}') };
+  return { ok: true, status: 200, text: async () => (url.endsWith('.txt') ? '# Kommentar\nbad-site.example\nWWW.Nitro-Scam.example\n*.wild.example\n' : url.includes('suspicious') ? '{"domains":["odd.example","bad-site.example"]}' : '{"domains":["steam-fake.example","kaputt domain"]}') };
 };
 
 test('Formate lesen: Textliste und JSON, sauber normalisiert', () => {
@@ -28,8 +28,8 @@ test('Laden, zusammenführen, zwischenspeichern; „gefährlich“ schlägt „v
   const st = await bl.update();
   assert.equal(st.total, 5);
   const g = bl.get();
-  assert.ok(g.danger.includes('evil-grab.example'));
-  assert.ok(!g.warn.includes('evil-grab.example'));
+  assert.ok(g.danger.includes('bad-site.example'));
+  assert.ok(!g.warn.includes('bad-site.example'));
   assert.ok(g.warn.includes('odd.example'));
   assert.deepEqual(events, ['blocklist']);
   assert.ok(fs.existsSync(path.join(dir, 'link-blocklist.json')));
@@ -55,10 +55,10 @@ test('Offline: alter Stand bleibt, Fehler wird gemeldet', async () => {
 });
 
 test('Link-Prüfung nutzt die Listen (auch Unterdomains)', () => {
-  const lists = { danger: new Set(['evil-grab.example']), warn: new Set(['odd.example']) };
-  assert.equal(checkLink('https://sub.evil-grab.example/x', [], lists).level, 'danger');
-  assert.equal(checkLink('https://evil-grab.example/x', [], lists).listed, true);
+  const lists = { danger: new Set(['bad-site.example']), warn: new Set(['odd.example']) };
+  assert.equal(checkLink('https://sub.bad-site.example/x', [], lists).level, 'danger');
+  assert.equal(checkLink('https://bad-site.example/x', [], lists).listed, true);
   assert.equal(checkLink('https://odd.example/x', [], lists).level, 'warn');
   assert.equal(checkLink('https://harmlos.example/x', [], lists).level, 'ok');
-  assert.equal(checkLink('https://evil-grab.example/x').level, 'ok'); // ohne Listen nicht bekannt
+  assert.equal(checkLink('https://bad-site.example/x').level, 'ok'); // ohne Listen nicht bekannt
 });

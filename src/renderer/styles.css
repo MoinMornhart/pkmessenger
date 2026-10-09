@@ -4767,3 +4767,5 @@ body.help-active .chat {
   user-select: none;
   opacity: 0.8;
 }
+
+.poll__note { display: block; }

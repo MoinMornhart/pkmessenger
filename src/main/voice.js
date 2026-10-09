@@ -176,7 +176,7 @@ function createVoiceManager({ voiceLib, getVoiceTarget, emit, sendAudio, joinTim
       for (const stream of s.receivers.values()) stream.destroy();
       s.receivers.clear();
     }
-    s.connection.rejoin?.({ channelId: s.channelId, selfDeaf: !on, selfMute: !s.talking || !s.canSpeak });
+    s.connection.rejoin?.({ channelId: s.channelId, selfDeaf: !on, selfMute: !s.canSpeak });
     return setState({ ...state, listening: on });
   }
 
