@@ -103,6 +103,8 @@ export function HelpDialog({ onClose, toast }) {
 export function HelpController({ toast }) {
   const [pending, setPending] = useState(null);
   const [active, setActive] = useState(false);
+  const [cursor, setCursor] = useState(null);
+
   useEffect(() => {
     const off = bus.on((type, p) => {
       if (type === 'help:pending') setPending(p.done ? null : p);
@@ -111,16 +113,22 @@ export function HelpController({ toast }) {
         setActive(running);
         if (running) startHelpBridge();
         else stopHelpBridge();
+        if (!running) setCursor(null);
       }
     });
+    const onCursor = (e) => setCursor({ x: e.detail.x, y: e.detail.y });
+    window.addEventListener('help:cursor', onCursor);
     api.helpStatus().then((s) => s?.running && (setActive(true), startHelpBridge())).catch(() => {});
     const onKey = (e) => {
       if (e.ctrlKey && (e.key || '').toLowerCase() === 'c' && active) api.helpStop().catch(() => {});
     };
     window.addEventListener('keydown', onKey);
+    document.body.classList.toggle('help-active', active);
     return () => {
       off();
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('help:cursor', onCursor);
+      document.body.classList.remove('help-active');
       stopHelpBridge();
     };
   }, [active]);
@@ -151,6 +159,22 @@ export function HelpController({ toast }) {
           <button className="btn btn--small" onClick={() => api.helpStop().catch(() => {})}>
             Beenden (Strg+C)
           </button>
+        </div>
+      )}
+      {active && cursor && (
+        <div
+          style={{
+            position: 'fixed',
+            left: cursor.x,
+            top: cursor.y,
+            zIndex: 9999,
+            pointerEvents: 'none',
+            fontSize: '24px',
+            textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+            transform: 'translate(-50%, -50%)'
+          }}
+        >
+          👆
         </div>
       )}
     </>

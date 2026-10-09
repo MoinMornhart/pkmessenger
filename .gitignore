@@ -31,3 +31,10 @@ mobile/android/build/
 mobile/android/local.properties
 *.keystore
 *.jks
+
+# Agent local files
+.agent/
+AGENTS.md
+LEARNING.md
+USER.md
+MCP-RULES.md

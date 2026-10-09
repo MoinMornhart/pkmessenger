@@ -66,6 +66,7 @@ const ALLOWED = {
   // zu einem Einrichtungs-Schritt scrollen / Hinweis zeigen
   highlight: (a) => typeof a.target === 'string' && a.target.length <= 80,
   scroll: (a) => ['up', 'down', 'top', 'bottom'].includes(a.dir),
+  cursor: (a) => typeof a.x === 'number' && typeof a.y === 'number',
 };
 
 /**

@@ -106,7 +106,61 @@ function checkLink(url, trustedExtra = [], lists = null) {
   if (reasons.length) return { level: 'warn', host, reasons };
 
   if (SHORTENERS.some((d) => isOrSub(host, d))) return { level: 'unknown', host, reasons: ['Kurzlink: Wohin er wirklich führt, ist nicht zu sehen (beliebter Trick für IP-Grabber).'] };
+
+  // #95: Structural analysis (no list needed). IP grabbers constantly switch to fresh domains, so blocklists alone
+  // never keep up. Instead we look at the SHAPE of the link: an opaque random code as the only path segment,
+  // hostnames that read like redirect/link services, and embedded redirect targets.
+  const t = trackingSignals(u, host);
+  if (t.score >= 2) return { level: 'warn', host, reasons: t.reasons, heuristic: true };
+  if (t.score === 1) return { level: 'unknown', host, reasons: t.reasons, heuristic: true };
   return { level: 'ok', host, reasons: [] };
+}
+
+// Words that typically appear in redirect / link-shortener / logger hostnames
+const LINKY_HOST = /(url|link|lnk|short|tiny|click|redir|track|trk|grab|logger|iplog|geo|trace|2no|cutt|snip)/;
+// Path parts typical for tracking pixels / click counters
+const TRACKY_PATH = /\/(track|trk|log|pixel|px|beacon|click|redirect|redir|r|c|go|out)(\/|$)/i;
+// Query parameters that carry a second (hidden) target URL
+const REDIRECT_PARAM = /^(url|u|redirect|redirect_uri|redir|to|next|dest|destination|target|goto|link|out)$/i;
+
+/**
+ * #95: Heuristic score for "this link probably hides its real target or logs the visitor".
+ * Pure function, runs locally – the link is never fetched (fetching would already leak the IP).
+ * @returns {{ score: number, reasons: string[] }}
+ */
+function trackingSignals(u, host) {
+  const reasons = [];
+  let score = 0;
+  const segments = u.pathname.split('/').filter(Boolean);
+  // 1) Only one short opaque code as the path ("/2pZms", "/aB3x9"): mixed case or letters+digits
+  if (segments.length === 1) {
+    const s = segments[0];
+    const opaque = /^[A-Za-z0-9_-]{3,12}$/.test(s) && ((/[a-z]/.test(s) && /[A-Z]/.test(s)) || (/[A-Za-z]/.test(s) && /\d/.test(s)));
+    if (opaque) {
+      score += 2;
+      reasons.push('Der Link besteht nur aus einem kurzen Zufallscode – typisch für Kurzlinks und IP-Logger. Wohin er wirklich führt, ist nicht zu sehen.');
+    }
+  }
+  // 2) Hostname reads like a link/redirect/logger service ("urlto.me", "clicktrk.io")
+  const label = baseOf(host).split('.')[0];
+  if (LINKY_HOST.test(label)) {
+    score += 1;
+    reasons.push('Der Name der Seite klingt nach einem Weiterleitungs- oder Kurzlink-Dienst.');
+  }
+  // 3) Tracking-ish path ("/track/…", "/r/…", "/pixel")
+  if (TRACKY_PATH.test(u.pathname)) {
+    score += 1;
+    reasons.push('Der Pfad sieht nach einem Klick-Zähler oder Tracking-Pixel aus.');
+  }
+  // 4) A second, hidden target inside the query (?url=https://…)
+  for (const [k, v] of u.searchParams) {
+    if (REDIRECT_PARAM.test(k) && /^(https?:)?\/\//i.test(v)) {
+      score += 2;
+      reasons.push('Im Link steckt eine Weiterleitung auf eine andere Adresse.');
+      break;
+    }
+  }
+  return { score, reasons };
 }
 
 /** Alle Links einer Nachricht prüfen → schlimmste Stufe zuerst. */
@@ -121,4 +175,4 @@ function trustKey(host) {
   return lower(host).replace(/^www\./, '').slice(0, 253);
 }
 
-module.exports = { checkLink, checkMessageLinks, trustKey, IP_LOGGERS, SHORTENERS, TRUSTED };
+module.exports = { checkLink, checkMessageLinks, trustKey, trackingSignals, IP_LOGGERS, SHORTENERS, TRUSTED };

@@ -83,7 +83,15 @@ export default function NewDMDialog({ guilds, onClose, onOpened, toast }) {
               <input ref={inputRef} id="newdm-query" value={query} maxLength={32} onChange={(e) => setQuery(e.target.value)} placeholder="Name suchen …" aria-label="Name suchen" />
             </div>
             <div className="newdm__list">
-              {items.length === 0 && <p className="muted small">{query ? 'Niemand gefunden.' : 'Tippe einen Namen.'}</p>}
+              {items.length === 0 && !/^\d{17,20}$/.test(query.trim()) && <p className="muted small">{query ? 'Niemand gefunden.' : 'Tippe einen Namen.'}</p>}
+              {/^\d{17,20}$/.test(query.trim()) && (
+                <button className="newdm__item" disabled={busy} onClick={() => open(query.trim())}>
+                  <span className="newdm__ph">🆔</span>
+                  <span>
+                    <b>Als Kontakt über ID hinzufügen</b> <span className="muted small">{query.trim()}</span>
+                  </span>
+                </button>
+              )}
               {items.map((u) => (
                 <button key={u.id} className="newdm__item" disabled={busy} onClick={() => open(u.id)}>
                   {u.avatarUrl ? <img src={u.avatarUrl} alt="" /> : <span className="newdm__ph">{u.display.slice(0, 1).toUpperCase()}</span>}

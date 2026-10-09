@@ -23,6 +23,14 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     if (!tokenStore) throw Object.assign(new Error('Im Demo-Modus gibt es keinen Token-Tresor.'), { code: 'NOT_FOUND' });
     return tokenStore;
   };
+  const requireHelp = () => {
+    if (!help) throw Object.assign(new Error('Fernhilfe ist auf diesem Gerät nicht verfügbar.'), { code: 'NOT_FOUND' });
+    return help;
+  };
+  const requireRemote = () => {
+    if (!remote) throw Object.assign(new Error('Fernzugriff ist auf diesem Gerät nicht verfügbar.'), { code: 'NOT_FOUND' });
+    return remote;
+  };
   return {
     // Token: Oberfläche bekommt NIE den Token zurück, nur Status/Bot-ID.
     'pk:token-info': () => (tokenStore ? tokenStore.info() : { stored: false, demo: true }),
@@ -198,23 +206,23 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     // Fernzugang im WLAN (Issue #46/#50) – nur vom eigenen Fenster steuerbar
     // Fernhilfe (Issue #79)
     'pk:help-status': () => (help ? help.status() : null),
-    'pk:help-request': () => help.requestWithQr(),
-    'pk:help-stop': () => help.stop(),
-    'pk:help-control': (p) => help.setControl(validators.flag(p)),
-    'pk:help-decide': (p) => help.decide(validators.remoteDecide(p)),
-    'pk:help-disconnect': () => help.disconnect(),
+    'pk:help-request': () => requireHelp().requestWithQr(),
+    'pk:help-stop': () => requireHelp().stop(),
+    'pk:help-control': (p) => requireHelp().setControl(validators.flag(p)),
+    'pk:help-decide': (p) => requireHelp().decide(validators.remoteDecide(p)),
+    'pk:help-disconnect': () => requireHelp().disconnect(),
     'pk:help-set-relay': (p) => {
       store.set('helpRelay', validators.helpRelay(p).url);
-      return help.status();
+      return help ? help.status() : null;
     },
     'pk:remote-status': () => (remote ? remote.status() : null),
-    'pk:remote-set-password': (p) => remote.setPassword(validators.remotePassword(p)),
-    'pk:remote-enable': (p) => remote.setEnabled(validators.backgroundSet(p)),
-    'pk:remote-options': (p) => remote.setOptions(validators.remoteOptions(p)),
-    'pk:remote-pair': () => remote.createPairingWithQr(),
-    'pk:remote-cancel-pair': (p) => remote.cancelPairing(validators.remoteId(p)),
-    'pk:remote-decide': (p) => remote.decide(validators.remoteDecide(p)),
-    'pk:remote-remove-device': (p) => remote.removeDevice(validators.remoteId(p)),
+    'pk:remote-set-password': (p) => requireRemote().setPassword(validators.remotePassword(p)),
+    'pk:remote-enable': (p) => requireRemote().setEnabled(validators.backgroundSet(p)),
+    'pk:remote-options': (p) => requireRemote().setOptions(validators.remoteOptions(p)),
+    'pk:remote-pair': () => requireRemote().createPairingWithQr(),
+    'pk:remote-cancel-pair': (p) => requireRemote().cancelPairing(validators.remoteId(p)),
+    'pk:remote-decide': (p) => requireRemote().decide(validators.remoteDecide(p)),
+    'pk:remote-remove-device': (p) => requireRemote().removeDevice(validators.remoteId(p)),
     'pk:blocklist-get': () => (blocklist ? blocklist.get() : { danger: [], warn: [] }),
     'pk:blocklist-update': () => (blocklist ? blocklist.update({ force: true }) : null),
     'pk:set-presence': (p) => service.setPresence(validators.backgroundSet(p)),

@@ -71,3 +71,24 @@ html[data-platform='android'] .center-card {
   max-width: 100%;
   box-sizing: border-box;
 }
+
+/* UI overflow fixes for small screens (Issue #87) */
+html[data-platform='android'] body {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+html[data-platform='android'] img,
+html[data-platform='android'] video {
+  max-width: 100%;
+  height: auto;
+  box-sizing: border-box;
+}
+html[data-platform='android'] pre,
+html[data-platform='android'] code,
+html[data-platform='android'] .chatrow {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}

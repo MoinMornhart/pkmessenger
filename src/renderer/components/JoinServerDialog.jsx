@@ -45,7 +45,7 @@ export default function JoinServerDialog({ onClose, onRefresh, toast }) {
 
   const bringBot = async () => {
     const url = await api.getInviteUrl({ guildId: preview.guild.id }).catch(() => null);
-    if (url) await api.openExternal({ url });
+    if (url) await api.openExternal({ url }).catch((e) => toast({ kind: 'error', title: e.message }));
     setStep(4);
   };
 

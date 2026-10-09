@@ -49,3 +49,32 @@ test('Nachricht: schlimmster Link zuerst', () => {
   assert.equal(r[1].level, 'trusted');
   assert.deepEqual(checkMessageLinks('kein link'), []);
 });
+
+// #95: Unknown shortener / IP-logger domains are detected by URL shape, not by a hard-coded list
+test('#95: unbekannte Kurz-/Tracking-Links werden an der Form erkannt (ohne Liste)', () => {
+  // The exact link from the issue screenshot
+  const r = checkLink('https://urlto.me/2pZms');
+  assert.equal(r.level, 'warn');
+  assert.ok(r.heuristic);
+  assert.ok(r.reasons.some((x) => /Zufallscode/.test(x)));
+  // Fresh, never-seen domains with an opaque code
+  assert.equal(lvl('https://neuer-dienst.xyz/aB3x9'), 'warn');
+  assert.equal(lvl('https://example.org/out?url=https%3A%2F%2Fevil.example'), 'warn');
+  assert.equal(lvl('https://example.org/go?to=https://evil.example/'), 'warn');
+  // Only a weak signal → "unknown" (dialog, but no alarm)
+  assert.equal(lvl('https://clickstats.net/about'), 'unknown');
+});
+
+test('#95: normale Links bleiben normal (keine Fehlalarme)', () => {
+  assert.equal(lvl('https://meine-seite.de/impressum'), 'ok');
+  assert.equal(lvl('https://blog.example.com/2024/10/mein-artikel'), 'ok');
+  assert.equal(lvl('https://example.com/2024'), 'ok');
+  assert.equal(lvl('https://example.com/kontakt'), 'ok');
+  // Trusted sites keep their opaque IDs (YouTube, GitHub …)
+  assert.equal(lvl('https://youtu.be/dQw4w9WgXcQ'), 'trusted');
+  assert.equal(lvl('https://github.com/aB3x9'), 'trusted');
+  // A domain the user trusts explicitly is never flagged
+  assert.equal(lvl('https://urlto.me/2pZms', ['urlto.me']), 'trusted');
+  // Known shorteners keep their existing level
+  assert.equal(lvl('https://bit.ly/3xyz'), 'unknown');
+});

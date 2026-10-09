@@ -138,6 +138,9 @@ export const PollCard = memo(function PollCard({ message }) {
           </button>
         )}
       </div>
+      <div className="poll__note muted small" style={{ marginTop: '8px' }}>
+        💡 Discord verbietet Bots die Teilnahme an Umfragen.
+      </div>
     </div>
   );
 });

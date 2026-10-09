@@ -154,6 +154,7 @@ function createVoiceManager({ voiceLib, getVoiceTarget, emit, sendAudio, joinTim
       s.mic?.end();
       s.mic = null;
     }
+    s.connection.rejoin?.({ channelId: s.channelId, selfDeaf: !s.listening, selfMute: !on || !s.canSpeak });
     return setState({ ...state, talking: on });
   }
 
@@ -175,7 +176,7 @@ function createVoiceManager({ voiceLib, getVoiceTarget, emit, sendAudio, joinTim
       for (const stream of s.receivers.values()) stream.destroy();
       s.receivers.clear();
     }
-    s.connection.rejoin?.({ channelId: s.channelId, selfDeaf: !on, selfMute: !s.canSpeak });
+    s.connection.rejoin?.({ channelId: s.channelId, selfDeaf: !on, selfMute: !s.talking || !s.canSpeak });
     return setState({ ...state, listening: on });
   }
 
