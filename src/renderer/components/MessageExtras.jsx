@@ -4,6 +4,9 @@ import MessageContent from './MessageContent.jsx';
 import EmojiPicker from './EmojiPicker.jsx';
 import MediaGate from './MediaGate.jsx';
 import { embedMedia } from '../../shared/media';
+import { checkLink } from '../../shared/link-safety';
+import { prefs } from '../prefs';
+import { getLists } from '../linkLists';
 
 // F7: Zitat der Nachricht, auf die geantwortet wurde (Klick springt hin)
 export const ReplyQuote = memo(function ReplyQuote({ reference }) {
@@ -54,7 +57,18 @@ function EmbedMedia({ e }) {
 export const Embeds = memo(function Embeds({ embeds }) {
   const nav = useContext(NavContext);
   if (!embeds?.length) return null;
-  return embeds.map((e, i) => (
+  return embeds.map((e, i) => {
+    if (e.url) {
+      const check = checkLink(e.url, prefs.get().trustedDomains, getLists());
+      if (check.level === 'danger') {
+        return (
+          <div key={i} className="embed">
+            <span className="link-danger">⛔ Embed blockiert (gefährlicher Link)</span>
+          </div>
+        );
+      }
+    }
+    return (
     <div key={i} className="embed" style={e.color ? { '--embed': e.color } : undefined}>
       {e.author?.name && <div className="embed__author">{e.author.name}</div>}
       {e.title &&
@@ -90,7 +104,8 @@ export const Embeds = memo(function Embeds({ embeds }) {
       <EmbedMedia e={e} />
       {e.footer && <div className="embed__footer">{e.footer}</div>}
     </div>
-  ));
+    );
+  });
 });
 
 // Umfrage: Ergebnisse als Balken, Restzeit, eigene Umfrage beenden

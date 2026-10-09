@@ -17,7 +17,7 @@
     "make": "npm run build:renderer && electron-forge make",
     "publish": "npm run build:renderer && electron-forge publish",
     "update": "git pull --ff-only && npm install && npm run build:renderer",
-    "test": "node --test --test-reporter=spec \"tests/test-*.js\"",
+    "test": "node --test --test-reporter=spec",
     "android:install": "npm ci --prefix mobile",
     "android:build": "node scripts/build-mobile.js && npm --prefix mobile exec cap sync android",
     "android:shots": "node scripts/build-mobile.js --demo && electron scripts/mobile-shots.js",
