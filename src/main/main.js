@@ -166,7 +166,15 @@ const lanAddresses = () =>
     .filter((i) => i && i.family === 'IPv4' && !i.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(i.address))
     .map((i) => i.address)
     .sort((a, b) => Number(!a.startsWith('192.168.')) - Number(!b.startsWith('192.168.'))); // echtes WLAN vor virtuellen Adaptern (WSL/Hyper-V)
+// Selbst gehosteter Relay (Einstellungen → Hilfe & Tour): ein Relay für Fernzugang UND Fernhilfe (#104/#105)
+const relayConfig = () => {
+  const u = store.get().helpRelay;
+  if (typeof u !== 'string' || !/^wss:\/\//i.test(u)) return null;
+  const httpBase = u.replace(/^wss:/i, 'https:').replace(/\/ws\/?$/i, '').replace(/\/+$/, '');
+  return { wss: u, httpBase };
+};
 const remote = createRemote({
+  getRelay: relayConfig,
   service,
   validators: remoteValidators,
   store,
@@ -185,7 +193,7 @@ const remote = createRemote({
 remote.createPairingWithQr = () => {
   const p = remote.createPairing();
   const qr = qrcode(0, 'M');
-  qr.addData(p.url);
+  qr.addData(p.relayUrl || p.url); // Unterwegs-Link geht überall, auch im WLAN
   qr.make();
   return { ...p, qr: qr.createDataURL(6, 2) };
 };
@@ -203,12 +211,7 @@ const help = createHelp({
   webDir: path.join(__dirname, '..', 'help-web'),
   naclPath: require.resolve('tweetnacl/nacl-fast.min.js'),
   // Relay-Adresse (für Fernhilfe außerhalb des WLANs): wss://<domain>/ws, selbst gehostet (relay/)
-  getRelay: () => {
-    const u = store.get().helpRelay;
-    if (typeof u !== 'string' || !/^wss:\/\//i.test(u)) return null;
-    const httpBase = u.replace(/^wss:/i, 'https:').replace(/\/ws\/?$/i, '').replace(/\/+$/, '');
-    return { wss: u, httpBase };
-  },
+  getRelay: relayConfig,
 });
 /** „Hilfe anfordern“: Einmal-Code + QR-Code (als Bild) für die Oberfläche */
 help.requestWithQr = async () => {

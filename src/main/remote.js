@@ -1,11 +1,15 @@
 'use strict';
 
-// Fernzugang im eigenen WLAN (Issue #46/#50, vom Eigentümer am 07.10.2026 freigegeben: „Ja, nur im WLAN“).
+// Fernzugang (Issue #46/#50). Ursprünglich nur im WLAN; seit #104/#105 (09.10.2026, OK von JoniMoni + MoinMornhart)
+// zusätzlich unterwegs über den SELBST GEHOSTETEN Relay (relay/). Der direkte WLAN-Server bleibt WLAN-only.
 // Andere Geräte (z. B. Handy) bedienen den Bot über eine kleine Web-Oberfläche – Nachrichten gehen weiter als BOT raus.
 //
 // Sicherheit (in dieser Reihenfolge):
 // - AB WERK AUS. Läuft nur, wenn der Besitzer ihn einschaltet und ein Fernzugangs-Passwort festgelegt hat.
-// - NUR private Netze (192.168.x, 10.x, 172.16–31.x, localhost): Anfragen von außen werden sofort abgelehnt.
+// - WLAN-Weg: NUR private Netze (192.168.x, 10.x, 172.16–31.x, localhost); Anfragen von außen → 403.
+// - Relay-Weg (optional, nur mit eingetragener wss://-Relay-Adresse): Der PC verbindet sich AUSGEHEND – es wird KEIN
+//   Port im Internet geöffnet. Der Relay sieht nur verschlüsselte Pakete, nie Schlüssel, Passwort, Token oder Inhalte.
+//   Für beide Wege gelten exakt dieselben Prüfungen (gemeinsamer rpc()-Kern unten).
 // - Ende-zu-Ende verschlüsselt mit tweetnacl secretbox (XSalsa20-Poly1305). Der Kopplungsschlüssel steht im QR-Code
 //   HINTER dem „#“ – Browser schicken diesen Teil nie übers Netz. Jede Anfrage: frische Zufallsnonce + Zeitstempel,
 //   Wiederholungen werden abgewiesen.
@@ -76,7 +80,7 @@ const isPrivateIp = (ip) => ip === '::1' || isLocalAddress(`http://${ip.includes
  * @param {(t:string,p:any)=>void} o.emit
  * @param {string} o.webDir    Ordner der Web-Oberfläche
  */
-function createRemote({ service, validators, store, vault, emit = () => {}, logger = null, now = () => Date.now(), webDir, naclPath, lanAddresses = () => [], bindHost = '0.0.0.0', hostName = null }) {
+function createRemote({ service, validators, store, vault, emit = () => {}, logger = null, now = () => Date.now(), webDir, naclPath, lanAddresses = () => [], bindHost = '0.0.0.0', hostName = null, getRelay = () => null, WebSocketImpl = null, setTimeoutImpl = setTimeout }) {
   let server = null;
   const pairings = new Map(); // pairId → { key, expires, used }
   const pending = new Map(); // reqId → { resolve, info }
@@ -86,7 +90,7 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
   const rate = new Map(); // ip → { count, windowStart }
   const activity = [];
 
-  const cfg = () => ({ enabled: false, port: DEFAULT_PORT, requireApproval: false, salt: null, hash: null, ...(store.get().remote || {}) });
+  const cfg = () => ({ enabled: false, port: DEFAULT_PORT, requireApproval: false, salt: null, hash: null, relayRoom: null, ...(store.get().remote || {}) });
   const saveCfg = (patch) => store.set('remote', { ...cfg(), ...patch });
   const loadDevices = () => {
     try {
@@ -119,6 +123,7 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
       host: hostName || null,
       addresses: lanAddresses(),
       devices: loadDevices().map(({ key: _k, ...d }) => d),
+      relay: relayStatus(),
       activity: activity.slice(0, 50),
       pending: [...pending.entries()].map(([id, p]) => ({ id, ...p.info })),
     };
@@ -204,15 +209,22 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
     return status();
   }
 
-  function setOptions({ requireApproval }) {
-    saveCfg({ requireApproval: Boolean(requireApproval) });
+  function setOptions({ requireApproval, newRoom }) {
+    if (typeof requireApproval === 'boolean') saveCfg({ requireApproval });
+    if (newRoom) {
+      // Neuer Relay-Raum: alte Relay-Links/-Geräte erreichen den PC nicht mehr (z. B. wenn ein Link in falsche Hände kam)
+      saveCfg({ relayRoom: null });
+      log({ action: 'Neuer Relay-Raum – alte Relay-Links gelten nicht mehr', device: '', ip: '' });
+      refreshRelay();
+    }
     return status();
   }
 
   /** Neuen Einmal-Code erzeugen → Link (Schlüssel hinter „#“) für QR-Code. */
   function createPairing() {
     const c = cfg();
-    if (!c.enabled || !server?.listening) throw Object.assign(new Error('Fernzugang ist aus.'), { code: 'VALIDATION' });
+    const relay = getRelay();
+    if (!c.enabled || (!server?.listening && !relay?.wss)) throw Object.assign(new Error('Fernzugang ist aus.'), { code: 'VALIDATION' });
     if (loadDevices().length >= MAX_DEVICES) throw Object.assign(new Error(`Höchstens ${MAX_DEVICES} Geräte.`), { code: 'VALIDATION', hint: 'Entferne erst ein altes Gerät.' });
     for (const [id, p] of pairings) if (p.expires < now() || p.used) pairings.delete(id);
     const pairId = rid(12);
@@ -221,18 +233,20 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
     pairings.set(pairId, { key, expires, used: false });
     // Nie eine IP im Link (Issue #53/#50): nur der Gerätename des PCs über mDNS („name.local“, in Windows eingebaut).
     // Kein Ersatz-Link mit Adresse mehr. Taugt der PC-Name nicht, gibt es keinen Link (Hinweis zum Umbenennen).
-    if (!hostName) {
+    const hash = `#p=${pairId}&k=${Buffer.from(key).toString('base64url')}`;
+    // WLAN-Link (nur PC-Name, keine IP) – falls der WLAN-Server läuft und der PC-Name taugt
+    const url = hostName && server?.listening ? `http://${hostName}:${server.address().port}/${hash}` : null;
+    // Unterwegs-Link über den eigenen Relay (#104/#105): Raum-ID steht im Link, der Schlüssel bleibt hinter „#“
+    const relayUrl = relay?.httpBase ? `${relay.httpBase}/remote/${hash}&r=${relayRoom()}` : null;
+    if (!url && !relayUrl) {
       pairings.delete(pairId);
       throw Object.assign(new Error('Der Name dieses PCs taugt nicht für den Link.'), {
         code: 'VALIDATION',
-        hint: 'Windows-Einstellungen → System → Info → „Diesen PC umbenennen“: nur Buchstaben, Ziffern und Bindestrich. Danach neu starten.',
+        hint: 'Windows-Einstellungen → System → Info → „Diesen PC umbenennen“: nur Buchstaben, Ziffern und Bindestrich. Oder eine Relay-Adresse eintragen (Hilfe & Tour).',
       });
     }
-    const port = server.address().port;
-    const hash = `#p=${pairId}&k=${Buffer.from(key).toString('base64url')}`;
-    const url = `http://${hostName}:${port}/${hash}`;
     log({ action: 'Kopplungs-Code erstellt', device: '', ip: '' });
-    return { pairId, url, expires, host: hostName };
+    return { pairId, url, relayUrl, expires, host: hostName };
   }
   function cancelPairing({ pairId }) {
     pairings.delete(pairId);
@@ -338,47 +352,57 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
     } catch {
       return json(res, 400, { error: 'Ungültige Anfrage.' });
     }
+    const { code, obj } = await rpc(url.pathname, body, ip);
+    return json(res, code, obj);
+  }
+
+  /**
+   * Gemeinsamer Kern für WLAN (HTTP) und Relay (WebSocket) → { code, obj }. code zählt nur bei HTTP.
+   * Alle Prüfungen (Einmal-Code, Passwort, Sperren, Wiederholungsschutz, Geräteschlüssel, Sitzung) gelten für BEIDE Wege.
+   */
+  async function rpc(pathname, body, ip) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return { code: 400, obj: { error: 'Ungültige Anfrage.' } };
 
     // Kopplung: Einmal-Code + Passwort + Bestätigung am PC
-    if (url.pathname === '/api/pair') {
+    if (pathname === '/api/pair') {
       const p = pairings.get(String(body.p || ''));
-      if (!p || p.used || p.expires < now()) return json(res, 403, { error: 'Code abgelaufen oder schon benutzt. Am PC einen neuen QR-Code erzeugen.' });
-      if (locked(`pair:${ip}`)) return json(res, 429, { error: 'Zu viele Fehlversuche. Bitte 5 Minuten warten.' });
+      if (!p || p.used || p.expires < now()) return { code: 403, obj: { error: 'Code abgelaufen oder schon benutzt. Am PC einen neuen QR-Code erzeugen.' } };
+      if (locked(`pair:${ip}`)) return { code: 429, obj: { error: 'Zu viele Fehlversuche. Bitte 5 Minuten warten.' } };
       const msg = unseal(body, p.key);
-      if (!msg || !freshNonce(body.n, msg.t)) return json(res, 400, { error: 'Ungültige Anfrage.' });
+      if (!msg || !freshNonce(body.n, msg.t)) return { code: 400, obj: { error: 'Ungültige Anfrage.' } };
       const c = cfg();
       if (!samePassword(msg.password, c.salt, c.hash)) {
         fail(`pair:${ip}`);
         log({ action: 'Falsches Passwort bei Kopplung', device: String(msg.name || '').slice(0, 40), ip });
-        return json(res, 200, seal({ error: 'Falsches Passwort.' }, p.key));
+        return { code: 200, obj: seal({ error: 'Falsches Passwort.' }, p.key) };
       }
       p.used = true; // Einmal-Code ist ab jetzt verbraucht – egal wie es ausgeht
       const name = String(msg.name || 'Gerät').replace(/[^\p{L}\p{N} ._-]/gu, '').slice(0, 40) || 'Gerät';
       const ok = await askHost({ kind: 'pair', device: name, ip });
       if (!ok) {
         log({ action: 'Kopplung abgelehnt', device: name, ip });
-        return json(res, 200, seal({ error: 'Am PC abgelehnt.' }, p.key));
+        return { code: 200, obj: seal({ error: 'Am PC abgelehnt.' }, p.key) };
       }
       if (loadDevices().length >= MAX_DEVICES) {
         pairings.delete(String(body.p));
-        return json(res, 200, seal({ error: `Höchstens ${MAX_DEVICES} Geräte. Entferne am PC erst ein altes Gerät.` }, p.key));
+        return { code: 200, obj: seal({ error: `Höchstens ${MAX_DEVICES} Geräte. Entferne am PC erst ein altes Gerät.` }, p.key) };
       }
       const dev = { id: rid(12), name, key: b64(nacl.randomBytes(32)), pairedAt: now(), lastSeen: now(), ip };
       saveDevices([...loadDevices(), dev]);
       log({ action: 'Gerät gekoppelt', device: name, ip });
       pairings.delete(String(body.p));
-      return json(res, 200, seal({ deviceId: dev.id, deviceKey: dev.key, name }, p.key));
+      return { code: 200, obj: seal({ deviceId: dev.id, deviceKey: dev.key, name }, p.key) };
     }
 
     // Alle weiteren Anfragen: Gerät + Geräteschlüssel + (außer login) gültige Sitzung
-    if (url.pathname === '/api') {
+    if (pathname === '/api') {
       const devices = loadDevices();
       const dev = devices.find((d) => d.id === body.d);
-      if (!dev) return json(res, 403, { error: 'Gerät unbekannt oder entfernt.', unpaired: true });
+      if (!dev) return { code: 403, obj: { error: 'Gerät unbekannt oder entfernt.', unpaired: true } };
       const key = unb64(dev.key);
       const msg = unseal(body, key);
-      if (!msg || !freshNonce(body.n, msg.t)) return json(res, 400, { error: 'Ungültige Anfrage.' });
-      const reply = (obj) => json(res, 200, seal(obj, key));
+      if (!msg || !freshNonce(body.n, msg.t)) return { code: 400, obj: { error: 'Ungültige Anfrage.' } };
+      const reply = (obj) => ({ code: 200, obj: seal(obj, key) });
       dev.lastSeen = now();
       dev.ip = ip;
       saveDevices(devices);
@@ -402,10 +426,134 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
         return reply({ error: String(err?.message || 'Fehler').slice(0, 200) });
       }
     }
-    return json(res, 404, {});
+    return { code: 404, obj: {} };
+  }
+
+  // ---- Relay (unterwegs, #104/#105) ----
+  // Der PC verbindet sich AUSGEHEND zum selbst gehosteten Relay und wartet dort in einem festen, zufälligen Raum auf
+  // gekoppelte Geräte. Kein offener Port. Fällt die Verbindung weg (Relay-Neustart, Raum nach 30 Min. abgelaufen,
+  // Internet weg), verbindet sich der PC von selbst neu (2 s … 60 s).
+  let relayWs = null;
+  let relayTimer = null;
+  let relayUp = false;
+  let relayTries = 0;
+  const loadWs = () => {
+    if (WebSocketImpl) return WebSocketImpl;
+    try {
+      return require('ws');
+    } catch {
+      return null;
+    }
+  };
+  function relayRoom() {
+    let r = cfg().relayRoom;
+    if (typeof r !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(r)) {
+      r = rid(18); // 24 Zeichen base64url ≈ 144 Bit Zufall
+      saveCfg({ relayRoom: r });
+    }
+    return r;
+  }
+  function relayStatus() {
+    const r = getRelay();
+    return { configured: Boolean(r?.wss), connected: relayUp, base: r?.httpBase || null };
+  }
+  function stopRelay() {
+    clearTimeout(relayTimer);
+    relayTimer = null;
+    const w = relayWs;
+    relayWs = null;
+    relayUp = false;
+    if (w) {
+      try {
+        w.close();
+      } catch {
+        /* egal */
+      }
+    }
+  }
+  function scheduleRelay() {
+    clearTimeout(relayTimer);
+    relayTimer = null;
+    if (!cfg().enabled || !getRelay()?.wss) return;
+    const delay = Math.min(60000, 2000 * 2 ** Math.min(relayTries, 5));
+    relayTries += 1;
+    relayTimer = setTimeoutImpl(() => {
+      relayTimer = null;
+      startRelay();
+    }, delay);
+    relayTimer?.unref?.();
+  }
+  function startRelay() {
+    const relay = getRelay();
+    const WS = loadWs();
+    if (!cfg().enabled || !relay?.wss || !WS) return;
+    stopRelay();
+    let ws;
+    try {
+      ws = new WS(relay.wss);
+    } catch (err) {
+      logger?.warn?.('remote', `relay: ${err?.message || err}`);
+      scheduleRelay();
+      return;
+    }
+    relayWs = ws;
+    const room = relayRoom();
+    ws.on('open', () => {
+      try {
+        ws.send(JSON.stringify({ room, role: 'host' }));
+      } catch {
+        /* egal */
+      }
+    });
+    ws.on('message', async (raw) => {
+      let m = null;
+      try {
+        m = JSON.parse(String(raw));
+      } catch {
+        return;
+      }
+      if (!m || typeof m !== 'object') return;
+      if (m.relay) {
+        if (m.relay === 'joined') {
+          relayUp = true;
+          relayTries = 0;
+        }
+        return;
+      }
+      if (typeof m.id !== 'string' || m.id.length > 40 || typeof m.path !== 'string') return;
+      let out;
+      if (limited('relay')) out = { code: 429, obj: { error: 'Zu viele Anfragen.' } };
+      else {
+        try {
+          out = await rpc(m.path, m.body, 'relay');
+        } catch {
+          out = { code: 500, obj: { error: 'Fehler.' } };
+        }
+      }
+      try {
+        ws.send(JSON.stringify({ id: m.id, reply: out.obj }));
+      } catch {
+        /* Verbindung inzwischen weg */
+      }
+    });
+    ws.on('close', () => {
+      if (relayWs !== ws) return; // absichtlich beendet
+      relayWs = null;
+      relayUp = false;
+      scheduleRelay();
+    });
+    ws.on('error', (err) => logger?.warn?.('remote', `relay: ${err?.message || err}`));
+  }
+  /** Relay-Adresse geändert / neuer Raum → Verbindung neu aufbauen. */
+  function refreshRelay() {
+    relayTries = 0;
+    stopRelay();
+    startRelay();
+    return status();
   }
 
   function start() {
+    if (!relayWs && !relayTimer) startRelay(); // unterwegs über den Relay (falls eingetragen)
     if (server?.listening) return Promise.resolve(status());
     return new Promise((resolve, reject) => {
       server = http.createServer((req, res) => {
@@ -427,6 +575,7 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
   }
   function stop() {
     return new Promise((resolve) => {
+      stopRelay();
       sessions.clear();
       pairings.clear();
       for (const id of [...pending.keys()]) decide({ id, allow: false });
@@ -438,7 +587,7 @@ function createRemote({ service, validators, store, vault, emit = () => {}, logg
     });
   }
 
-  return { status, setPassword, setEnabled, setOptions, createPairing, cancelPairing, removeDevice, decide, start, stop, _test: { seal, unseal, sessions, pairings } };
+  return { status, setPassword, setEnabled, setOptions, createPairing, cancelPairing, removeDevice, decide, start, stop, refreshRelay, _test: { seal, unseal, sessions, pairings, rpc } };
 }
 
 module.exports = { createRemote, seal, unseal, isPrivateIp, PAIR_TTL_MS, DEFAULT_PORT };

@@ -54,9 +54,9 @@ export default function RemoteSection({ toast }) {
 
   return (
     <div className="remote" data-setting="remote">
-      <span className="settings__label">📱 Fernzugang im WLAN (Handy, zweiter PC)</span>
+      <span className="settings__label">📱 Fernzugang (Handy, zweiter PC)</span>
       <p className="muted small">
-        Andere Geräte in <b>deinem</b> WLAN können den Bot über den Browser bedienen. Ihre Nachrichten gehen weiter als Bot raus. Verschlüsselt, nur mit Einmal-Code, Passwort und deiner Bestätigung. Ab Werk aus.
+        Andere Geräte können den Bot über den Browser bedienen – im <b>eigenen WLAN</b> direkt, <b>unterwegs</b> über deinen eigenen Relay (Adresse unter Hilfe &amp; Tour). Ihre Nachrichten gehen weiter als Bot raus. Verschlüsselt, nur mit Einmal-Code, Passwort und deiner Bestätigung. Ab Werk aus.
       </p>
 
       <div className="remote__pw">
@@ -78,11 +78,34 @@ export default function RemoteSection({ toast }) {
           <span className="muted"> · Beim ersten Mal fragt die Windows-Firewall nach: „Private Netzwerke“ erlauben, „Öffentliche“ NICHT.</span>
         </p>
       )}
+      {st.enabled && (
+        <p className="small" data-help-id="remote-relay">
+          🌍 Unterwegs:{' '}
+          {!st.relay?.configured ? (
+            <span className="muted">aus – trag unter „Hilfe &amp; Tour“ deine Relay-Adresse ein (wss://…/ws), dann geht es auch außerhalb des WLANs.</span>
+          ) : st.relay.connected ? (
+            <span>🟢 über deinen Relay erreichbar</span>
+          ) : (
+            <span>🟡 verbinde mit dem Relay …</span>
+          )}
+        </p>
+      )}
+      {st.enabled && st.relay?.configured && (
+        <div className="settings__row">
+          <button
+            className="btn btn--ghost btn--small"
+            title="Alle bisherigen Unterwegs-Links werden ungültig – gekoppelte Geräte müssen dann neu gekoppelt werden"
+            onClick={() => run(async () => setSt(await api.remoteOptions({ newRoom: true })), 'Neuer Relay-Raum – alte Unterwegs-Links gelten nicht mehr')}
+          >
+            🔄 Neuen Relay-Raum erzeugen
+          </button>
+        </div>
+      )}
       <label className="composer__ping">
         <input type="checkbox" checked={st.requireApproval} onChange={(e) => run(async () => setSt(await api.remoteOptions({ requireApproval: e.target.checked })))} /> ✋ Jede Nachricht von anderen Geräten erst hier bestätigen
       </label>
 
-      {st.enabled && st.running && (
+      {st.enabled && (st.running || st.relay?.configured) && (
         <div className="settings__row">
           <button
             className="btn btn--primary btn--small"
@@ -102,10 +125,10 @@ export default function RemoteSection({ toast }) {
           <img src={pair.qr} alt="QR-Code zum Koppeln" width="220" height="220" />
           <div>
             <p className="small">
-              Mit dem Handy scannen (gleiches WLAN). Gültig noch <b>{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</b> Minuten, nur <b>einmal</b> benutzbar.
+              Mit dem Handy scannen{pair.relayUrl ? ' – geht überall (über deinen Relay)' : ' (gleiches WLAN)'}. Gültig noch <b>{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</b> Minuten, nur <b>einmal</b> benutzbar.
             </p>
             <div className="settings__row">
-              <button className="btn btn--ghost btn--small" onClick={() => api.copyText({ text: pair.url }).then(() => toast({ kind: 'info', title: 'Link kopiert', duration: 1500 }))}>
+              <button className="btn btn--ghost btn--small" onClick={() => api.copyText({ text: pair.relayUrl || pair.url }).then(() => toast({ kind: 'info', title: 'Link kopiert', duration: 1500 }))}>
                 📋 Link kopieren
               </button>
               <button
@@ -118,7 +141,7 @@ export default function RemoteSection({ toast }) {
                 Widerrufen
               </button>
             </div>
-            <p className="muted small">🔒 Der Link enthält keine IP-Adresse, nur den Namen deines PCs („{pair.host || 'im WLAN'}“) und einen geheimen Schlüssel. Nicht weitergeben.</p>
+            <p className="muted small">🔒 Der Link enthält keine IP-Adresse – {pair.relayUrl ? 'nur deinen Relay' : `nur den Namen deines PCs („${pair.host || 'im WLAN'}“)`} und einen geheimen Schlüssel. Nicht weitergeben. Koppeln geht nur mit Fernzugangs-Passwort und deiner Bestätigung hier.</p>
           </div>
         </div>
       )}
