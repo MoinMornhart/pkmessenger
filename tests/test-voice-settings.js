@@ -56,3 +56,17 @@ test('#108: geschlossenes Gate dämpft weich, aber nie auf völlige Stille', () 
   assert.ok(GATE_FLOOR > 0); // nie 0 → falsch eingestufte Sprache bleibt hörbar
   assert.equal(gateGain(undefined, false) < 1, true);
 });
+
+test('#110: eigener Mikrofon-Pegel – geprüft, begrenzt und ohne Übersteuern', () => {
+  const { applyMicGain, MIC_GAIN_MAX } = require('../src/shared/voice-settings');
+  assert.equal(sanitizeVoiceFx({}).micGain, 1);
+  assert.equal(sanitizeVoiceFx({ micGain: 9 }).micGain, MIC_GAIN_MAX);
+  assert.equal(sanitizeVoiceFx({ micGain: -1 }).micGain, 0);
+  assert.equal(sanitizeVoiceFx({ micGain: 'laut' }).micGain, 1);
+  const f = new Float32Array([0.1, -0.2, 0.6]);
+  applyMicGain(f, 2);
+  assert.deepEqual([...f].map((x) => Math.round(x * 100) / 100), [0.2, -0.4, 1]); // 0.6*2 → auf 1 begrenzt
+  const same = new Float32Array([0.3]);
+  applyMicGain(same, 1);
+  assert.equal(same[0], new Float32Array([0.3])[0]);
+});

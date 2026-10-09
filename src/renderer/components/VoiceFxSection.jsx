@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { prefs } from '../prefs';
-import { micConstraints, gateStep, gateGain, HIGHPASS_HZ } from '../../shared/voice-settings';
+import { micConstraints, gateStep, gateGain, HIGHPASS_HZ, MIC_GAIN_MAX } from '../../shared/voice-settings';
 import { rms } from '../../shared/audio-frames';
 
 // Sprachkanal-Audio (Issue #1): Filter, Audio-Test, Hilfe bei Problemen
@@ -48,11 +48,12 @@ export default function VoiceFxSection() {
       const r = { stream, ctx, delay, raf: 0, openUntil: 0, gain: 1 };
       const tick = () => {
         analyser.getFloatTimeDomainData(buf);
-        const level = rms(buf);
+        const mg = prefs.get().voiceFx.micGain ?? 1;
+        const level = rms(buf) * mg; // #110: Test zeigt den Pegel inkl. eigener Verstärkung
         const g = gateStep(level, prefs.get().voiceFx.gate, performance.now(), r.openUntil);
         r.openUntil = g.openUntil;
         r.gain = gateGain(r.gain, g.open);
-        gate.gain.value = r.gain; // weich absenken statt harter Stille (wie im Anruf)
+        gate.gain.value = r.gain * mg; // weich absenken statt harter Stille (wie im Anruf) + eigener Pegel
         setTest({ level: Math.min(1, level * 4), open: g.open });
         r.raf = requestAnimationFrame(tick);
       };
@@ -109,6 +110,26 @@ export default function VoiceFxSection() {
         <option value="normal">Normal – leises Rauschen wird nicht gesendet</option>
         <option value="stark">Stark – nur deutliche Sprache wird gesendet</option>
       </select>
+
+      <label className="settings__label" htmlFor="mic-gain">
+        Mein Mikrofon-Pegel: {Math.round((fx.micGain ?? 1) * 100)} %
+      </label>
+      <div className="settings__row">
+        <input
+          id="mic-gain"
+          type="range"
+          min="0"
+          max={MIC_GAIN_MAX}
+          step="0.1"
+          value={fx.micGain ?? 1}
+          aria-label="Mein Mikrofon lauter oder leiser"
+          onChange={(e) => set({ micGain: Number(e.target.value) })}
+        />
+        <button className="btn btn--ghost btn--small" onClick={() => set({ micGain: 1 })} disabled={(fx.micGain ?? 1) === 1}>
+          Zurück auf 100 %
+        </button>
+      </div>
+      <p className="muted small">So laut hören dich die anderen. Zu leise? Höher stellen und im Audio-Test prüfen. Bei „Automatische Lautstärke“ gleicht der Browser zusätzlich aus.</p>
 
       <span className="settings__label">Audio-Test</span>
       <div className="settings__row">
