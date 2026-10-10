@@ -29,9 +29,9 @@ test('#86 Knöpfe, Link-Knopf und Auswahlmenü werden korrekt als Ansicht serial
   const s = service.serializeMessage(m);
   assert.equal(s.components.length, 2);
   // normaler Knopf: keine URL, Stil erhalten
-  assert.deepEqual(s.components[0].components[0], { kind: 'button', label: 'Verifizieren', style: 3, url: null, emoji: null, disabled: false });
+  assert.deepEqual(s.components[0].components[0], { kind: 'button', label: 'Verifizieren', style: 3, url: null, emoji: null, emojiUrl: null, disabled: false });
   // Link-Knopf: URL + Emoji erhalten
-  assert.deepEqual(s.components[0].components[1], { kind: 'button', label: 'Website', style: 5, url: 'https://example.com/', emoji: '🔗', disabled: false });
+  assert.deepEqual(s.components[0].components[1], { kind: 'button', label: 'Website', style: 5, url: 'https://example.com/', emoji: '🔗', emojiUrl: null, disabled: false });
   // deaktivierter Knopf
   assert.equal(s.components[0].components[2].disabled, true);
   // Auswahlmenü
@@ -55,4 +55,17 @@ test('#86 kaputte/unbekannte Komponenten werden ignoriert (null-sicher)', async 
   assert.equal(s.components[0].components.length, 1);
   assert.equal(s.components[0].components[0].label, 'Ok');
   assert.equal(s.components[0].components[0].style, 1); // Standard primary
+});
+
+test('#129 Knöpfe nur mit Emoji (Musik-Bots): eigenes Emoji als Bild, kein „Knopf“-Text nötig', async () => {
+  const { service, world } = await readyService();
+  const m = botMessage(world, '1000000000000000203', [
+    { type: 1, components: [{ type: 2, style: 2, customId: 'pause', emoji: { name: 'pause', id: '1234567890123456789' } }, { type: 2, style: 2, customId: 'skip', emoji: { name: '⏭️' } }, { type: 2, style: 2, emoji: { name: 'x', id: '../böse' } }] },
+  ]);
+  const [a, b, c] = service.serializeMessage(m).components[0].components;
+  assert.equal(a.label, '');
+  assert.equal(a.emojiUrl, 'https://cdn.discordapp.com/emojis/1234567890123456789.png?size=64');
+  assert.equal(b.emoji, '⏭️');
+  assert.equal(b.emojiUrl, null);
+  assert.equal(c.emojiUrl, null); // nur echte IDs
 });

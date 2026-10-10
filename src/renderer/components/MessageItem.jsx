@@ -28,6 +28,11 @@ function Avatar({ author }) {
 // #86: Knöpfe/Auswahlmenüs einer Nachricht ANZEIGEN. Fremde Knöpfe kann ein Bot nicht drücken (Discord-Grenze),
 // darum nur Ansicht. Link-Knöpfe sind echte Links und öffnen über den normalen Link-Schutz im Browser.
 const BTN_STYLE = { 1: 'primary', 2: 'secondary', 3: 'success', 4: 'danger', 5: 'link' };
+// Emoji eines Knopfs: eigenes Server-Emoji als Bild, sonst Unicode-Zeichen
+function BtnEmoji({ c }) {
+  if (c.emojiUrl) return <img className="msg-btn__emoji" src={c.emojiUrl} alt={c.emoji || ''} draggable={false} />;
+  return c.emoji ? <span className="msg-btn__emoji">{c.emoji}</span> : null;
+}
 function MessageButtons({ rows }) {
   const nav = useContext(NavContext);
   if (!rows?.length) return null;
@@ -48,13 +53,14 @@ function MessageButtons({ rows }) {
               </span>
             ) : c.url ? (
               <button className={`msg-btn msg-btn--${BTN_STYLE[c.style] || 'secondary'} msg-btn--link`} key={ci} onClick={() => openLink(c.url)} title={`${c.url} (öffnet im Browser)`}>
-                {c.emoji ? `${c.emoji} ` : ''}
-                {c.label || 'Link'} ↗
+                <BtnEmoji c={c} />
+                {c.label || (c.emoji ? '' : 'Link')} ↗
               </button>
             ) : (
-              <span className={`msg-btn msg-btn--${BTN_STYLE[c.style] || 'secondary'} msg-btn--ro`} key={ci} title="Diesen Knopf kann nur ein Nutzer im Discord-Client drücken">
-                {c.emoji ? `${c.emoji} ` : ''}
-                {c.label || 'Knopf'}
+              <span className={`msg-btn msg-btn--${BTN_STYLE[c.style] || 'secondary'} msg-btn--ro${c.disabled ? ' is-disabled' : ''}`} key={ci} title={`${c.label || c.emoji || 'Knopf'} – kann nur ein Nutzer im Discord-Client drücken`}>
+                <BtnEmoji c={c} />
+                {/* #129: nur-Emoji-Knöpfe ohne angehängtes „Knopf“ */}
+                {c.label || (c.emoji ? '' : 'Knopf')}
               </span>
             ),
           )}

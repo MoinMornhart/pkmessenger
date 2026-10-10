@@ -554,6 +554,8 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
         style,
         url: style === 5 && typeof c?.url === 'string' ? c.url : null,
         emoji: c?.emoji?.name || null,
+        // #129: eigene Emojis (z. B. Musik-Bots) als Bild statt nur Name
+        emojiUrl: /^\d{5,25}$/.test(String(c?.emoji?.id || '')) ? `https://cdn.discordapp.com/emojis/${c.emoji.id}.${c.emoji.animated ? 'gif' : 'png'}?size=64` : null,
         disabled: Boolean(c?.disabled),
       };
     }
