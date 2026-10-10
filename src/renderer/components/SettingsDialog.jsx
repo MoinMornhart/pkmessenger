@@ -139,10 +139,40 @@ function WallpaperButton() {
   return (
     <>
       <button className="btn btn--small" onClick={() => setOpen(true)}>
-        🖼 Standard-Hintergrund wählen
+        🖼 Standard-Hintergrund wählen (auch eigene Bilder)
       </button>
       <p className="muted small">Pro Chat oder Server: {pc('Rechtsklick', 'lange drücken')} auf einen Chat in der Liste → „Hintergrund …“.</p>
       {open && <WallpaperDialog onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+// #131 Leistung: alles, was Rechenzeit kostet, an einer Stelle abschaltbar
+function PerformanceSection() {
+  const [p, setP] = useState(prefs.get());
+  useEffect(() => prefs.subscribe(setP), []);
+  const saver = p.motion === 'aus' && !p.wallAnim && !p.glass;
+  return (
+    <>
+      <span className="settings__label">Animationen</span>
+      <div className="look-seg" role="radiogroup" aria-label="Animationen (Leistung)">
+        {MOTIONS.map((m) => (
+          <button key={m.id} role="radio" aria-checked={p.motion === m.id} className={p.motion === m.id ? 'is-on' : ''} title={m.hint} onClick={() => prefs.set({ motion: m.id })}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <label className="composer__ping" data-setting="wall-anim" title="Sanft bewegte Vorlagen und animierte GIF-Hintergründe">
+        <input type="checkbox" checked={p.wallAnim} onChange={(e) => prefs.set({ wallAnim: e.target.checked })} /> ✨ Bewegte Hintergründe (Vorlagen und GIFs)
+      </label>
+      {p.motion === 'aus' && p.wallAnim && <p className="muted small">Gerade still, weil „Animationen: Aus“ gewählt ist.</p>}
+      <label className="composer__ping" data-setting="glass" title="Unscharfer Glas-Effekt hinter Fenstern und Leisten">
+        <input type="checkbox" checked={p.glass} onChange={(e) => prefs.set({ glass: e.target.checked })} /> 🪟 Glas-Effekte (Unschärfe)
+      </label>
+      <p className="muted small">Ruckelt die App auf einem älteren PC? Schalte hier ab, was Leistung kostet – oder alles auf einmal:</p>
+      <button className="btn btn--small" onClick={() => prefs.set(saver ? { motion: 'voll', wallAnim: true, glass: true } : { motion: 'aus', wallAnim: false, glass: false })}>
+        {saver ? '✨ Alle Effekte wieder an' : '🔋 Sparmodus: alle Effekte aus'}
+      </button>
     </>
   );
 }
@@ -553,6 +583,7 @@ function AudioSection() {
 // Bereiche in sinnvoller Reihenfolge: Alltägliches oben, Technik unten, Beta (experimentell) ganz unten (Issue #1)
 const ALL_SECTIONS = [
   { id: 'aussehen', icon: '🎨', title: 'Aussehen', desc: 'Design, Farbe, Animationen, Chat-Hintergrund.', keywords: ['farbe', 'theme', 'hell', 'dunkel', 'hintergrund', 'kompakt', 'animation'] },
+  { id: 'leistung', icon: '⚡', title: 'Leistung', desc: 'Animationen, bewegte Hintergründe und Glas-Effekte – auf schwächeren PCs abschalten.', keywords: ['performance', 'leistung', 'animation', 'ruckeln', 'langsam', 'gif', 'hintergrund', 'unschärfe', 'sparmodus', 'akku'] },
   { id: 'schreiben', icon: '✍️', title: 'Schreiben', desc: 'Wie Namensvorschläge beim Schreiben funktionieren.', keywords: ['erwähnen', 'mention', 'namen', 'vorschläge', '@'] },
   { id: 'toene', icon: '🔔', title: 'Benachrichtigungen', desc: 'Töne, eigener Ton, Nicht stören.', keywords: ['ton', 'sound', 'lautstärke', 'nicht stören', 'benachrichtigung'] },
   { id: 'datenschutz', icon: '🔒', title: 'Datenschutz', desc: 'Bildschirmschutz, Bilder/GIFs/Videos laden, Warnung vor Links.', keywords: ['bilder', 'gif', 'video', 'medien', 'link', 'screenshot', 'ip', 'spoiler', 'grabber', 'vertrauen', 'trusted', 'betrug', 'online', 'status', 'presence'] },
@@ -729,6 +760,7 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
   };
   const render = {
     aussehen: () => <AppearanceSection />,
+    leistung: () => <PerformanceSection />,
     schreiben: () => <WritingSection />,
     toene: () => <NotificationSection toast={toast} />,
     datenschutz: () => <PrivacySection toast={toast} />,

@@ -4,7 +4,7 @@ import { sanitizeVoiceFx } from '../shared/voice-settings';
 import { sanitizeWallpapers } from '../shared/wallpapers';
 // localStorage kann fehlen/werfen → immer mit Standardwerten weiterarbeiten.
 const KEY = 'pk.prefs.v1';
-const DEFAULTS = Object.freeze({ micDeviceId: '', outputDeviceId: '', volume: 1, chatSort: 'recent', collapsed: {}, theme: 'nacht', accent: '', motion: 'voll', density: 'normal', sound: sanitizeSound(null), voiceFx: sanitizeVoiceFx(null), dnd: false, mentionScope: 'server', wallpapers: {}, media: 'fragen', linkWarn: true, spoilerAsk: true, trustedDomains: [], hiddenMessages: [], showWhatsNew: true, lastSeenVersion: '', chatNotify: {}, collapsedSections: {} });
+const DEFAULTS = Object.freeze({ micDeviceId: '', outputDeviceId: '', volume: 1, chatSort: 'recent', collapsed: {}, theme: 'nacht', accent: '', motion: 'voll', density: 'normal', sound: sanitizeSound(null), voiceFx: sanitizeVoiceFx(null), dnd: false, mentionScope: 'server', wallpapers: {}, media: 'fragen', linkWarn: true, spoilerAsk: true, trustedDomains: [], hiddenMessages: [], showWhatsNew: true, lastSeenVersion: '', chatNotify: {}, collapsedSections: {}, wallAnim: true, glass: true });
 const THEME_IDS = ['nacht', 'ozean', 'lila', 'amoled', 'hell'];
 const pick = (v, allowed, fallback) => (allowed.includes(v) ? v : fallback);
 const listeners = new Set();
@@ -22,6 +22,9 @@ function read() {
       accent: typeof raw?.accent === 'string' && /^#[0-9a-f]{6}$/i.test(raw.accent) ? raw.accent : '',
       motion: pick(raw?.motion, ['voll', 'dezent', 'aus'], 'voll'),
       density: pick(raw?.density, ['normal', 'kompakt'], 'normal'),
+      // #131 Leistung: bewegte Hintergründe (auch GIFs) und Glas-Unschärfe abschaltbar
+      wallAnim: raw?.wallAnim !== false,
+      glass: raw?.glass !== false,
       sound: sanitizeSound(raw?.sound),
       voiceFx: sanitizeVoiceFx(raw?.voiceFx),
       dnd: raw?.dnd === true,

@@ -33,6 +33,9 @@ export function applyAppearance(p = prefs.get()) {
   root.dataset.theme = p.theme;
   root.dataset.motion = p.motion;
   root.dataset.density = p.density;
+  // #131 Leistung: „Animationen aus“ stoppt auch bewegte Hintergründe
+  root.dataset.wallAnim = p.wallAnim && p.motion !== 'aus' ? 'an' : 'aus';
+  root.dataset.glass = p.glass ? 'an' : 'aus';
   if (p.accent) {
     root.style.setProperty('--accent', p.accent);
     root.style.setProperty('--accent-ink', inkFor(p.accent));

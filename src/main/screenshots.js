@@ -107,6 +107,29 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await wait(400);
   await shoot(win, dir, '41-hintergrund-aurora');
   const wall = await js(win, `document.querySelector('main.chat')?.dataset.wall`);
+  // #131: eigenes Bild hochladen (echtes, hier erzeugtes PNG über das Datei-Feld) → als Hintergrund übernehmen
+  await rowCtx('allgemein');
+  await wait(300);
+  await js(win, `[...document.querySelectorAll('.ctx-menu__item')].find(b=>b.textContent.includes('Hintergrund'))?.click()`);
+  await wait(300);
+  await js(win, `(async () => { const c=document.createElement('canvas'); c.width=1200; c.height=800; const g=c.getContext('2d'); const gr=g.createLinearGradient(0,0,1200,800); gr.addColorStop(0,'#f472b6'); gr.addColorStop(0.5,'#a78bfa'); gr.addColorStop(1,'#38bdf8'); g.fillStyle=gr; g.fillRect(0,0,1200,800); g.fillStyle='rgba(255,255,255,.35)'; for(let i=0;i<40;i++){g.beginPath(); g.arc((i*137)%1200,(i*271)%800,10+(i%7)*6,0,7); g.fill();} const blob=await new Promise(r=>c.toBlob(r,'image/png')); const dt=new DataTransfer(); dt.items.add(new File([blob],'urlaub.png',{type:'image/png'})); const inp=document.querySelector('.wallpaper-dialog input[type=file]'); inp.files=dt.files; inp.dispatchEvent(new Event('change',{bubbles:true})); })()`);
+  await wait(1500);
+  await shoot(win, dir, '41b-hintergrund-eigenes-bild');
+  await js(win, `[...document.querySelectorAll('.wallpaper-dialog .btn')].find(b=>b.textContent.includes('Übernehmen'))?.click()`);
+  await wait(500);
+  await shoot(win, dir, '41c-chat-mit-eigenem-bild');
+  const ownWall = await js(win, `JSON.stringify({ wall: document.querySelector('main.chat')?.dataset.wall, bild: /url\\("data:image\\/webp/.test(document.querySelector('main.chat')?.style.getPropertyValue('--wall-img') || '') })`);
+  console.log(`[hintergrund-eigen] ${ownWall}`);
+  // wieder löschen → zurück auf Aurora (für die weiteren Bilder)
+  await rowCtx('allgemein');
+  await wait(300);
+  await js(win, `[...document.querySelectorAll('.ctx-menu__item')].find(b=>b.textContent.includes('Hintergrund'))?.click()`);
+  await wait(300);
+  await js(win, `document.querySelector('.wallpaper-tile__del')?.click()`);
+  await wait(300);
+  await js(win, `[...document.querySelectorAll('.wallpaper-tile')].find(b=>b.textContent.includes('Aurora'))?.click()`);
+  await js(win, `[...document.querySelectorAll('.wallpaper-dialog .btn')].find(b=>b.textContent.includes('Übernehmen'))?.click()`);
+  await wait(300);
   await rowCtx('projekt-a');
   await wait(300);
   const manageMenu = await js(win, `[...document.querySelectorAll('.ctx-menu__item')].map(b=>b.textContent.trim()).filter(t=>/Umbenennen|verschieben/.test(t)).length`);
@@ -977,6 +1000,18 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await wait(600);
   await shoot(win, dir, '26-aussehen');
   const look = await js(win, `JSON.stringify({ designs: document.querySelectorAll('.look-theme').length, farben: document.querySelectorAll('.look-accent').length })`);
+  // #131: Leistung – Sparmodus an/aus
+  await js(win, `document.querySelector('.settings__nav [data-nav="leistung"]')?.click()`);
+  await wait(300);
+  await clickText('.settings .btn', 'Sparmodus');
+  await wait(200);
+  const perf = await js(win, `JSON.stringify({ wallAnim: document.documentElement.dataset.wallAnim, glass: document.documentElement.dataset.glass, motion: document.documentElement.dataset.motion })`);
+  await shoot(win, dir, '26b-leistung');
+  await clickText('.settings .btn', 'wieder an');
+  await wait(200);
+  console.log(`[leistung] Sparmodus: ${perf} · danach: ${await js(win, `document.documentElement.dataset.wallAnim + '/' + document.documentElement.dataset.glass`)}`);
+  await js(win, `document.querySelector('.settings__nav [data-nav="aussehen"]')?.click()`);
+  await wait(300);
   await clickText('.look-theme', 'Hell');
   await wait(200);
   await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
