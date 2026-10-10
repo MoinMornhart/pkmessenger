@@ -57,7 +57,10 @@ async function setup(replies, { web = true } = {}) {
   const secret = { has: () => false, get: () => null, set() {}, clear() {} };
   const bodies = [];
   const fetchImpl = async (url, init) => {
-    bodies.push(JSON.parse(init.body));
+    const b = JSON.parse(init.body);
+    // Dieses (lokale) Modell kann kein natives Tool-Calling → App fällt aufs Text-Protokoll „SEARCH:“ zurück (#218)
+    if (b.tools) return { ok: false, status: 400, json: async () => ({ error: { message: 'llama3.2 does not support tools' } }) };
+    bodies.push(b);
     const content = replies[Math.min(bodies.length - 1, replies.length - 1)];
     return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content } }] }) };
   };
@@ -82,15 +85,15 @@ test('Werkzeug-Schleife: KI fordert Suche an, bekommt Ergebnisse als Daten, antw
   assert.match(r.text, /^Hier die News/);
   assert.ok(!/@everyone/.test(r.text)); // safeOutput gilt weiterhin
   assert.equal(ai.getConfig().searches[0].query, 'nachrichten heute');
-  assert.equal(ai.getConfig().usage.hour, 2); // jede Runde zählt
+  assert.equal(ai.getConfig().usage.hour, 3); // jede Runde zählt – inkl. des einen abgelehnten Werkzeug-Versuchs (nur einmal pro Modell)
 });
 
-test('Werkzeug-Schleife: höchstens 2 Suchen, dann muss die KI antworten', async () => {
-  const { ai, bodies, searched, job } = await setup(['SEARCH: a', 'SEARCH: b', 'SEARCH: c']);
+test('Werkzeug-Schleife: höchstens 4 Suchen, dann muss die KI antworten', async () => {
+  const { ai, bodies, searched, job } = await setup(['SEARCH: a', 'SEARCH: b', 'SEARCH: c', 'SEARCH: d', 'SEARCH: e']);
   const r = await ai.previewJob(job);
-  assert.deepEqual(searched, ['a', 'b']);
-  assert.equal(bodies.length, 3);
-  assert.match(bodies[2].messages[1].content, /Do not search again/);
+  assert.deepEqual(searched, ['a', 'b', 'c', 'd']);
+  assert.equal(bodies.length, 5);
+  assert.match(bodies[4].messages[1].content, /Do not search again/);
   assert.ok(!/SEARCH:/.test(r.text));
 });
 
