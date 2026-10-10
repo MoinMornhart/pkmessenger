@@ -93,6 +93,9 @@ function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () =>
       addresses: lanAddresses(),
       port: server?.address()?.port || DEFAULT_PORT,
       relay: getRelay()?.httpBase || null,
+      relayMode: getRelay()?.mode || null,
+      relayConnected: relayUp,
+      relayError,
       activity: activity.slice(0, 20),
     };
   }
@@ -191,9 +194,12 @@ function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () =>
 
   // Relay-Client (außerhalb des WLANs): verbindet sich AUSGEHEND zum Relay, empfängt Helfer-Pakete, antwortet.
   let relayWs = null;
+  let relayUp = false;
+  let relayError = null;
   function stopRelay() {
     const w = relayWs;
     relayWs = null;
+    relayUp = false;
     if (w) try { w.close(); } catch { /* egal */ }
   }
   function startRelay(roomId) {
@@ -201,13 +207,21 @@ function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () =>
     const WS = WebSocketImpl || (() => { try { return require('ws'); } catch { return null; } })();
     if (!relay?.wss || !WS) return;
     stopRelay();
-    const ws = new WS(relay.wss);
+    relayError = null;
+    let ws;
+    try {
+      ws = new WS(relay.wss);
+    } catch (err) {
+      relayError = String(err?.message || err).slice(0, 200);
+      return;
+    }
     relayWs = ws;
     ws.on('open', () => { try { ws.send(JSON.stringify({ room: roomId, role: 'host' })); } catch { /* egal */ } });
     ws.on('message', async (rawMsg) => {
       let m = null;
       try { m = JSON.parse(rawMsg.toString()); } catch { return; }
       if (m.relay) {
+        if (m.relay === 'joined') relayUp = true;
         if (m.relay === 'peer') { log(m.connected ? 'Helfer (über Relay) da' : 'Helfer (über Relay) weg'); emitStatus(); }
         return;
       }
@@ -215,8 +229,11 @@ function createHelp({ emit = () => {}, getView = () => ({}), applyAction = () =>
       const { obj } = await rpc(m.path, m.body, { ip: 'relay' });
       try { ws.send(JSON.stringify({ id: m.id, reply: obj })); } catch { /* egal */ }
     });
-    ws.on('close', () => { if (relayWs === ws) relayWs = null; });
-    ws.on('error', (err) => logger?.warn?.('help', `relay: ${err?.message || err}`));
+    ws.on('close', () => { if (relayWs === ws) { relayWs = null; relayUp = false; } });
+    ws.on('error', (err) => {
+      relayError = String(err?.message || err).slice(0, 200);
+      logger?.warn?.('help', `relay: ${relayError}`);
+    });
   }
 
   async function handle(req, res) {
