@@ -19,6 +19,7 @@ const { createMemory } = require('./ai-memory');
 const { createHello } = require('./hello');
 const { createLogger, buildReport } = require('./logger');
 const { createBlocklist } = require('./blocklist');
+const { createRelayTester } = require('./relay-test');
 const { createRemote } = require('./remote');
 const { createHelp } = require('./help');
 const { validators: remoteValidators } = require('./validate');
@@ -380,7 +381,7 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
   const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help, relayTester: createRelayTester() }, isTrustedSender);
   // Der Renderer meldet laufend seine (ungeschwärzte) Sicht; geschwärzt wird erst im Hilfe-Manager.
   ipcMain.on('pk:help-view', (event, view) => {
     if (isTrustedSender(event) && view && typeof view === 'object') latestHelpView = view;

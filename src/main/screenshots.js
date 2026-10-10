@@ -365,6 +365,8 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
       await wait(500);
       await js(win, `document.querySelector('.settings__nav [data-nav="support"]')?.click()`);
       await wait(400);
+      await js(win, `(() => { const d = document.querySelector('[data-setting="support-remote"]'); if (d) d.open = true; })()`); // #120: eingeklappt
+      await wait(200);
       await setIn('input[aria-label="Neues Fernzugangs-Passwort"]', 'demo-passwort-123');
       await setIn('input[aria-label="Fernzugangs-Passwort wiederholen"]', 'demo-passwort-123');
       await js(win, `[...document.querySelectorAll('.remote .btn')].find(b=>b.textContent.includes('Passwort festlegen'))?.click()`);
@@ -1110,10 +1112,13 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
     await wait(500);
     await js(win, `document.querySelector('.settings__nav [data-nav="support"]')?.click()`);
     await wait(400);
-    await js(win, `[...document.querySelectorAll('.support__link .btn')].find((b) => b.textContent.includes('Hilfelink erstellen'))?.click()`);
+    await js(win, `[...document.querySelectorAll('.support__link .btn')].find((b) => b.textContent.includes('Hilfe starten'))?.click()`);
     await wait(900);
     const sup = await js(win, `JSON.stringify({ code: document.querySelector('.support__link .login-code')?.textContent?.length || 0, knoepfe: [...document.querySelectorAll('.support__link .btn')].map((b) => b.textContent.trim()) })`);
     await shoot(win, dir, '87-support-hilfelink');
+    await js(win, `(() => { const d = document.querySelector('[data-setting="support-advanced"]'); if (d) { d.open = true; d.querySelector('details')?.setAttribute('open', ''); d.scrollIntoView({ block: 'start' }); } })()`);
+    await wait(300);
+    await shoot(win, dir, '88-support-erweitert');
     console.log(`[support] ${sup}`);
     await js(win, `[...document.querySelectorAll('.support__link .btn')].find((b) => b.textContent.includes('beenden'))?.click()`);
     await wait(300);

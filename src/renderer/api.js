@@ -45,6 +45,7 @@ export const api = Object.fromEntries(
     'helpDecide',
     'helpDisconnect',
     'helpSetRelay',
+    'helpTestRelay',
     'remoteSetPassword',
     'remoteEnable',
     'remoteOptions',
