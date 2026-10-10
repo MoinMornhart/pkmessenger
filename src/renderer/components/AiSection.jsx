@@ -817,6 +817,18 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
                 🌐 Letzte Websuche: „{cfg.searches[0].query}“ · {cfg.searches[0].source} · {cfg.searches[0].count} Treffer
               </span>
             )}
+            {cfg.toolLog?.length > 0 && (
+              <details className="ai-tools-log">
+                <summary>🧰 Werkzeug-Aufrufe der KI ({cfg.toolLog.length})</summary>
+                <ul className="small">
+                  {cfg.toolLog.slice(0, 15).map((t, i) => (
+                    <li key={`${t.at}-${i}`} className={t.ok ? '' : 'warn'}>
+                      {new Date(t.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} · {t.ok ? '✅' : '⚠️'} {t.tool}: {t.detail}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {cfg.running.length > 0 && (
               <button className="btn btn--danger btn--small" onClick={wrap('abort', () => api.aiAbort())}>
                 ⏹ Laufende KI-Anfragen stoppen

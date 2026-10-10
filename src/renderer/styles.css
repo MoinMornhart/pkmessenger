@@ -4812,3 +4812,12 @@ body.help-active .chat {
 .token--mid {
   color: #f59e0b;
 }
+
+/* #218: Werkzeug-Aufrufe der KI */
+.ai-tools-log summary {
+  cursor: pointer;
+}
+.ai-tools-log ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
