@@ -54,7 +54,7 @@ function EmbedMedia({ e }) {
   );
 }
 
-export const Embeds = memo(function Embeds({ embeds }) {
+export const Embeds = memo(function Embeds({ embeds, mentions }) {
   const nav = useContext(NavContext);
   if (!embeds?.length) return null;
   return embeds.map((e, i) => {
@@ -88,7 +88,7 @@ export const Embeds = memo(function Embeds({ embeds }) {
         ))}
       {e.description && (
         <div className="embed__desc">
-          <MessageContent content={e.description} />
+          <MessageContent content={e.description} mentions={mentions} />
         </div>
       )}
       {e.fields?.length > 0 && (
@@ -96,7 +96,7 @@ export const Embeds = memo(function Embeds({ embeds }) {
           {e.fields.map((f, j) => (
             <div key={j} className={`embed__field ${f.inline ? 'is-inline' : ''}`}>
               <b>{f.name}</b>
-              <MessageContent content={f.value} />
+              <MessageContent content={f.value} mentions={mentions} />
             </div>
           ))}
         </div>

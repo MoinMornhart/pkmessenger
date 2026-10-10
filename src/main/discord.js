@@ -475,7 +475,14 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   function mentionedUsers(msg, guild) {
     const out = valuesOf(msg?.mentions?.users).map((u) => ({ id: u.id, name: displayNameOf(u, guild?.members?.cache?.get?.(u.id)) }));
     const seen = new Set(out.map((u) => u.id));
-    const text = typeof msg?.content === 'string' ? msg.content : '';
+    // #131: auch Erwähnungen in Embeds (z. B. Musik-Bots: „Gewünscht von <@id>“) – sonst stand dort „@Unbekannt“
+    const embedText = valuesOf(msg?.embeds)
+      .slice(0, 10)
+      .flatMap((e) => [e?.title, e?.description, e?.footer?.text, e?.author?.name, ...valuesOf(e?.fields).flatMap((f) => [f?.name, f?.value])])
+      .filter((t) => typeof t === 'string')
+      .join('\n')
+      .slice(0, 20000);
+    const text = `${typeof msg?.content === 'string' ? msg.content : ''}\n${embedText}`;
     for (const m of text.matchAll(/<@!?(\d{17,20})>/g)) {
       const id = m[1];
       if (seen.has(id)) continue;
