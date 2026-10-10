@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('api', {
   helpDecide: call('pk:help-decide'),
   helpDisconnect: call('pk:help-disconnect'),
   helpSetRelay: call('pk:help-set-relay'),
+  helpTestRelay: call('pk:help-test-relay'),
   remoteSetPassword: call('pk:remote-set-password'),
   remoteEnable: call('pk:remote-enable'),
   remoteOptions: call('pk:remote-options'),

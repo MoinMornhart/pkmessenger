@@ -10,7 +10,7 @@ const { sealToken, openLink } = require('../shared/token-transfer');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help, relayTester }) {
   const requireAi = () => {
     if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
     return ai;
@@ -211,6 +211,12 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:help-control': (p) => requireHelp().setControl(validators.flag(p)),
     'pk:help-decide': (p) => requireHelp().decide(validators.remoteDecide(p)),
     'pk:help-disconnect': () => requireHelp().disconnect(),
+    // #120: eingetragenen (oder angegebenen) Relay-Server prüfen – nur Gesundheitscheck + Test-Raum, keine Daten
+    'pk:help-test-relay': (p) => {
+      const given = validators.helpRelay(p).url;
+      const url = given || store.get().helpRelay || '';
+      return relayTester ? relayTester.test(url) : { ok: false, steps: [{ name: 'Test', ok: false, detail: 'Nicht verfügbar.' }], ms: 0 };
+    },
     'pk:help-set-relay': (p) => {
       store.set('helpRelay', validators.helpRelay(p).url);
       remote?.refreshRelay?.(); // #104/#105: Fernzugang nutzt denselben Relay
