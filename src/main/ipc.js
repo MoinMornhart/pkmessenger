@@ -213,6 +213,7 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:help-disconnect': () => requireHelp().disconnect(),
     'pk:help-set-relay': (p) => {
       store.set('helpRelay', validators.helpRelay(p).url);
+      remote?.refreshRelay?.(); // #104/#105: Fernzugang nutzt denselben Relay
       return help ? help.status() : null;
     },
     'pk:remote-status': () => (remote ? remote.status() : null),

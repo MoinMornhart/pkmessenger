@@ -593,9 +593,11 @@ const validators = {
     return { password, current };
   },
   remoteOptions(p) {
-    const { requireApproval } = obj(p);
-    if (typeof requireApproval !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
-    return { requireApproval };
+    const { requireApproval, newRoom } = obj(p);
+    if (requireApproval !== undefined && typeof requireApproval !== 'boolean') throw new ValidationError('Ungültiger Schalter.');
+    if (newRoom !== undefined && newRoom !== true) throw new ValidationError('Ungültiger Schalter.');
+    if (requireApproval === undefined && !newRoom) throw new ValidationError('Ungültiger Schalter.');
+    return { ...(requireApproval !== undefined ? { requireApproval } : {}), ...(newRoom ? { newRoom: true } : {}) };
   },
   remoteDecide(p) {
     const { id, allow } = obj(p);

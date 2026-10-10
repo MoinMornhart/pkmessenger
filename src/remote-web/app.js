@@ -1,6 +1,7 @@
 'use strict';
 
-// PKMessenger Fernzugang – Web-Oberfläche für Geräte im eigenen WLAN (Issue #46/#50).
+// PKMessenger Fernzugang – Web-Oberfläche (Issue #46/#50). Im WLAN direkt per fetch, unterwegs über den eigenen Relay
+// per WebSocket (#104/#105). Beide Wege sind gleich verschlüsselt; der Relay sieht nur Chiffretext.
 // Alles wird mit tweetnacl verschlüsselt. Der Kopplungsschlüssel steht im Link hinter „#“ und wird nie gesendet.
 // Inhalte werden nur als Text eingesetzt (textContent), nie als HTML.
 (function () {
@@ -20,16 +21,97 @@
     const plain = nacl.secretbox.open(fromB64(msg.c), fromB64(msg.n), key);
     return plain ? JSON.parse(dec.decode(plain)) : null;
   }
-  async function post(path, body) {
-    const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store' });
-    return r.json();
-  }
-
   let device = null;
   try {
     device = JSON.parse(localStorage.getItem(STORE) || 'null');
   } catch {
     device = null;
+  }
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const relayRoom = () => hash.get('r') || (device && device.room) || null;
+
+  // ---- Unterwegs: Relay-WebSocket (gleicher Server wie diese Seite, Pfad /ws) ----
+  let ws = null;
+  let wsReady = null;
+  let pcOnline = false;
+  const waiting = {};
+  let nextId = 1;
+  function connectRelay() {
+    if (ws && ws.readyState === 1) return Promise.resolve();
+    if (wsReady) return wsReady;
+    wsReady = new Promise((resolve, reject) => {
+      const s = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+      const timer = setTimeout(() => {
+        reject(new Error('Relay nicht erreichbar.'));
+        try {
+          s.close();
+        } catch (e) {
+          /* egal */
+        }
+      }, 10000);
+      s.onopen = () => s.send(JSON.stringify({ room: relayRoom(), role: 'guest' }));
+      s.onmessage = (ev) => {
+        let m;
+        try {
+          m = JSON.parse(ev.data);
+        } catch (e) {
+          return;
+        }
+        if (m.relay) {
+          if (m.relay === 'joined') {
+            clearTimeout(timer);
+            ws = s;
+            pcOnline = Boolean(m.peer);
+            resolve();
+          } else if (m.relay === 'peer') pcOnline = Boolean(m.connected);
+          return;
+        }
+        if (m.id && waiting[m.id]) {
+          waiting[m.id](m.reply);
+          delete waiting[m.id];
+        }
+      };
+      s.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error('Relay nicht erreichbar.'));
+      };
+      s.onclose = (ev) => {
+        clearTimeout(timer);
+        if (ws === s) ws = null;
+        wsReady = null;
+        pcOnline = false;
+        const why = ev && ev.reason === 'slot-taken' ? 'Ein anderes Gerät ist gerade unterwegs verbunden. Bitte dort schließen und erneut versuchen.' : 'Verbindung zum PC unterbrochen.';
+        if (ev && ev.reason === 'slot-taken') reject(new Error(why));
+        for (const k of Object.keys(waiting)) {
+          waiting[k]({ error: why });
+          delete waiting[k];
+        }
+      };
+    });
+    wsReady.catch(() => {
+      wsReady = null;
+    });
+    return wsReady;
+  }
+  async function viaRelay(path, body) {
+    await connectRelay();
+    if (!pcOnline) throw new Error('Dein PC ist gerade nicht erreichbar (PKMessenger offen? Fernzugang an? Internet?).');
+    return new Promise((resolve) => {
+      const id = String(nextId++);
+      waiting[id] = resolve;
+      ws.send(JSON.stringify({ id, path, body }));
+      setTimeout(() => {
+        if (waiting[id]) {
+          waiting[id]({ error: 'Keine Antwort vom PC.' });
+          delete waiting[id];
+        }
+      }, 100000); // Kopplung wartet bis zu 90 s auf die Bestätigung am PC
+    });
+  }
+  async function post(path, body) {
+    if (relayRoom()) return viaRelay(path, body);
+    const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store' });
+    return r.json();
   }
   let session = null;
   let botName = 'Bot';
@@ -58,7 +140,6 @@
   }
 
   // ---- Koppeln (Einmal-Code aus dem Link) ----
-  const hash = new URLSearchParams(location.hash.slice(1));
   const pairId = hash.get('p');
   const pairKey = hash.get('k');
   if (pairId && pairKey) {
@@ -71,7 +152,7 @@
         const res = await post('/api/pair', { p: pairId, ...seal({ password: $('pair-pw').value, name: $('pair-name').value || 'Gerät', t: Date.now() }, key) });
         const msg = res && res.n ? unseal(res, key) : res;
         if (!msg || msg.error) throw new Error((msg && msg.error) || 'Fehler');
-        device = { id: msg.deviceId, key: msg.deviceKey, name: msg.name };
+        device = { id: msg.deviceId, key: msg.deviceKey, name: msg.name, room: hash.get('r') || null }; // Relay-Raum merken (unterwegs)
         localStorage.setItem(STORE, JSON.stringify(device));
         history.replaceState(null, '', location.pathname); // Schlüssel aus der Adresszeile entfernen
         $('pair-pw').value = '';

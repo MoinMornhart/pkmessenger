@@ -14,6 +14,7 @@ RUN npm ci --omit=dev
 # bei __dirname=/app also unter /src/help-web.
 COPY relay/core.js relay/server.js ./
 COPY src/help-web /src/help-web
+COPY src/remote-web /src/remote-web
 
 ENV HOST=0.0.0.0 \
     PORT=8787
