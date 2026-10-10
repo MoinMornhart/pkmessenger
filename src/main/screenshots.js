@@ -363,7 +363,7 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
       const setIn = (sel, v) => js(win, `(() => { const el=document.querySelector(${JSON.stringify(sel)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(v)}); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
       await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
       await wait(500);
-      await js(win, `document.querySelector('.settings__nav [data-nav="sicherheit"]')?.click()`);
+      await js(win, `document.querySelector('.settings__nav [data-nav="support"]')?.click()`);
       await wait(400);
       await setIn('input[aria-label="Neues Fernzugangs-Passwort"]', 'demo-passwort-123');
       await setIn('input[aria-label="Fernzugangs-Passwort wiederholen"]', 'demo-passwort-123');
@@ -1104,6 +1104,24 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await wait(800);
   const test2 = await js(win, `JSON.stringify((window.__pkSoundLog||[]).slice(0,3).map(e=>e.event+':'+e.preset))`);
   console.log(`[toene] Einstellungen: ${test1} · nach Erwähnung: ${test2}`);
+  // #120: Support-Bereich – Hilfelink mit einem Klick erzeugen + kopieren
+  try {
+    await js(win, `document.querySelector('.chatlist__head .icon-btn[aria-label="Einstellungen"]')?.click()`);
+    await wait(500);
+    await js(win, `document.querySelector('.settings__nav [data-nav="support"]')?.click()`);
+    await wait(400);
+    await js(win, `[...document.querySelectorAll('.support__link .btn')].find((b) => b.textContent.includes('Hilfelink erstellen'))?.click()`);
+    await wait(900);
+    const sup = await js(win, `JSON.stringify({ code: document.querySelector('.support__link .login-code')?.textContent?.length || 0, knoepfe: [...document.querySelectorAll('.support__link .btn')].map((b) => b.textContent.trim()) })`);
+    await shoot(win, dir, '87-support-hilfelink');
+    console.log(`[support] ${sup}`);
+    await js(win, `[...document.querySelectorAll('.support__link .btn')].find((b) => b.textContent.includes('beenden'))?.click()`);
+    await wait(300);
+    await js(win, `document.querySelector('.settings .icon-btn')?.click()`);
+    await wait(300);
+  } catch (e) {
+    console.log(`[support] Fehler: ${e.message}`);
+  }
   // Fernhilfe (Issue #79): Hilfe anfordern → Code + QR. In try/catch, damit es den Lauf nie abbricht.
   try {
     await js(win, `document.querySelector('.rail__item:not(.rail__dm):not(.rail__add)')?.click()`);

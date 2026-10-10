@@ -71,7 +71,7 @@ export function buildSteps() {
     { target: SETTINGS_BTN, title: 'Einstellungen', text: 'Hier stellst du alles ein.', task: 'Klick auf das Zahnrad.', click: SETTINGS_BTN },
     { target: '.settings__nav', title: 'Alles schnell finden', text: 'Klick links auf einen Bereich, dann siehst du nur diesen. Oben suchen („Passwort“, „Töne“, „Hintergrund“ …), auch mit Tippfehlern.' },
     { target: '.settings__nav [data-nav="toene"]|.settings__nav [data-nav="aussehen"]', title: 'Töne & Aussehen', text: '🔔 Töne, eigener Ton, Nicht stören · 🎨 Designs, Akzentfarbe, Animationen und Chat-Hintergründe.' },
-    { target: '.settings__nav [data-nav="datenschutz"]|.settings__nav [data-nav="sicherheit"]', title: 'Datenschutz & Sicherheit', text: 'Bilder/GIFs erst nach Rückfrage, Link-Warnungen, vertraute Seiten, Spoiler · App-Passwort, Windows Hello, mit Windows starten, im Hintergrund weiterlaufen.' },
+    { target: '.settings__nav [data-nav="datenschutz"]|.settings__nav [data-nav="sicherheit"]', title: 'Datenschutz & Sicherheit', text: 'Bilder/GIFs erst nach Rückfrage, Link-Warnungen, vertraute Seiten, Spoiler · App-Passwort, Windows Hello, mit Windows starten, im Hintergrund weiterlaufen. Hilfe von anderen und Fernzugang fürs Handy: unter „🛟 Support“.' },
     { target: '.settings__nav [data-nav="beta"]', title: 'Beta = experimentell', text: 'Hier liegen neue, noch experimentelle Sachen wie KI-Agenten. Sie sind standardmäßig aus und können sich noch ändern.' },
     { target: '.settings__nav [data-nav="hilfe"]', title: 'Fertig! 🎉', text: 'Unter „Hilfe & Tour“ startest du die Tour neu, prüfst die Einrichtung und findest Tastenkürzel. Viel Spaß!' },
   );
