@@ -63,20 +63,32 @@ function createMemory({ vault, now = () => Date.now() }) {
 
   const tokensOf = (p) => estimateTokens(p.summary) + p.turns.reduce((n, t) => n + estimateTokens(t.text), 0);
 
-  /** Kontext für den Prompt: Zusammenfassung + letzte Wortwechsel (reine Daten, keine Anweisungen). */
-  function context(userId) {
+  // Datenschutz (vibeworks #218): Jeder Wortwechsel merkt sich, wo er stattfand (g = Server-ID, null = Privatchat).
+  // Auf einem Server sieht die KI nur wörtliche Wortwechsel von DIESEM Server – nie aus Privatchats oder anderen Servern.
+  // Andere Personen (nicht der Fragende): nur Wortwechsel von diesem Server, nie ihre Zusammenfassung (die mischt alle Orte).
+  const visible = (t, guildId, own) => (guildId ? t.g === String(guildId) || (own && t.g === undefined) : own);
+
+  /**
+   * Kontext für den Prompt: Zusammenfassung + letzte Wortwechsel (reine Daten, keine Anweisungen).
+   * guildId: Server, auf dem gerade gefragt wird (null = Privatchat). own=false: Gedächtnis einer anderen Person.
+   */
+  function context(userId, { guildId = null, own = true } = {}) {
     const p = load().people[userId];
-    if (!p || (!p.summary && !p.turns.length)) return '';
+    if (!p) return '';
+    const turns = p.turns.filter((t) => visible(t, guildId, own));
+    const summary = own ? p.summary : '';
+    if (!summary && !turns.length) return '';
     const lines = [];
-    if (p.summary) lines.push(`Summary of earlier conversations:\n${p.summary}`);
-    if (p.turns.length) lines.push(`Recent messages:\n${p.turns.map((t) => `${t.role === 'user' ? p.name || 'User' : 'You (bot)'}: ${t.text}`).join('\n')}`);
+    if (summary) lines.push(`Summary of earlier conversations:\n${summary}`);
+    if (turns.length) lines.push(`Recent messages:\n${turns.map((t) => `${t.role === 'user' ? p.name || 'User' : 'You (bot)'}: ${t.text}`).join('\n')}`);
     return `<memory about="${(p.name || 'user').replace(/"/g, "'")}">\n${lines.join('\n\n')}\n</memory>`;
   }
 
-  function remember(userId, name, userText, botText) {
+  function remember(userId, name, userText, botText, { guildId = null } = {}) {
     const p = person(userId, name);
-    p.turns.push({ role: 'user', text: String(userText || '').slice(0, MAX_TURN_CHARS), at: now() });
-    p.turns.push({ role: 'bot', text: String(botText || '').slice(0, MAX_TURN_CHARS), at: now() });
+    const g = guildId ? String(guildId) : null;
+    p.turns.push({ role: 'user', text: String(userText || '').slice(0, MAX_TURN_CHARS), at: now(), g });
+    p.turns.push({ role: 'bot', text: String(botText || '').slice(0, MAX_TURN_CHARS), at: now(), g });
     p.at = now();
     save();
     return tokensOf(p);
@@ -120,6 +132,20 @@ function createMemory({ vault, now = () => Date.now() }) {
     return { compacted: true, ok, error: ok ? null : error, tokens: tokensOf(p) };
   }
 
+  /**
+   * „@Leon hat mal gesagt …“ (vibeworks #218): Personen per Name suchen und nur deren Wortwechsel von DIESEM Server liefern.
+   * Ohne Server (Privatchat) gibt es nichts – Erinnerungen anderer verlassen nie ihren Server.
+   */
+  function recall(name, { guildId = null, excludeUserId = null, limit = 10 } = {}) {
+    const q = String(name || '').replace(/^@/, '').trim().toLowerCase();
+    if (!guildId || !q) return [];
+    return Object.entries(load().people)
+      .filter(([id, p]) => id !== excludeUserId && String(p.name || '').toLowerCase().includes(q))
+      .map(([userId, p]) => ({ userId, name: p.name, turns: p.turns.filter((t) => t.g === String(guildId)).slice(-limit) }))
+      .filter((x) => x.turns.length)
+      .slice(0, 3);
+  }
+
   /** Übersicht für die Oberfläche – Inhalte nur auf ausdrücklichen Wunsch (view). */
   function list() {
     const d = load();
@@ -154,7 +180,7 @@ function createMemory({ vault, now = () => Date.now() }) {
     return [];
   }
 
-  return { context, remember, compact, list, view, setSummary, forget, forgetAll, flush, estimateTokens };
+  return { context, remember, recall, compact, list, view, setSummary, forget, forgetAll, flush, estimateTokens };
 }
 
 module.exports = { createMemory, estimateTokens, KEEP_TURNS };
