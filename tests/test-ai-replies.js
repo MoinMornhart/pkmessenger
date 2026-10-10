@@ -82,7 +82,7 @@ test('Nur bestimmte Personen / Personen ausschließen', async () => {
 test('Spam-Schutz: Wartezeit pro Kanal und Stundenlimit', async () => {
   const { ai, msg, advance } = await setup();
   assert.equal((await ai.onMessage(msg())).ok, true);
-  assert.equal((await ai.onMessage(msg())).skipped, 'wartezeit');
+  assert.equal((await ai.onMessage(msg())).queued, true); // #112: Warteschlange statt ignorieren
   advance(16000);
   assert.equal((await ai.onMessage(msg())).ok, true);
   for (let i = 0; i < 40; i++) {
@@ -110,7 +110,7 @@ test('Validierung der Antwort-Einstellungen', () => {
   assert.deepEqual(v.channelIds, [ALLG]); // doppelte entfernt
   assert.equal(v.instructions, 'Hi');
   assert.throws(() => validators.aiResponder({ ...ok, channelIds: ['abc'] }), /Ungültige ID/);
-  assert.throws(() => validators.aiResponder({ ...ok, instructions: 'x'.repeat(1501) }), /1500/);
+  assert.throws(() => validators.aiResponder({ ...ok, instructions: 'x'.repeat(8001) }), /8000/);
   assert.throws(() => validators.aiResponder({ ...ok, notify: 'ja' }), /notify/);
   assert.throws(() => validators.aiResponder({ ...ok, allowUsers: [{ id: '1', name: 'x' }] }), /Ungültige ID/);
 });
