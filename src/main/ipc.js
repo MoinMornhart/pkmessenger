@@ -11,7 +11,7 @@ const { sealToken, openLink } = require('../shared/token-transfer');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help, relayTester, currentRelay = () => '' }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help, relayTester, currentRelay = () => '', botModules = null }) {
   const requireAi = () => {
     if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
     return ai;
@@ -23,6 +23,10 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
   const requireTokens = () => {
     if (!tokenStore) throw Object.assign(new Error('Im Demo-Modus gibt es keinen Token-Tresor.'), { code: 'NOT_FOUND' });
     return tokenStore;
+  };
+  const requireModules = () => {
+    if (!botModules) throw Object.assign(new Error('Bot-Module sind auf diesem Gerät nicht verfügbar.'), { code: 'NOT_FOUND' });
+    return botModules;
   };
   const requireHelp = () => {
     if (!help) throw Object.assign(new Error('Fernhilfe ist auf diesem Gerät nicht verfügbar.'), { code: 'NOT_FOUND' });
@@ -206,6 +210,10 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:setup-check': () => service.setupCheck(),
     // Fernzugang im WLAN (Issue #46/#50) – nur vom eigenen Fenster steuerbar
     // Fernhilfe (Issue #79)
+    // Bot-Module (Beta, #131): Prüfung der Eingaben in bot-modules.js (checkSet)
+    'pk:modules-list': (p) => requireModules().list(validators.guildRef(p)),
+    'pk:modules-set': (p) => requireModules().set(p),
+    'pk:modules-reset': (p) => requireModules().reset(p),
     'pk:help-status': () => (help ? { ...help.status(), relaySetting: relaySetting(store.get()) } : null),
     'pk:help-request': () => requireHelp().requestWithQr(),
     'pk:help-stop': () => requireHelp().stop(),

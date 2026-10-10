@@ -130,6 +130,10 @@ contextBridge.exposeInMainWorld('api', {
   memberBan: call('pk:member-ban'),
   copyText: call('pk:copy-text'),
   aiGet: call('pk:ai-get'),
+  // Bot-Module (Beta, #131)
+  modulesList: call('pk:modules-list'),
+  modulesSet: call('pk:modules-set'),
+  modulesReset: call('pk:modules-reset'),
   aiSetConfig: call('pk:ai-set-config'),
   aiSetKey: call('pk:ai-set-key'),
   aiClearKey: call('pk:ai-clear-key'),

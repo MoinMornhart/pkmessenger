@@ -4916,7 +4916,7 @@ details.ai-mode[open] > summary::before {
   border-radius: 10px;
   background: var(--panel-2);
 }
-.ai-mode input {
+.ai-mode input:not([type='checkbox']) {
   flex: 1;
   min-width: 0;
 }
@@ -4994,4 +4994,26 @@ body.help-active .chat {
 .ai-tools-log ul {
   margin: 4px 0 0;
   padding-left: 18px;
+}
+
+/* ---------- Bot-Module (Beta, #131) ---------- */
+.module-card .settings__row select {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.module-rules {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+.module-rule {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.module-rule .settings__row input {
+  flex: 1 1 160px;
+  min-width: 0;
 }
