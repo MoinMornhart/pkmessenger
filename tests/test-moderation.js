@@ -74,5 +74,5 @@ test('Unbekannte Person, Validierung', async () => {
   assert.throws(() => validators.memberBan({ ...ref, deleteMessageSeconds: 604801 }), /7 Tage/);
   assert.throws(() => validators.memberKick({ ...ref, reason: 'x'.repeat(401) }), /400/);
   assert.throws(() => validators.memberRole({ ...ref, roleId: 'abc', add: true }), /Ungültige ID/);
-  assert.throws(() => validators.copyText({ text: 'x'.repeat(4001) }), /Ungültiger Text/);
+  assert.throws(() => validators.copyText({ text: 'x'.repeat(20001) }), /Ungültiger Text/);
 });

@@ -354,7 +354,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
   function listGuilds() {
     const c = requireReady();
     return [...c.guilds.cache.values()]
-      .map((g) => ({ id: g.id, name: g.name, acronym: g.nameAcronym, iconUrl: g.iconURL({ size: 96, extension: 'png' }), canCreateChannels: Boolean(g.members?.me?.permissions?.has?.(PermissionFlagsBits.ManageChannels)) }))
+      .map((g) => ({ id: g.id, name: g.name, acronym: g.nameAcronym, iconUrl: g.iconURL({ size: 128, extension: 'png' }), canCreateChannels: Boolean(g.members?.me?.permissions?.has?.(PermissionFlagsBits.ManageChannels)) }))
       .sort((a, b) => a.name.localeCompare(b.name, 'de'));
   }
 
@@ -534,7 +534,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
     if (!e?.name && !e?.id) return null;
     let url = null;
     try {
-      url = e.id && typeof e.imageURL === 'function' ? e.imageURL({ size: 48 }) : null;
+      url = e.id && typeof e.imageURL === 'function' ? e.imageURL({ size: 64 }) : null;
     } catch {
       url = null;
     }
@@ -1177,7 +1177,7 @@ function createDiscordService({ discord, envPath, emit, createClient, loginTimeo
       .map((e) => {
         let url = null;
         try {
-          url = typeof e.imageURL === 'function' ? e.imageURL({ size: 48 }) : null;
+          url = typeof e.imageURL === 'function' ? e.imageURL({ size: 64 }) : null;
         } catch {
           url = null;
         }

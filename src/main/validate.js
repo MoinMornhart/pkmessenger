@@ -408,7 +408,8 @@ const validators = {
   },
   copyText(p) {
     const { text } = obj(p);
-    if (typeof text !== 'string' || text.length > 4000) throw new ValidationError('Ungültiger Text.');
+    // #129: Fehlerberichte können länger als 4000 Zeichen sein (GitHub erlaubt ~65 000)
+    if (typeof text !== 'string' || text.length > 20000) throw new ValidationError('Ungültiger Text.');
     return text;
   },
   userRef(p) {

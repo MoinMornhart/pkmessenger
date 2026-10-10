@@ -53,3 +53,21 @@ test('Einrichtungs-Check: angemeldet, Server, Kanäle; Presence freiwillig', asy
   assert.ok(res.items.some((i) => i.id.startsWith('guild:') && /Kanälen sichtbar/.test(i.text)));
   assert.match(res.portal, /^https:\/\/discord\.com\/developers\/applications/);
 });
+
+test('#129: Fehlerbericht bleibt kopierbar – lange Logzeilen gekürzt, älteste Zeilen fallen weg', () => {
+  const { validators } = require('../src/main/validate');
+  const lines = Array.from({ length: 30 }, (_, i) => `2026-10-10 ERROR [pk:list-guilds] Zeile ${i} ` + 'x'.repeat(900));
+  const r = buildReport({ version: '0.18.6', platform: 'win32', arch: 'x64', electron: '44.6.0', where: 'manuell', error: 'Test', lines });
+  assert.ok(r.length < 10000);
+  assert.match(r, /Zeile 29/); // neueste Zeile bleibt
+  assert.doesNotMatch(r, /Zeile 0 /);
+  assert.ok(r.split('\n').every((l) => l.length <= 402));
+  assert.equal(validators.copyText({ text: r }), r);
+});
+
+test('#129: Serverliste – Discord erlaubt nur Bildgrößen als Zweierpotenz', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'discord.js'), 'utf8');
+  const sizes = [...src.matchAll(/size:\s*(\d+)/g)].map((m) => Number(m[1]));
+  assert.ok(sizes.length > 5);
+  for (const s of sizes) assert.ok([16, 32, 64, 128, 256, 512, 1024, 2048, 4096].includes(s), `ungültige Größe ${s}`);
+});
