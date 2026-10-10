@@ -53,7 +53,15 @@ function createLogger({ dir, now = () => new Date() }) {
 }
 
 /** Fehlerbericht als Text (englisch, ohne Geheimnisse) – wird nur angezeigt/kopiert, nie automatisch gesendet. */
+// #129: lange Logzeilen machten den Bericht zu groß → Kopieren schlug fehl. Zeilen kürzen, älteste zuerst weglassen.
+const MAX_REPORT_LINE = 400;
+const MAX_REPORT_LINES = 8000;
 function buildReport({ version, platform, arch, electron, error, where, lines }) {
+  const shown = (lines || []).map((l) => {
+    const s = scrub(l);
+    return s.length > MAX_REPORT_LINE ? `${s.slice(0, MAX_REPORT_LINE)} …` : s;
+  });
+  while (shown.length > 1 && shown.join('\n').length > MAX_REPORT_LINES) shown.shift();
   return [
     '### PKMessenger error report',
     `- Version: ${version}`,
@@ -64,7 +72,7 @@ function buildReport({ version, platform, arch, electron, error, where, lines })
     '<details><summary>Last log lines</summary>',
     '',
     '```',
-    ...(lines || []).map(scrub),
+    ...shown,
     '```',
     '</details>',
   ].join('\n');

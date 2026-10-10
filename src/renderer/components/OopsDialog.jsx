@@ -39,7 +39,9 @@ export default function OopsDialog() {
       .copyText({ text: oops.report })
       .then(() => setCopied(true))
       .catch(() => setCopied(false));
-  const openIssue = () => {
+  // #129: „Auf GitHub melden“ geht immer – es kopiert den Bericht selbst mit (vorher gesperrt, wenn Kopieren scheiterte)
+  const openIssue = async () => {
+    if (!copied) await copy();
     const title = `Fehler: ${String(oops.error).split('\n')[0].slice(0, 80)}`;
     const body = 'Bitte hier den kopierten Fehlerbericht einfügen (' + pc('Strg+V', 'lange drücken → Einfügen') + ') und kurz schreiben, was du gerade gemacht hast.\n\n';
     api.openExternal({ url: `${ISSUE_URL}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}` }).catch(() => {});
@@ -62,7 +64,7 @@ export default function OopsDialog() {
           <button className="btn" onClick={copy}>
             📋 {copied ? 'Kopiert ✓' : 'Kopieren'}
           </button>
-          <button className="btn btn--primary" disabled={!copied} title={copied ? '' : 'Erst kopieren'} onClick={openIssue}>
+          <button className="btn btn--primary" title="Kopiert den Bericht und öffnet GitHub" onClick={openIssue}>
             🐙 Auf GitHub melden
           </button>
         </div>
