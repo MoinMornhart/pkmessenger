@@ -114,6 +114,8 @@ function createDemo() {
       { type: 2, style: 5, url: 'https://example.com/hilfe', label: 'Mehr Infos' },
     ] },
     { type: 1, components: [{ type: 3, placeholder: 'Rolle wählen …' }] },
+    // #129: Musik-Bot-Knöpfe nur mit Emoji
+    { type: 1, components: ['⏮️', '⏸️', '⏭️', '🔁', '🔀'].map((e, i) => ({ type: 2, style: i === 1 ? 1 : 2, customId: `m${i}`, emoji: { name: e } })) },
   ];
 
   // eigenes Server-Emoji für die Reaktionsauswahl

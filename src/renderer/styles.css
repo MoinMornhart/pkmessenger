@@ -912,6 +912,19 @@ a:hover {
   color: #fff;
   background: #4e5058;
   max-width: 100%;
+  min-height: 30px;
+}
+.msg-btn__emoji {
+  font-size: 16px;
+  line-height: 1;
+}
+img.msg-btn__emoji {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+.msg-btn.is-disabled {
+  opacity: 0.5;
 }
 .msg-btn--primary {
   background: var(--accent, #5865f2);
