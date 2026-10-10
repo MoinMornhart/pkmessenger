@@ -822,6 +822,8 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await wait(600);
   await js(win, `[...document.querySelectorAll('.settings label.composer__ping')].find(l=>l.textContent.includes('Beta'))?.querySelector('input')?.click()`);
   await wait(500);
+  await js(win, `document.querySelectorAll('.settings details[data-fold]').forEach((d) => (d.open = true))`); // #131: einklappbare Bereiche öffnen
+  await wait(150);
   await js(win, `(() => { ${SET} setVal(document.querySelector('#ai-model'),'demo-modell'); })()`);
   await wait(200);
   await clickText('.ai-box .btn', 'Übernehmen');
@@ -916,6 +918,8 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await wait(200);
   await js(win, `(() => { ${SET} setVal(document.querySelector('.ai-mode input[aria-label="Name des Modus"]'), 'Rainer'); setVal(document.querySelector('.ai-mode textarea'), 'Kurz, trocken, mit Humor.'); })()`);
   await wait(200);
+  await js(win, `document.querySelectorAll('.settings details[data-fold]').forEach((d) => (d.open = true))`); // #131: einklappbare Bereiche öffnen
+  await wait(150);
   await js(win, `document.querySelector('.ai-modes')?.scrollIntoView({block:'center'})`);
   await wait(300);
   await shoot(win, dir, '84-ki-modi');

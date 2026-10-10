@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, onEvent } from '../api';
+import Fold from './Fold';
 import { fuzzyFilter } from '../../shared/fuzzy';
 import { describeSchedule, DAY_NAMES } from '../../shared/schedule';
 import { formatListTime } from '../../shared/format';
@@ -328,13 +329,13 @@ function ModesEditor({ r, set, guilds }) {
   const guildName = (gid) => guilds.find((g) => g.id === gid)?.name || 'Privatchat';
   const activeList = Object.entries(r.activeModes || {}).map(([scope, id]) => [scope, modes.find((x) => x.id === id)]).filter(([, x]) => x);
   return (
-    <div className="ai-modes" data-setting="ai-modes">
-      <span className="settings__label">🎭 Modi</span>
+    <Fold id="ai-modes" className="ai-modes ai-subfold" title="🎭 Modi" badge={modes.length || null} hint="Mehrere Persönlichkeiten für den Bot – Admins wechseln im Chat mit „modus Name“">
+      <div data-setting="ai-modes">
       <p className="muted small">
         Mehrere unabhängige Persönlichkeiten für den Bot, jede mit eigenen Anweisungen und auf Wunsch eigenem Modell. Eine Admin schreibt im Chat <b>„modus Name“</b> – der Bot wechselt sofort. „modus“ allein zeigt die Liste, „modus standard“ schaltet zurück.
       </p>
       {modes.map((x) => (
-        <div key={x.id} className="ai-mode">
+        <Fold key={x.id} id={`ai-mode-${x.id}`} className="ai-mode" title={`🎭 ${x.name || 'Ohne Namen'}`} badge={x.model || null}>
           <div className="settings__row">
             <input aria-label="Name des Modus" value={x.name} maxLength={32} onChange={(e) => update(x.id, { name: e.target.value })} placeholder="Name, z. B. Rainer" />
             <input aria-label="Eigenes Modell (optional)" value={x.model} maxLength={100} onChange={(e) => update(x.id, { model: e.target.value })} placeholder="Modell (leer = wie oben)" />
@@ -344,7 +345,7 @@ function ModesEditor({ r, set, guilds }) {
           </div>
           <TokenHint text={x.instructions} />
           <textarea className="profile__desc" rows={3} maxLength={8000} value={x.instructions} onChange={(e) => update(x.id, { instructions: e.target.value })} placeholder="So ist der Bot in diesem Modus …" />
-        </div>
+        </Fold>
       ))}
       {modes.length < 20 && (
         <button className="btn btn--ghost btn--small" onClick={add}>
@@ -364,6 +365,44 @@ function ModesEditor({ r, set, guilds }) {
             </p>
           )}
         </>
+      )}
+      </div>
+    </Fold>
+  );
+}
+
+// #131: Werkzeuge der KI übersichtlich – was sie darf, wo man es einschaltet, und was sie zuletzt getan hat
+function ToolsInfo({ cfg }) {
+  const r = cfg.responder;
+  const jobsWithWeb = cfg.jobs.filter((j) => j.web).length;
+  return (
+    <div className="ai-tools">
+      <ul className="small ai-tools__list">
+        <li>
+          🌐 <b>Websuche</b> – Antworten: <b>{r.web ? 'an' : 'aus'}</b> · Aufträge mit Websuche: <b>{jobsWithWeb}</b>
+          <span className="muted"> (einschalten unter „Auf Erwähnungen antworten“ bzw. im Auftrag)</span>
+        </li>
+        <li>
+          🧠 <b>Erinnern</b> („Leon hat mal gesagt …“): <b>{r.memory ? 'an' : 'aus'}</b>
+          <span className="muted"> – nur Gespräche vom selben Server, nie aus Privatchats</span>
+        </li>
+      </ul>
+      <p className="muted small">Modelle, die Werkzeuge können, rufen sie selbst auf. Bei anderen nutzt die App einen einfachen Ersatz (nur Websuche).</p>
+      {cfg.searches?.length > 0 && (
+        <p className="small">
+          Letzte Websuche: „{cfg.searches[0].query}“ · {cfg.searches[0].source} · {cfg.searches[0].count} Treffer
+        </p>
+      )}
+      {cfg.toolLog?.length > 0 ? (
+        <ul className="small ai-tools-log">
+          {cfg.toolLog.slice(0, 15).map((t, i) => (
+            <li key={`${t.at}-${i}`} className={t.ok ? '' : 'warn'}>
+              {new Date(t.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} · {t.ok ? '✅' : '⚠️'} {t.tool}: {t.detail}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted small">Noch keine Werkzeug-Aufrufe.</p>
       )}
     </div>
   );
@@ -789,7 +828,7 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
   const jobServers = groupByServer(targets).filter((g) => cfg.jobs.some((j) => serverOfJob(j) === g.id));
 
   return (
-    <>
+    <Fold id="ai-all" className="ai-card ai-all" title="🤖 KI-Agenten" badge={cfg.enabled ? 'an' : 'aus'} hint="KI-Aufträge, Antworten auf Erwähnungen, Modi, Werkzeuge und Gedächtnis">
       <label className="composer__ping">
         <input type="checkbox" checked={cfg.enabled} disabled={busy === 'beta'} onChange={toggleBeta} /> 🧪 Beta freischalten: KI-Agenten
       </label>
@@ -817,26 +856,13 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
                 🌐 Letzte Websuche: „{cfg.searches[0].query}“ · {cfg.searches[0].source} · {cfg.searches[0].count} Treffer
               </span>
             )}
-            {cfg.toolLog?.length > 0 && (
-              <details className="ai-tools-log">
-                <summary>🧰 Werkzeug-Aufrufe der KI ({cfg.toolLog.length})</summary>
-                <ul className="small">
-                  {cfg.toolLog.slice(0, 15).map((t, i) => (
-                    <li key={`${t.at}-${i}`} className={t.ok ? '' : 'warn'}>
-                      {new Date(t.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} · {t.ok ? '✅' : '⚠️'} {t.tool}: {t.detail}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
             {cfg.running.length > 0 && (
               <button className="btn btn--danger btn--small" onClick={wrap('abort', () => api.aiAbort())}>
                 ⏹ Laufende KI-Anfragen stoppen
               </button>
             )}
           </div>
-          <details className="ai-card" open>
-            <summary>🔌 Verbindung & Modell</summary>
+          <Fold id="ai-conn" title="🔌 Verbindung & Modell" hint="Anbieter, Adresse, Modell und API-Schlüssel">
           <ProfilesRow cfg={cfg} draft={draft} setDraft={setDraft} wrap={wrap} setCfg={setCfg} />
           <label className="settings__label" htmlFor="ai-preset">
             KI-Anbieter
@@ -972,21 +998,20 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
           </label>
           <p className="muted small">Dann bekommt die KI Bilder aus Nachrichten (nur von Discords Servern, max. 5 MB). Ohne den Schalter, und bei Ton oder Video, sagt sie locker, dass sie das nicht kann.</p>
 
-          </details>
-          <details className="ai-card" open>
-            <summary>📊 Verbrauch & Limits</summary>
+          </Fold>
+          <Fold id="ai-limits" title="📊 Verbrauch & Limits" hint="Wie viele KI-Anfragen pro Stunde/Tag erlaubt sind">
             <LimitsRow cfg={cfg} onSave={(l) => wrap('limits', async () => setCfg(await api.aiSetLimits(l)))()} />
-          </details>
-          <details className="ai-card" open>
-            <summary>💬 Auf Erwähnungen antworten</summary>
+          </Fold>
+          <Fold id="ai-responder" title="💬 Auf Erwähnungen antworten" badge={cfg.responder.enabled ? 'an' : 'aus'} hint="Der Bot antwortet, wenn ihn jemand anpingt – mit Modi, Gedächtnis und Websuche">
             <ResponderSection key={JSON.stringify(cfg.responder)} cfg={cfg} targets={targets} guilds={guilds} toast={toast} />
-          </details>
-          <details className="ai-card" open>
-            <summary>🧠 Gedächtnis verwalten</summary>
+          </Fold>
+          <Fold id="ai-tools" title="🧰 Werkzeuge (Websuche & Erinnern)" badge={cfg.toolLog?.length || null} hint="Was die KI selbst nachschlagen darf und was sie zuletzt gemacht hat">
+            <ToolsInfo cfg={cfg} />
+          </Fold>
+          <Fold id="ai-memory" title="🧠 Gedächtnis verwalten" hint="Was sich der Bot über jede Person gemerkt hat">
             <MemoryList toast={toast} />
-          </details>
-          <details className="ai-card" open>
-            <summary>🤖 Aufträge</summary>
+          </Fold>
+          <Fold id="ai-jobs" title="🤖 Aufträge" badge={cfg.jobs.length || null} hint="Zeitgesteuerte Aufgaben, z. B. jeden Morgen ein Gruß">
 
           {cfg.jobs.length === 0 && !editing && <p className="muted small">Noch keine Aufträge.</p>}
           {jobServers.length > 1 && (
@@ -1091,10 +1116,10 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
               </button>
             )
           )}
-          </details>
+          </Fold>
         </div>
       )}
-    </>
+    </Fold>
   );
 }
 
