@@ -15,6 +15,7 @@ const { registerIpc } = require('./ipc');
 const { createUpdater, parseRepo } = require('./updater');
 const { createVoiceManager } = require('./voice');
 const { createAiManager, createSecretFile } = require('./ai');
+const { createBotModules } = require('./bot-modules');
 const { createMemory } = require('./ai-memory');
 const { createHello } = require('./hello');
 const { createLogger, buildReport } = require('./logger');
@@ -74,6 +75,7 @@ function broadcast(type, payload) {
   if (type === 'message:create') {
     try {
       ai.onMessage(payload).catch(() => {});
+      botModules.onMessage(payload).catch(() => {}); // Bot-Module (Beta, #131)
     } catch {
       /* KI-Manager noch nicht initialisiert */
     }
@@ -271,6 +273,8 @@ const autostart = {
 };
 
 // KI-Agenten (Beta): API-Schlüssel verschlüsselt in ai-key.enc; im Demo simulierter Anbieter
+// Bot-Module (Beta, #131): Auto-Antworten, Zählen, Level – pro Server an/aus, ab Werk alles aus
+const botModules = createBotModules({ store, service, logger });
 const ai = createAiManager({
   store,
   service,
@@ -379,7 +383,7 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
   const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help, relayTester: createRelayTester(), currentRelay: () => relayConfig()?.wss || '' }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help, relayTester: createRelayTester(), currentRelay: () => relayConfig()?.wss || '', botModules }, isTrustedSender);
   // Der Renderer meldet laufend seine (ungeschwärzte) Sicht; geschwärzt wird erst im Hilfe-Manager.
   ipcMain.on('pk:help-view', (event, view) => {
     if (isTrustedSender(event) && view && typeof view === 'object') latestHelpView = view;
@@ -408,6 +412,7 @@ app.on('before-quit', (e) => {
   quitting = true;
   e.preventDefault();
   try {
+    botModules.flush(); // Zählerstand/Punkte sichern
     store.flush();
   } catch {
     /* ignorieren */

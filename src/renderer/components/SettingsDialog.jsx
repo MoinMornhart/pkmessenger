@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { prefs } from '../prefs';
 import AiSection from './AiSection.jsx';
+import ModulesSection from './ModulesSection.jsx';
 import UpdateSection from './UpdateSection.jsx';
 import NotificationSection from './NotificationSection.jsx';
 import VoiceFxSection from './VoiceFxSection.jsx';
@@ -594,7 +595,7 @@ const ALL_SECTIONS = [
   { id: 'updates', icon: '🔄', title: 'Updates', desc: 'Nach neuen Versionen suchen, sehen was neu ist, neu installieren.', keywords: ['update', 'version', 'neu', 'release', 'installieren'] },
   { id: 'support', icon: '🛟', title: 'Support', desc: 'Hilfelink für einen Helfer (auch von außerhalb), Relay-Server, Fernzugang fürs Handy.', keywords: ['support', 'fernhilfe', 'hilfelink', 'helfer', 'relay', 'server', 'fernzugang', 'handy', 'qr', 'gerät', 'wlan', 'unterwegs', 'link'] },
   { id: 'hilfe', icon: '❓', title: 'Hilfe & Tour', desc: 'Tour neu starten, Einrichtung prüfen, Tastenkürzel, Fehler melden.', keywords: ['tour', 'hilfe', 'tutorial', 'tasten', 'kürzel', 'einrichtung', 'fehler', 'protokoll', 'log', 'intent'] },
-  { id: 'beta', icon: '🧪', title: 'Beta', desc: 'Experimentelle Funktionen wie KI-Agenten. Standardmäßig aus, kann sich noch ändern.', keywords: ['ki', 'ai', 'agent', 'openai', 'claude', 'ollama', 'experimentell'] },
+  { id: 'beta', icon: '🧪', title: 'Beta', desc: 'Experimentelle Funktionen: KI-Agenten und Bot-Module. Standardmäßig aus, kann sich noch ändern.', keywords: ['ki', 'ai', 'agent', 'openai', 'claude', 'ollama', 'experimentell', 'module', 'zählen', 'level', 'auto-antwort'] },
 ];
 // Android-App (Issue #56): Sicherheit & Start (Autostart, Windows Hello, Fernzugang), Audio (Sprachkanäle) und
 // KI-Beta gibt es dort (noch) nicht – ausblenden statt Fehlermeldungen
@@ -776,7 +777,12 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
     updates: () => <UpdateSection appInfo={appInfo} toast={toast} />,
     support: () => <SupportSection toast={toast} />,
     hilfe: () => <HelpSection onClose={onClose} />,
-    beta: () => <AiSection toast={toast} targets={aiTargets} guilds={guilds} />,
+    beta: () => (
+      <>
+        <AiSection toast={toast} targets={aiTargets} guilds={guilds} />
+        <ModulesSection toast={toast} targets={aiTargets} guilds={guilds} />
+      </>
+    ),
   };
 
   return (

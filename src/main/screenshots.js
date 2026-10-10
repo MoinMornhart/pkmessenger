@@ -946,6 +946,24 @@ async function runScreenshots(win, dir, { demo, stats, simulate }) {
   await js(win, `document.querySelector('.ai-modes')?.scrollIntoView({block:'center'})`);
   await wait(300);
   await shoot(win, dir, '84-ki-modi');
+  // #131: Bot-Module – Auto-Antwort anlegen, Zählen einschalten
+  await js(win, `document.querySelectorAll('.settings details[data-fold]').forEach((d) => (d.open = true))`);
+  await wait(300);
+  await js(win, `document.querySelectorAll('.settings details[data-fold^="module"]').forEach((d) => (d.open = true))`);
+  await wait(200);
+  await js(win, `document.querySelector('[data-setting="module-counting"] input')?.click()`);
+  await wait(300);
+  if (!(await js(win, `document.querySelectorAll('.module-rule').length`))) await clickText('.module-card .btn', 'Auto-Antwort');
+  await wait(200);
+  await js(win, `(() => { ${SET} setVal(document.querySelector('.module-rule input[aria-label="Stichwort"]'), '!regeln'); setVal(document.querySelector('.module-rule textarea'), 'Seid nett zueinander 💛'); })()`);
+  await wait(200);
+  await clickText('.module-card .btn', 'Speichern');
+  await wait(400);
+  await js(win, `document.querySelector('[data-fold="modules"]')?.scrollIntoView({block:'start'})`);
+  await wait(300);
+  await shoot(win, dir, '87-bot-module');
+  const modState = await js(win, `JSON.stringify([...document.querySelectorAll('.module-card > summary')].map((s) => s.textContent.trim()))`);
+  console.log(`[module] ${modState}`);
   console.log(`[ki-modi] ${await js(win, `JSON.stringify({ modi: document.querySelectorAll('.ai-mode').length, name: document.querySelector('.ai-mode input')?.value, wechsler: Boolean([...document.querySelectorAll('.ai-people')].find(p=>p.textContent.includes('Modus wechseln'))), limit: document.querySelector('.ai-responder .ai-limits select')?.value })`)}`);
   // Gedächtnis pro Person einschalten (Issue #1)
   await js(win, `document.querySelector('[data-setting="ai-memory"] input')?.click()`);
