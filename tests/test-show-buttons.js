@@ -69,3 +69,14 @@ test('#129 Knöpfe nur mit Emoji (Musik-Bots): eigenes Emoji als Bild, kein „K
   assert.equal(b.emojiUrl, null);
   assert.equal(c.emojiUrl, null); // nur echte IDs
 });
+
+test('#131 Erwähnungen in Embeds (z. B. „Gewünscht von <@id>“) bekommen den echten Namen', async () => {
+  const { service, world } = await readyService();
+  const m = botMessage(world, '1000000000000000204', null);
+  const anna = world.addMember('777777777777777771', 'Julia');
+  m.embeds = [{ title: 'Jetzt läuft', fields: [{ name: 'Gewünscht von', value: `<@${anna.id}>` }] }];
+  const s = service.serializeMessage(m);
+  const hit = s.mentions.users.find((u) => u.id === anna.id);
+  assert.ok(hit, 'Person aus dem Embed fehlt');
+  assert.ok(hit.name && hit.name !== 'Unbekannt');
+});

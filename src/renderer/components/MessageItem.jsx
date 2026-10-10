@@ -216,7 +216,7 @@ function MessageItem({ message: m, grouped, highlighted, onRetry, onDiscard }) {
         {!out && <LinkAlarm m={m} actions={actions} />}
         <Attachments items={m.attachments} />
         <PollCard message={m} />
-        <Embeds embeds={m.embeds} />
+        <Embeds embeds={m.embeds} mentions={m.mentions} />
         <MessageButtons rows={m.components} />
         <ThreadChip thread={m.thread} />
         <span className="bubble__meta" title={formatFull(m.createdTimestamp)}>
