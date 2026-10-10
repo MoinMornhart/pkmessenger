@@ -1,6 +1,7 @@
 'use strict';
 
 const { validators } = require('./validate');
+const { relaySetting } = require('../shared/relay-config');
 const { describeError } = require('./errors');
 const { sealToken, openLink } = require('../shared/token-transfer');
 
@@ -10,7 +11,7 @@ const { sealToken, openLink } = require('../shared/token-transfer');
  *  2. validiert den Payload,
  *  3. liefert IMMER { ok: true, data } oder { ok: false, error: { code, message, hint } } – nie eine Exception.
  */
-function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help, relayTester }) {
+function buildHandlers({ service, store, openEnvFile, openExternal, updater, appVersion, voice, tokenStore, setScreenProtection, ai, soundFile, copyText, appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help, relayTester, currentRelay = () => '' }) {
   const requireAi = () => {
     if (!ai) throw Object.assign(new Error('KI-Agenten sind nicht verfügbar.'), { code: 'NOT_FOUND' });
     return ai;
@@ -205,7 +206,7 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     'pk:setup-check': () => service.setupCheck(),
     // Fernzugang im WLAN (Issue #46/#50) – nur vom eigenen Fenster steuerbar
     // Fernhilfe (Issue #79)
-    'pk:help-status': () => (help ? help.status() : null),
+    'pk:help-status': () => (help ? { ...help.status(), relaySetting: relaySetting(store.get()) } : null),
     'pk:help-request': () => requireHelp().requestWithQr(),
     'pk:help-stop': () => requireHelp().stop(),
     'pk:help-control': (p) => requireHelp().setControl(validators.flag(p)),
@@ -214,13 +215,15 @@ function buildHandlers({ service, store, openEnvFile, openExternal, updater, app
     // #120: eingetragenen (oder angegebenen) Relay-Server prüfen – nur Gesundheitscheck + Test-Raum, keine Daten
     'pk:help-test-relay': (p) => {
       const given = validators.helpRelay(p).url;
-      const url = given || store.get().helpRelay || '';
+      const url = given || currentRelay() || '';
       return relayTester ? relayTester.test(url) : { ok: false, steps: [{ name: 'Test', ok: false, detail: 'Nicht verfügbar.' }], ms: 0 };
     },
     'pk:help-set-relay': (p) => {
-      store.set('helpRelay', validators.helpRelay(p).url);
+      const v = validators.helpRelay(p);
+      if (v.url !== undefined) store.set('helpRelay', v.url);
+      if (v.mode) store.set('relayMode', v.mode);
       remote?.refreshRelay?.(); // #104/#105: Fernzugang nutzt denselben Relay
-      return help ? help.status() : null;
+      return help ? { ...help.status(), relaySetting: relaySetting(store.get()) } : null;
     },
     'pk:remote-status': () => (remote ? remote.status() : null),
     'pk:remote-set-password': (p) => requireRemote().setPassword(validators.remotePassword(p)),

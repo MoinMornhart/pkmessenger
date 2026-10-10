@@ -550,10 +550,12 @@ const validators = {
     return { code };
   },
   helpRelay(p) {
-    const { url } = obj(p);
-    if (url === '' || url == null) return { url: '' };
+    const { url, mode } = obj(p);
+    if (mode !== undefined && !['standard', 'own', 'off'].includes(mode)) throw new ValidationError('Unbekannte Relay-Einstellung.');
+    if (url === undefined && mode !== undefined) return { mode };
+    if (url === '' || url == null) return { url: '', ...(mode ? { mode } : {}) };
     if (typeof url !== 'string' || url.length > 300 || !/^wss:\/\/[a-z0-9.-]+(:\d+)?(\/[\w./-]*)?$/i.test(url)) throw new ValidationError('Bitte eine Adresse wie wss://relay.deine-domain.de/ws eintragen.');
-    return { url: url.trim() };
+    return { url: url.trim(), ...(mode ? { mode } : {}) };
   },
   tokenImport(p) {
     const { link, code } = obj(p);

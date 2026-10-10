@@ -168,14 +168,12 @@ const lanAddresses = () =>
     .map((i) => i.address)
     .sort((a, b) => Number(!a.startsWith('192.168.')) - Number(!b.startsWith('192.168.'))); // echtes WLAN vor virtuellen Adaptern (WSL/Hyper-V)
 // Selbst gehosteter Relay (Einstellungen → Hilfe & Tour): ein Relay für Fernzugang UND Fernhilfe (#104/#105)
-const relayConfig = () => {
-  const u = store.get().helpRelay;
-  if (typeof u !== 'string' || !/^wss:\/\//i.test(u)) return null;
-  const httpBase = u.replace(/^wss:/i, 'https:').replace(/\/ws\/?$/i, '').replace(/\/+$/, '');
-  return { wss: u, httpBase };
-};
+// Standard: Morni-Team-Server (nichts installieren); eigener Server oder aus unter Support → Erweitert (vibeworks #219)
+const { resolveRelay } = require('../shared/relay-config');
+const relayConfig = () => resolveRelay(store.get(), { demo: Boolean(demo) });
+const remoteRelayConfig = () => resolveRelay(store.get(), { demo: Boolean(demo), forRemote: true });
 const remote = createRemote({
-  getRelay: relayConfig,
+  getRelay: remoteRelayConfig,
   service,
   validators: remoteValidators,
   store,
@@ -381,7 +379,7 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionCheckHandler((_wc, perm, origin, details) => perm === 'media' && details?.mediaType !== 'video' && isOwnUrl(details?.requestingUrl || origin));
   const setScreenProtection = (on) => mainWindow?.setContentProtection(on);
-  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help, relayTester: createRelayTester() }, isTrustedSender);
+  registerIpc(ipcMain, { service, store, openEnvFile, openExternal, updater, appVersion: app.getVersion(), voice, tokenStore, setScreenProtection, ai, soundFile, copyText: (t) => clipboard.writeText(t), appLock, autostart, hello, background, logger, errorReport, openLogFolder, blocklist, remote, help, relayTester: createRelayTester(), currentRelay: () => relayConfig()?.wss || '' }, isTrustedSender);
   // Der Renderer meldet laufend seine (ungeschwärzte) Sicht; geschwärzt wird erst im Hilfe-Manager.
   ipcMain.on('pk:help-view', (event, view) => {
     if (isTrustedSender(event) && view && typeof view === 'object') latestHelpView = view;
