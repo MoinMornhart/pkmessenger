@@ -475,7 +475,7 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
               <input type="checkbox" checked={r.memoryAuto !== false} onChange={(e) => set({ memoryAuto: e.target.checked })} /> Automatisch zusammenfassen, wenn es voll wird
             </label>
           )}
-          {r.memory && <p className="muted small">Der Bot merkt sich, was jede Person ihm geschrieben hat. Wird es zu viel, fasst die KI das Alte zu wichtigen Fakten zusammen und löscht den Rest. Das Gedächtnis geht nur an deinen KI-Anbieter und liegt verschlüsselt auf diesem PC.</p>}
+          {r.memory && <p className="muted small">Der Bot merkt sich, was jede Person ihm geschrieben hat. Wird es zu viel, fasst die KI das Alte zu wichtigen Fakten zusammen und löscht den Rest. Das Gedächtnis geht nur an deinen KI-Anbieter und liegt verschlüsselt auf diesem PC. Auf einem Server kann der Bot nachschlagen, was andere dort zu ihm gesagt haben („Leon hat mal gesagt …“) – aber nur Gespräche von diesem Server, nie aus Privatchats.</p>}
           <p className="muted small">💡 Als Erwähnung zählt: @Bot, die Bot-Rolle oder eine Antwort auf eine Nachricht des Bots.</p>
           <label className="composer__ping">
             <input type="checkbox" checked={r.notify} onChange={(e) => set({ notify: e.target.checked })} /> Hinweis in der App, wenn der Bot geantwortet hat
