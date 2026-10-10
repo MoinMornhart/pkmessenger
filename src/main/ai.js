@@ -91,11 +91,16 @@ const SKIP_TEXT = {
   ausgeschlossen: 'Person steht auf „ausschließen“',
   'nicht-erlaubt': 'Person steht nicht auf „Nur diesen Personen antworten“',
   wartezeit: 'Wartezeit (15 s pro Kanal)',
+  'warteschlange-voll': 'Warteschlange voll (zu viele Erwähnungen auf einmal)',
   stundenlimit: 'Stundenlimit für Antworten erreicht',
   'chat-offen': 'Du hattest den Chat gerade offen',
 };
 // Antwort-Agent: Schutz vor Spam und Endlosschleifen
 const REPLY_COOLDOWN_MS = 15000; // pro Kanal
+// #112: Erwähnungen während der Wartezeit/einer laufenden Antwort kommen in eine Warteschlange statt verloren zu gehen.
+// Je mehr warten, desto länger die Pause zwischen den Antworten (Spam-Schutz bleibt).
+const QUEUE_MAX = 5; // pro Kanal
+const QUEUE_STEP_MS = 5000; // zusätzliche Pause je weiterer wartender Nachricht
 const REPLY_LIMIT_PER_HOUR = 30; // Standard insgesamt (einstellbar: responder.replyLimit, 0 = unbegrenzt)
 // Modus wechseln im Chat: „modus Name“, „!modus Name“ oder „@Bot modus Name“; nur „modus“ = Liste
 const MODE_COMMAND = /^\s*(?:<@!?\d{17,20}>\s*|@\S+\s+)?[!/]?modus\b[\s:]*(.*)$/i;
@@ -224,8 +229,9 @@ async function callModel({ provider, baseUrl, model, key, system, user, maxToken
   // Denkende Modelle schreiben ihre Gedanken in <think>…</think> – die gehören nie in den Chat (Issue #1)
   const raw = text;
   text = stripThinking(text);
-  if (!text && raw.trim()) throw aiError('Die KI hat nur nachgedacht, aber keine Antwort geschrieben.', thinking ? 'Kürzeren Auftrag geben oder anderes Modell wählen.' : 'KI-Einstellungen → „Denkendes Modell (Thinking)“ einschalten, dann bekommt sie mehr Platz.');
-  if (!text) throw aiError('Die KI hat keine Antwort geliefert.', 'Auftrag genauer formulieren oder anderes Modell wählen.');
+  // empty: true → der Antwort-Agent versucht es einmal neu (#112)
+  if (!text && raw.trim()) throw Object.assign(aiError('Die KI hat nur nachgedacht, aber keine Antwort geschrieben.', thinking ? 'Kürzeren Auftrag geben oder anderes Modell wählen.' : 'KI-Einstellungen → „Denkendes Modell (Thinking)“ einschalten, dann bekommt sie mehr Platz.'), { empty: true });
+  if (!text) throw Object.assign(aiError('Die KI hat keine Antwort geliefert.', 'Auftrag genauer formulieren oder anderes Modell wählen.'), { empty: true });
   return text;
 }
 
@@ -277,7 +283,7 @@ async function discoverLocal({ fetchImpl = fetch } = {}) {
   return found.filter(Boolean);
 }
 
-function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = (...a) => fetch(...a), now = () => Date.now(), tickMs = TICK_MS, searchImpl = webSearch, memory = null }) {
+function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = (...a) => fetch(...a), now = () => Date.now(), tickMs = TICK_MS, searchImpl = webSearch, memory = null, setTimeoutImpl = setTimeout }) {
   const searches = []; // letzte Websuchen für die Oberfläche (nur im Speicher)
   const skips = []; // Warum wurde NICHT geantwortet? (nur Nachrichten an den Bot / Privatchats, nur im Speicher)
   const busy = new Map(); // channelId → { userName, since } – KI schreibt gerade
@@ -650,7 +656,7 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
   }
 
   /** Warum (nicht) antworten? Gibt null zurück, wenn geantwortet werden soll – sonst einen Grund (für Tests/Fehlersuche). */
-  function skipReason(m, cfg, botId) {
+  function skipReason(m, cfg, botId, { queued = false } = {}) {
     const r = cfg.responder;
     if (!cfg.enabled || !r.enabled) return 'aus';
     if (!m || m.isOwn || m.author?.id === botId) return 'eigene';
@@ -663,7 +669,7 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
     if (r.quietWhenOpen && activeChat.focused && activeChat.channelId === m.channelId) return 'chat-offen';
     if (r.blockUsers.some((u) => u.id === m.author.id)) return 'ausgeschlossen';
     if (r.allowUsers.length && !r.allowUsers.some((u) => u.id === m.author.id)) return 'nicht-erlaubt';
-    if (now() - (lastReplyAt.get(m.channelId) || 0) < REPLY_COOLDOWN_MS) return 'wartezeit';
+    if (!queued && (busy.has(m.channelId) || now() - (lastReplyAt.get(m.channelId) || 0) < REPLY_COOLDOWN_MS)) return 'wartezeit';
     replyTimes = replyTimes.filter((t) => now() - t < 3600000);
     const limit = Number.isInteger(r.replyLimit) ? r.replyLimit : REPLY_LIMIT_PER_HOUR;
     if (limit > 0 && replyTimes.length >= limit) return 'stundenlimit';
@@ -729,13 +735,48 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
     return true;
   }
 
+  // ---- Warteschlange (#112) ----
+  const queues = new Map(); // channelId → [Nachricht]
+  const queueTimers = new Map();
+  function scheduleQueue(channelId) {
+    if (queueTimers.has(channelId)) return;
+    const q = queues.get(channelId) || [];
+    if (!q.length) return;
+    const sinceLast = now() - (lastReplyAt.get(channelId) || 0);
+    const wait = Math.max(1000, REPLY_COOLDOWN_MS - sinceLast) + QUEUE_STEP_MS * Math.max(0, q.length - 1);
+    const t = setTimeoutImpl(async () => {
+      queueTimers.delete(channelId);
+      if (busy.has(channelId)) return scheduleQueue(channelId); // läuft gerade noch eine Antwort → später
+      const next = q.shift();
+      if (!q.length) queues.delete(channelId);
+      if (next) await onMessage(next, { queued: true }).catch(() => null);
+      if (queues.get(channelId)?.length) scheduleQueue(channelId);
+    }, wait);
+    t?.unref?.();
+    queueTimers.set(channelId, t);
+  }
+  function enqueue(m) {
+    const q = queues.get(m.channelId) || [];
+    if (q.length >= QUEUE_MAX) return null;
+    q.push(m);
+    queues.set(m.channelId, q);
+    scheduleQueue(m.channelId);
+    emit('ai:changed', {});
+    return q.length;
+  }
+
   /** Neue Nachricht (vom Discord-Service) → ggf. als Bot mit KI-Antwort reagieren. */
-  async function onMessage(m) {
+  async function onMessage(m, { queued = false } = {}) {
     const cfg = read();
     const status = service.getStatus?.() || {};
     const botId = status.bot?.id;
-    if (await handleModeCommand(m, cfg, botId)) return { mode: true };
-    const reason = skipReason(m, cfg, botId);
+    if (!queued && (await handleModeCommand(m, cfg, botId))) return { mode: true };
+    let reason = skipReason(m, cfg, botId, { queued });
+    if (reason === 'wartezeit') {
+      const position = enqueue(m);
+      if (position) return { queued: true, position };
+      reason = 'warteschlange-voll';
+    }
     if (reason) {
       // Protokoll für die Oberfläche: nur bei Nachrichten, die wirklich an den Bot gingen (sonst wäre es Rauschen)
       if (cfg.enabled && cfg.responder.enabled && (m?.toBot || (m && !m.guildId)) && !['aus', 'eigene', 'bot', 'leer'].includes(reason)) {
@@ -777,6 +818,9 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
         atts.some((a) => /^audio\//i.test(a.contentType || '')) && 'an audio/voice message',
       ].filter(Boolean);
       const memCtx = r.memory && memory ? memory.context(m.author.id) : '';
+      // #112: Wurden weitere Personen mit angepingt, kennt der Bot auch deren bisherige Gespräche mit ihm (nur mit Gedächtnis an)
+      const others = (m.mentions?.users || []).filter((u) => u.id !== botId && u.id !== m.author?.id).slice(0, 3);
+      const othersCtx = r.memory && memory ? others.map((u) => ({ u, c: memory.context(u.id) })).filter((x) => x.c).map((x) => `Earlier conversation with ${x.u.name} (also mentioned):\n${x.c}`).join('\n\n') : '';
       const mode = activeMode(cfg, m);
       const system = [
         `You are "${status.bot?.displayName || 'Bot'}", a Discord bot in the app PKMessenger, replying ${m.guildId ? 'in a server channel' : 'in a private chat'}.`,
@@ -791,6 +835,7 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
         .join('\n');
       const user = [
         memCtx,
+        othersCtx,
         context && `Chat history:\n${context}`,
         `${m.author.name} asks: ${question || '(only mentioned you)'}`,
         unseen.length ? `[The user also sent ${unseen.join(' and ')} that you cannot see or hear. Say casually and a bit cheekily in German that you can't look at / listen to it (e.g. "Bilder kann ich leider nicht sehen 🙈" or "Sprachnachrichten? Keine Ohren, keine Chance 😄"), then answer the rest.]` : '',
@@ -799,7 +844,18 @@ function createAiManager({ store, secret, service, emit = () => {}, fetchImpl = 
       ]
         .filter(Boolean)
         .join('\n\n');
-      const text = safeOutput(await askWithTools({ system, user, kind: 'reply', web: r.web, images, model: mode?.model || null }));
+      // leere Antwort (#112) zählt nicht als Fehler, sondern löst unten einen neuen Versuch aus
+      const tryAsk = (u, web) =>
+        askWithTools({ system, user: u, kind: 'reply', web, images, model: mode?.model || null }).catch((e) => {
+          if (e?.empty) return '';
+          throw e;
+        });
+      let text = safeOutput(await tryAsk(user, r.web));
+      // #112: Manche (denkende) Modelle liefern nach dem Entfernen der Gedanken nichts mehr → einmal neu versuchen
+      if (!plainText(text).trim()) {
+        text = safeOutput(await tryAsk(`${user}\n\n[Your previous answer was empty. Answer the question now directly, without thinking out loud.]`, false));
+        if (!plainText(text).trim()) throw new Error('Die KI hat zweimal leer geantwortet.');
+      }
       // Gedächtnis: Wortwechsel merken, bei vollem Budget im Hintergrund zusammenfassen
       if (r.memory && memory) {
         memory.remember(m.author.id, m.author.name, question || '(erwähnt)', plainText(text));

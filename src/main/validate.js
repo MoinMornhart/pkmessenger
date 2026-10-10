@@ -282,7 +282,7 @@ const validators = {
         })
         .filter((u) => !seen.has(u.id) && seen.add(u.id));
     };
-    if (typeof instructions !== 'string' || instructions.length > 1500) throw new ValidationError('Die Anweisungen dürfen höchstens 1500 Zeichen haben.');
+    if (typeof instructions !== 'string' || instructions.length > 8000) throw new ValidationError('Die Anweisungen dürfen höchstens 8000 Zeichen haben.');
     // KI-Modi: Name (für „modus Name“ im Chat), eigene Anweisungen, optional eigenes Modell
     if (!Array.isArray(modes) || modes.length > 20) throw new ValidationError('Höchstens 20 Modi.');
     const names = new Set();
@@ -293,7 +293,7 @@ const validators = {
       const key = name.trim().toLowerCase();
       if (names.has(key) || ['standard', 'normal', 'aus', 'default', 'reset'].includes(key)) throw new ValidationError(`Den Modus-Namen „${name.trim()}“ gibt es schon oder er ist reserviert.`);
       names.add(key);
-      if (typeof ins !== 'string' || ins.length > 1500) throw new ValidationError('Modus-Anweisungen: höchstens 1500 Zeichen.');
+      if (typeof ins !== 'string' || ins.length > 8000) throw new ValidationError('Modus-Anweisungen: höchstens 8000 Zeichen.');
       if (typeof model !== 'string' || model.length > 100 || /[\s<>]/.test(model.trim())) throw new ValidationError('Ungültiger Modellname.');
       return { id, name: name.trim(), instructions: ins.trim(), model: model.trim() };
     });

@@ -342,7 +342,8 @@ function ModesEditor({ r, set, guilds }) {
               🗑
             </button>
           </div>
-          <textarea className="profile__desc" rows={2} maxLength={1500} value={x.instructions} onChange={(e) => update(x.id, { instructions: e.target.value })} placeholder="So ist der Bot in diesem Modus …" />
+          <TokenHint text={x.instructions} />
+          <textarea className="profile__desc" rows={3} maxLength={8000} value={x.instructions} onChange={(e) => update(x.id, { instructions: e.target.value })} placeholder="So ist der Bot in diesem Modus …" />
         </div>
       ))}
       {modes.length < 20 && (
@@ -433,13 +434,13 @@ function ResponderSection({ cfg, targets, guilds, toast }) {
           <PeoplePicker label="Nur diesen Personen antworten (leer = allen)" people={r.allowUsers} onChange={(allowUsers) => set({ allowUsers })} guilds={guilds} />
           <PeoplePicker label="Diese Personen ausschließen" people={r.blockUsers} onChange={(blockUsers) => set({ blockUsers })} guilds={guilds} />
           <label className="settings__label" htmlFor="ai-instr">
-            So soll der Bot sein <span className="muted small">{r.instructions.length}/1500</span>
+            So soll der Bot sein <TokenHint text={r.instructions} />
           </label>
           <textarea
             id="ai-instr"
             className="profile__desc"
-            rows={3}
-            maxLength={1500}
+            rows={5}
+            maxLength={8000}
             value={r.instructions}
             onChange={(e) => set({ instructions: e.target.value })}
             placeholder="z. B. Du bist Claw, locker und hilfsbereit. Du kennst die Server-Regeln: …"
@@ -1082,5 +1083,18 @@ export default function AiSection({ toast, targets = [], guilds = [] }) {
         </div>
       )}
     </>
+  );
+}
+
+// #112: Länge + geschätzte Tokens (≈ Zeichen/4). Ab ~1500 Tokens orange: jede Antwort kostet dann merklich mehr und
+// kleine Modelle verlieren den Faden; ab ~4000 Tokens rot.
+function TokenHint({ text }) {
+  const n = (text || '').length;
+  const tokens = Math.ceil(n / 4);
+  const cls = tokens >= 4000 ? 'warn' : tokens >= 1500 ? 'token--mid' : 'muted';
+  return (
+    <span className={`small ${cls}`} title="Ungefähre Größe im Prompt. Je mehr Tokens, desto teurer und langsamer jede Antwort.">
+      {n}/8000 Zeichen · ≈{tokens} Tokens{tokens >= 1500 ? ' – viel, jede Antwort wird teurer' : ''}
+    </span>
   );
 }
