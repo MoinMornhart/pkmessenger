@@ -1,0 +1,172 @@
+# Jules (KI-Coding-Agent von Google Labs) als zweiter Prüfer – Wunsch JoniMoni (#116).
+#
+# Was passiert:
+#   1) Schlägt „Tests" oder „Release bauen" auf main fehl, legt dieser Workflow automatisch ein Issue an
+#      (bzw. ergänzt das offene) – mit Link zum Lauf und den letzten Fehlerzeilen – und beauftragt Jules mit einem Fix.
+#   2) Einmal pro Woche (Montag früh) prüft Jules das Projekt auf Fehler, Sicherheitslücken und fehlende Null-Prüfungen
+#      und behebt das Wichtigste in EINEM kleinen Pull Request. Weitere Funde stehen in der PR-Beschreibung.
+#   3) Manuell: Actions → „Jules" → „Run workflow" mit eigenem Auftrag.
+# Jules erstellt NUR Pull Requests – zusammengeführt wird weiterhin von Menschen (MoinMornhart/JoniMoni).
+#
+# Einrichtung (einmalig): jules.google.com → mit GitHub anmelden → API-Schlüssel erzeugen → Repo-Einstellungen →
+# Secrets and variables → Actions → „New repository secret": Name JULES_API_KEY. Ohne Schlüssel überspringt sich
+# dieser Workflow still (bleibt grün).
+#
+# Sicherheit:
+#   - Die Action ist auf einen festen Commit gepinnt (v1.0.0) – ein späteres Update kann nicht unbemerkt etwas einschleusen.
+#   - Jules startet immer von „main" (fester Wert). Die Action setzt den Branch-Namen ungefiltert in einen Shell-Befehl
+#     ein; Branch-Namen aus Ereignissen werden deshalb NIE durchgereicht.
+#   - Nur Läufe aus diesem Repo auf main lösen etwas aus – keine Forks, keine Issues von Fremden.
+#   - Minimale Rechte; der API-Schlüssel kommt nur aus dem Secret.
+
+name: Jules
+
+on:
+  workflow_run:
+    workflows: ["Tests", "Release bauen"]
+    types: [completed]
+  schedule:
+    - cron: "17 4 * * 1" # Montag 04:17 UTC
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Eigener Auftrag an Jules (leer = allgemeine Fehlersuche)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jules
+  cancel-in-progress: false
+
+env:
+  RULES: |
+    Project rules for PKMessenger (Electron + discord.js "Bot Control Center", plus a Capacitor Android app):
+    - Everything user-facing (UI texts, PR title/description, commit messages, code comments in German files) is GERMAN.
+      Code identifiers stay English.
+    - NEVER implement or suggest: self-bots / user tokens, acting "as the user", friends, group DMs, client mods,
+      Discord branding/logos, rate-limit evasion, recording voice, tokens in plain text or in git, telemetry.
+    - NEVER weaken security: Electron sandbox, contextIsolation, CSP, IPC validation (src/main/validate.js),
+      encrypted token vault, remote-access protections (pairing code, password, E2E encryption, PC approval).
+    - Do not touch .github/workflows/, package.json "version", .env files, or anything under relay/ certificates.
+    - Keep changes small and focused (max ~150 changed lines), add or update tests in tests/ (node:test).
+    - `npm test` must pass completely before opening the PR. For UI changes also run `npm run build:renderer`.
+    - Opening a pull request is the final step. Never merge. End the PR description with:
+      "🤖 Erstellt von Jules (KI-Agent) – bitte prüfen, nichts wurde automatisch zusammengeführt."
+
+jobs:
+  jules:
+    # Nur: CI auf main fehlgeschlagen (aus diesem Repo), Wochenplan oder manueller Start
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'failure' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - name: Schlüssel vorhanden?
+        id: key
+        env:
+          HAS_KEY: ${{ secrets.JULES_API_KEY != '' }}
+        run: |
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::notice title=Jules übersprungen::Kein Secret JULES_API_KEY – siehe Kopf von .github/workflows/jules.yml."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # (1) CI-Fehler auf main → Issue anlegen/ergänzen (auch ohne Jules-Schlüssel – Fehler sollen nie unbemerkt bleiben)
+      - name: Fehler als Issue festhalten
+        id: issue
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          WF_NAME: ${{ github.event.workflow_run.name }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          TITLE="CI-Fehler auf main: $WF_NAME"
+          LOG="$(gh run view "$RUN_ID" --repo "$REPO" --log-failed 2>/dev/null | tail -n 80 | cut -c1-300 || true)"
+          [ -n "$LOG" ] || LOG="(Fehlerprotokoll nicht abrufbar – bitte im Lauf nachsehen.)"
+          {
+            echo "Der Workflow **$WF_NAME** ist auf \`main\` fehlgeschlagen."
+            echo
+            echo "- Lauf: $RUN_URL"
+            echo "- Commit: \`$SHA\`"
+            echo
+            echo "<details><summary>Letzte Fehlerzeilen</summary>"
+            echo
+            echo '```text'
+            echo "$LOG"
+            echo '```'
+            echo
+            echo "</details>"
+            echo
+            echo "---"
+            echo "🤖 *Automatisch angelegt vom Workflow „Jules“ (.github/workflows/jules.yml).*"
+          } > body.md
+          EXISTING="$(gh issue list --repo "$REPO" --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --repo "$REPO" --body-file body.md
+            echo "number=$EXISTING" >> "$GITHUB_OUTPUT"
+          else
+            URL="$(gh issue create --repo "$REPO" --title "$TITLE" --label bug --body-file body.md)"
+            echo "number=${URL##*/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Auftrag zusammenstellen
+        id: prompt
+        if: steps.key.outputs.ok == 'true'
+        env:
+          EVENT: ${{ github.event_name }}
+          TASK: ${{ inputs.task }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          WF_NAME: ${{ github.event.workflow_run.name }}
+          ISSUE: ${{ steps.issue.outputs.number }}
+        run: |
+          {
+            if [ "$EVENT" = "workflow_run" ]; then
+              echo "The GitHub Actions workflow \"$WF_NAME\" FAILED on main."
+              echo "Run: $RUN_URL"
+              [ -n "$ISSUE" ] && echo "Tracking issue: #$ISSUE (mention \"Fixes #$ISSUE\" in the PR description)."
+              echo "Reproduce locally with the same command the workflow runs, find the ROOT CAUSE, fix it properly"
+              echo "(never by deleting, skipping or weakening tests), and open a pull request."
+            elif [ -n "$TASK" ]; then
+              echo "Task from the maintainers:"
+              echo "$TASK"
+            else
+              echo "Weekly review. Look for real bugs: missing null/undefined checks, unhandled promise rejections,"
+              echo "race conditions, wrong German texts, security problems (input validation, injection, unsafe URLs),"
+              echo "flaky tests. Fix the single most important verified problem in ONE small pull request."
+              echo "In the PR description add a German section \"Weitere Funde\" listing other problems you saw"
+              echo "(file:line + one sentence each) but did not change. If you find nothing worth fixing, do not open a PR."
+            fi
+            echo
+            echo "$RULES"
+          } > prompt.txt
+          {
+            echo "text<<JULES_EOF"
+            cat prompt.txt
+            echo "JULES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Jules beauftragen
+        if: steps.key.outputs.ok == 'true'
+        # v1.0.0 – auf Commit gepinnt (siehe Kopf)
+        uses: google-labs-code/jules-action@bff7875eaa123cac6742b7cfc51005b95ba4d566
+        with:
+          prompt: ${{ steps.prompt.outputs.text }}
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          starting_branch: main
+          include_last_commit: ${{ github.event_name == 'workflow_run' }}
+          include_commit_log: true
