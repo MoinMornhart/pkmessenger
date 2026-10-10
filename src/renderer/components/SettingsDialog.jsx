@@ -688,6 +688,8 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
     const t = setTimeout(() => {
       const el = document.querySelector(`.settings [data-setting="${focus}"], .settings section[data-section="${focus}"]`);
       if (!el) return;
+      // #131: liegt die Einstellung in eingeklappten Bereichen, diese zuerst aufklappen
+      for (let d = el.closest('details'); d; d = d.parentElement?.closest('details')) d.open = true;
       el.scrollIntoView({ block: 'center', behavior: 'smooth' });
       el.classList.add('is-focus');
       setTimeout(() => el.classList.remove('is-focus'), 2500);
