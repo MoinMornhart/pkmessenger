@@ -4807,3 +4807,8 @@ body.help-active .chat {
 }
 
 .poll__note { display: block; }
+
+/* #112: Token-Anzeige für lange KI-Anweisungen */
+.token--mid {
+  color: #f59e0b;
+}
