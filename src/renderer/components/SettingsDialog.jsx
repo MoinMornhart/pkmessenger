@@ -8,6 +8,7 @@ import UpdateSection from './UpdateSection.jsx';
 import NotificationSection from './NotificationSection.jsx';
 import VoiceFxSection from './VoiceFxSection.jsx';
 import SecuritySection from './SecuritySection.jsx';
+import SupportSection from './SupportSection.jsx';
 import { THEMES, ACCENTS, MOTIONS } from '../theme';
 import WallpaperDialog from './WallpaperDialog.jsx';
 import { tourState, startTour } from './Tour.jsx';
@@ -555,58 +556,19 @@ const ALL_SECTIONS = [
   { id: 'schreiben', icon: '✍️', title: 'Schreiben', desc: 'Wie Namensvorschläge beim Schreiben funktionieren.', keywords: ['erwähnen', 'mention', 'namen', 'vorschläge', '@'] },
   { id: 'toene', icon: '🔔', title: 'Benachrichtigungen', desc: 'Töne, eigener Ton, Nicht stören.', keywords: ['ton', 'sound', 'lautstärke', 'nicht stören', 'benachrichtigung'] },
   { id: 'datenschutz', icon: '🔒', title: 'Datenschutz', desc: 'Bildschirmschutz, Bilder/GIFs/Videos laden, Warnung vor Links.', keywords: ['bilder', 'gif', 'video', 'medien', 'link', 'screenshot', 'ip', 'spoiler', 'grabber', 'vertrauen', 'trusted', 'betrug', 'online', 'status', 'presence'] },
-  { id: 'sicherheit', icon: '🛡', title: 'Sicherheit & Start', desc: 'App-Passwort, Windows Hello, mit Windows starten, im Hintergrund weiterlaufen.', keywords: ['passwort', 'sperre', 'hello', 'fingerabdruck', 'autostart', 'hintergrund', 'tray', 'fernzugang', 'handy', 'qr', 'gerät', 'wlan'] },
+  { id: 'sicherheit', icon: '🛡', title: 'Sicherheit & Start', desc: 'App-Passwort, Windows Hello, mit Windows starten, im Hintergrund weiterlaufen.', keywords: ['passwort', 'sperre', 'hello', 'fingerabdruck', 'autostart', 'hintergrund', 'tray'] },
   { id: 'profil', icon: '🪪', title: 'Bot-Profil', desc: 'Name, Bild und Beschreibung deines Bots.', keywords: ['name', 'avatar', 'bild', 'über mich', 'spitzname'] },
   { id: 'token', icon: '🔑', title: 'Bot-Token', desc: 'Den geheimen Schlüssel deines Bots ersetzen oder entfernen.', keywords: ['token', 'schlüssel', 'anmelden'] },
   { id: 'audio', icon: '🎧', title: 'Audio', desc: 'Mikrofon, Lautsprecher und Stimme für Sprachkanäle.', keywords: ['mikrofon', 'lautsprecher', 'sprachkanal', 'rauschen', 'stimme'] },
   { id: 'updates', icon: '🔄', title: 'Updates', desc: 'Nach neuen Versionen suchen, sehen was neu ist, neu installieren.', keywords: ['update', 'version', 'neu', 'release', 'installieren'] },
+  { id: 'support', icon: '🛟', title: 'Support', desc: 'Hilfelink für einen Helfer (auch von außerhalb), Relay-Server, Fernzugang fürs Handy.', keywords: ['support', 'fernhilfe', 'hilfelink', 'helfer', 'relay', 'server', 'fernzugang', 'handy', 'qr', 'gerät', 'wlan', 'unterwegs', 'link'] },
   { id: 'hilfe', icon: '❓', title: 'Hilfe & Tour', desc: 'Tour neu starten, Einrichtung prüfen, Tastenkürzel, Fehler melden.', keywords: ['tour', 'hilfe', 'tutorial', 'tasten', 'kürzel', 'einrichtung', 'fehler', 'protokoll', 'log', 'intent'] },
   { id: 'beta', icon: '🧪', title: 'Beta', desc: 'Experimentelle Funktionen wie KI-Agenten. Standardmäßig aus, kann sich noch ändern.', keywords: ['ki', 'ai', 'agent', 'openai', 'claude', 'ollama', 'experimentell'] },
 ];
 // Android-App (Issue #56): Sicherheit & Start (Autostart, Windows Hello, Fernzugang), Audio (Sprachkanäle) und
 // KI-Beta gibt es dort (noch) nicht – ausblenden statt Fehlermeldungen
-const ANDROID_HIDDEN = new Set(['sicherheit', 'audio', 'beta']);
+const ANDROID_HIDDEN = new Set(['sicherheit', 'audio', 'beta', 'support']);
 const SECTIONS = isAndroid ? ALL_SECTIONS.filter((s) => !ANDROID_HIDDEN.has(s.id)) : ALL_SECTIONS;
-
-// Relay-Adresse für Fernhilfe/Fernzugang außerhalb des WLANs (selbst gehostet, siehe docs/proxmox-quickstart.md)
-function HelpRelayField() {
-  const [url, setUrl] = useState('');
-  const [saved, setSaved] = useState('');
-  const [msg, setMsg] = useState(null);
-  useEffect(() => {
-    api.helpStatus().then((s) => {
-      setSaved(s?.relay || '');
-      setUrl(s?.relay ? `${s.relay.replace(/^https:/, 'wss:')}/ws` : '');
-    }).catch(() => {});
-  }, []);
-  const save = async (value) => {
-    try {
-      const s = await api.helpSetRelay({ url: value });
-      setSaved(s?.relay || '');
-      setMsg(value ? { ok: true, text: 'Relay gespeichert – Hilfe geht jetzt auch von außerhalb.' } : { ok: true, text: 'Relay entfernt – wieder nur im WLAN.' });
-    } catch (e) {
-      setMsg({ ok: false, text: e.message });
-    }
-  };
-  return (
-    <div className="settings__field" data-setting="help-relay">
-      <span className="settings__label">🌍 Relay-Adresse (für Hilfe von außerhalb)</span>
-      <div className="settings__row">
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="wss://relay.deine-domain.de/ws" aria-label="Relay-Adresse" spellCheck={false} />
-        <button className="btn btn--small" onClick={() => save(url.trim())} disabled={!url.trim()}>
-          Speichern
-        </button>
-        {saved && (
-          <button className="btn btn--ghost btn--small" onClick={() => (setUrl(''), save(''))}>
-            Entfernen
-          </button>
-        )}
-      </div>
-      {msg && <p className={`small ${msg.ok ? 'ok' : 'warn'}`}>{msg.text}</p>}
-      <p className="muted small">Ohne Relay geht Hilfe nur im selben WLAN. Den Relay hostest du selbst (kostenlos, z. B. auf Proxmox) – er leitet nur verschlüsselt weiter und sieht nie deinen Token. Anleitung: docs/proxmox-quickstart.md.</p>
-    </div>
-  );
-}
 
 // Hilfe & Tour
 function HelpSection({ onClose }) {
@@ -653,12 +615,10 @@ function HelpSection({ onClose }) {
       <SetupCheck />
       <span className="settings__label">🙋 Fernhilfe</span>
       <div className="settings__row">
-        <button className="btn btn--small" onClick={() => window.dispatchEvent(new CustomEvent('pk:help-open'))}>
-          Jemanden um Hilfe bitten
+        <button className="btn btn--small" onClick={() => window.dispatchEvent(new CustomEvent('pk:open-settings', { detail: { focus: 'support' } }))}>
+          🛟 Zu „Support“ (Hilfelink, Relay, Fernzugang)
         </button>
       </div>
-      <p className="muted small">Ein Helfer im selben WLAN sieht nur die Einrichtung – deine Chats und Nachrichten bleiben verborgen. Beenden jederzeit mit Strg+C.</p>
-      <HelpRelayField />
       <span className="settings__label">🐞 Fehler melden</span>
       <div className="settings__row">
         <button className="btn btn--small" onClick={() => reportError('manuell (Einstellungen → Hilfe)', 'Fehlerbericht von Hand erstellt')}>
@@ -780,6 +740,7 @@ export default function SettingsDialog({ onClose, toast, appInfo, guildId, aiTar
       </>
     ),
     updates: () => <UpdateSection appInfo={appInfo} toast={toast} />,
+    support: () => <SupportSection toast={toast} />,
     hilfe: () => <HelpSection onClose={onClose} />,
     beta: () => <AiSection toast={toast} targets={aiTargets} guilds={guilds} />,
   };
