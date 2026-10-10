@@ -3654,6 +3654,62 @@ img.chat-avatar {
   background-size: 32px 32px;
   background-position: 0 0;
 }
+/* #131: eigenes Bild – leicht abgedunkelt, damit Nachrichten lesbar bleiben */
+.chat[data-wall='bild'] {
+  background-image: linear-gradient(color-mix(in srgb, var(--wall) 55%, transparent), color-mix(in srgb, var(--wall) 55%, transparent)), var(--wall-img, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+/* #131: sanft bewegte Vorlagen – nur mit „Hintergrund-Animationen“ an (Einstellungen → Leistung) */
+@keyframes wall-drift-28 {
+  to {
+    background-position: 28px 28px, 42px 42px;
+  }
+}
+@keyframes wall-drift-32 {
+  to {
+    background-position: 32px 32px;
+  }
+}
+@keyframes wall-drift-180 {
+  to {
+    background-position: 180px -180px;
+  }
+}
+@keyframes wall-glow {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 100% 100%;
+  }
+}
+:root[data-wall-anim='an'] .chat:not([data-wall]),
+:root[data-wall-anim='an'] .chat[data-wall='punkte'] {
+  animation: wall-drift-28 18s linear infinite;
+}
+:root[data-wall-anim='an'] .chat[data-wall='raster'],
+:root[data-wall-anim='an'] .chat[data-wall='wellen'] {
+  animation: wall-drift-32 14s linear infinite;
+}
+:root[data-wall-anim='an'] .chat[data-wall='sterne'] {
+  animation: wall-drift-180 60s linear infinite;
+}
+:root[data-wall-anim='an'] .chat[data-wall='verlauf'],
+:root[data-wall-anim='an'] .chat[data-wall='aurora'] {
+  background-size: 200% 200%;
+  animation: wall-glow 16s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat[data-wall] {
+    animation: none !important;
+  }
+}
+/* #131 Leistung: Glas-Unschärfe aus → deutlich weniger Rechenarbeit auf schwachen PCs */
+:root[data-glass='aus'] * {
+  backdrop-filter: none !important;
+}
 .wallpaper-dialog {
   width: min(520px, calc(100vw - 32px));
   padding: 22px;
@@ -3681,6 +3737,53 @@ img.chat-avatar {
   display: block;
   height: 56px;
   border-radius: 8px;
+}
+.wallpaper-tile {
+  position: relative;
+}
+.wallpaper-tile__anim {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 12px;
+}
+.wallpaper-tile__wrap {
+  position: relative;
+  display: grid;
+}
+.wallpaper-tile__img {
+  background-size: cover;
+  background-position: center;
+}
+.wallpaper-tile__del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 12px;
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.wallpaper-tile__wrap:hover .wallpaper-tile__del,
+.wallpaper-tile__del:focus-visible {
+  opacity: 1;
+}
+.wallpaper-tile--add {
+  border-style: dashed;
+}
+.wallpaper-tile__plus {
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  background: var(--panel-2);
+}
+@media (hover: none) {
+  .wallpaper-tile__del {
+    opacity: 1;
+  }
 }
 .wallpaper-dialog select {
   width: 100%;

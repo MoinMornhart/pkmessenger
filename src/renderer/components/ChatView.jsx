@@ -7,7 +7,8 @@ import ConfirmDialog from './ConfirmDialog.jsx';
 import ContextMenu from './ContextMenu.jsx';
 import ModerationDialog from './ModerationDialog.jsx';
 import { prefs } from '../prefs';
-import { wallpaperFor } from '../../shared/wallpapers';
+import { wallpaperFor, isCustomWall } from '../../shared/wallpapers';
+import { getWall, loadWalls, subscribeWalls } from '../wall-store';
 import { PinsPanel, ThreadsPanel, NameDialog } from './SidePanels.jsx';
 import MessageList from './MessageList.jsx';
 import Composer from './Composer.jsx';
@@ -60,6 +61,14 @@ function HeaderSubtitle({ names, channel, guild, status }) {
   );
 }
 
+// Hintergrund-Attribute: Vorlage per CSS, eigenes Bild als Hintergrundbild (Standbild, wenn Animationen aus sind)
+function wallProps(id, anim) {
+  if (!isCustomWall(id)) return { 'data-wall': id };
+  const w = getWall(id);
+  if (!w) return { 'data-wall': 'punkte' }; // Bild (noch) nicht geladen oder gelöscht
+  return { 'data-wall': 'bild', style: { '--wall-img': `url("${anim ? w.url : w.still}")` } };
+}
+
 export default function ChatView({ guild, channel, bot, typingNames, onRead, toast, searchOpen, onCloseSearch, onOpenSearch, allChannels, onOpenThread, onBack, parentName, presenceStatus = null, backLabel = null }) {
   const state = useChannelMessages(channel?.id);
   const listRef = useRef(null);
@@ -76,7 +85,14 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
     return () => window.removeEventListener('pk:chat-notify', onOpen);
   }, [channel?.id]);
   const [walls, setWalls] = useState(() => prefs.get().wallpapers);
-  useEffect(() => prefs.subscribe((p) => setWalls(p.wallpapers)), []);
+  const [wallAnim, setWallAnim] = useState(() => prefs.get().wallAnim && prefs.get().motion !== 'aus');
+  useEffect(() => prefs.subscribe((p) => (setWalls(p.wallpapers), setWallAnim(p.wallAnim && p.motion !== 'aus'))), []);
+  // #131: eigene Bilder aus der lokalen App-Datenbank
+  const [, setWallsLoaded] = useState(0);
+  useEffect(() => {
+    loadWalls();
+    return subscribeWalls(() => setWallsLoaded((n) => n + 1));
+  }, []);
   const [modTarget, setModTarget] = useState(null); // Person verwalten { guildId, userId }
   const [threadFrom, setThreadFrom] = useState(null); // F12: Thread aus Nachricht starten
   const [panel, setPanel] = useState(null); // 'pins' | 'threads'
@@ -257,7 +273,7 @@ export default function ChatView({ guild, channel, bot, typingNames, onRead, toa
   }
 
   return (
-    <main className="chat" data-wall={wallpaperFor(walls, { channelId: channel.id, guildId: channel.guildId || guild?.id })}>
+    <main className="chat" {...wallProps(wallpaperFor(walls, { channelId: channel.id, guildId: channel.guildId || guild?.id }), wallAnim)}>
       <header className="chat__head">
         {onBack && (
           <button className="icon-btn icon-btn--lg" onClick={onBack} title={backLabel || `Zurück zu #${parentName || 'Kanal'}`} aria-label="Zurück">
